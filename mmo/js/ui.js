@@ -6,6 +6,7 @@ import { world, hgt, regionAt, REGION_NAMES } from './world.js';
 import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName } from './data.js';
 import * as Sea from './sea.js';
 import { LORE, PERKS } from './story.js';
+import { TALK, VILLAGER_LINES, MOB_LORE } from './dialogue.js';
 import * as Cb from './combat.js';
 import * as Game from './game.js';
 
@@ -240,7 +241,7 @@ function interact(n) {
   if (n.prop) { const lore = Game.inspect(n); if (lore) openLore(lore); }
   else if (n.banker) openBank();
   else if (n.giver) openGiver(n.giver);
-  else if (n.idle?.length || n.storyNpc) chat('say', n.name, Game.fill((n.idle && n.idle.length ? n.idle : ['Ghosts! In my parlour! Again!', 'Lovely weather for a haunting.'])[(Math.random() * 2) | 0 % 2] || 'Hello.'));
+  else if (n.storyNpc || n.guard || n.team === 'npc') { const v = VILLAGER_LINES[n.name]; const line = Array.isArray(v) ? pickOf(v) : v || (n.guard ? 'Move along, citizen. Nothing to see here, and I intend to keep it that way.' : 'Good day to you.'); chat('say', n.name, Game.fill(line)); toast(n.name + ': ' + Game.fill(line)); }
   else if (n.vendor) openVendor(n);
   else if (n.armory) openBook('char');
   else if (n.bindstone) { S.bind = { zone: S.zone, x: n.x, z: n.z + 1.5 }; const pl = placeAt(n.x, n.z); chat('sys', null, 'You are bound here.'); toast('Bound to ' + (pl ? pl.name : world.names.town)); Game.save(); }
@@ -310,8 +311,9 @@ function updateFrames() {
     let btns = '';
     if (t.fake && !t.inParty && !t.dead) btns = `<button data-a="inv">Invite</button><button data-a="fr">${t.fake.friend ? 'Unfriend' : 'Friend'}</button>`;
     else if (t.fake && t.inParty) btns = `<button data-a="fr">${t.fake.friend ? 'Unfriend' : 'Friend'}</button><button data-a="kick">Remove</button>`;
-    else if (t.team === 'npc' && !t.corpse) btns = `<button data-a="talk">Talk</button>`;
+    else if (t.team === 'npc' && !t.corpse && !t.prop) btns = `<button data-a="talk">${t.banker ? 'Bank' : 'Talk'}</button>`;
     else if (t.mob && t.dead && t.loot?.length && t.lootFor === 'party') btns = `<button data-a="loot">Loot</button>`;
+    if (!t.prop && !t.corpse && !(t.mob && t.dead)) btns += '<button data-a="insp">Inspect</button>';
     if ($('tgtBtns')._s !== btns) { $('tgtBtns').innerHTML = btns; $('tgtBtns')._s = btns; }
     // threat on the target
     let th = '';
@@ -414,10 +416,8 @@ function updatePlates(dt) {
 let zoneName = '';
 const placeAt = (x, z) => (world.places || []).find(p => Math.hypot(x - p.x, z - p.z) < p.R);
 export function questMark(k) {
-  const h = S.hero, qs = Game.questsFor(k);
-  if (qs.some(q => Game.turnToOf(q) === k && S.quests[q.id]?.state === 'done')) return '?';
-  if (qs.some(q => q.giver === k && Game.questState(q) === 'open' && q.lvl <= h.lvl + 1)) return '!';
-  return '';
+  if (Game.turnInsFor(k).length) return '?';
+  return Game.nextOffer(k) ? '!' : '';
 }
 function updateMini() {
   if (S.frame % 3) return;
@@ -575,13 +575,15 @@ function tabQuests(body) {
   const done = QUESTS.filter(q => S.quests[q.id]?.state === 'turned');
   if (done.length) body.appendChild(el(`<p class="dim" style="font-size:12px">Completed: ${done.map(q => esc(q.name)).join(', ')}</p>`));
 }
+const plural = w => /man$/.test(w) ? w.replace(/man$/, 'men') : /Bones$/.test(w) ? w : /(?:wolf|elf)$/i.test(w) ? w.replace(/f$/i, 'ves') : /(s|x|ch|sh)$/i.test(w) ? w + 'es' : /[^aeiou]y$/i.test(w) ? w.slice(0, -1) + 'ies' : w + 's';
+const orList = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' or ' + a[a.length - 1];
 function objText(q) {
-  const o = q.obj, nm = k => MOBS[k].name;
+  const o = q.obj, nm = k => MOBS[k].name, n = o.n || 1;
   if (o.what) return Game.fill(o.what);
-  if (o.named) return `Kill ${world.names[o.named] || MOBS[o.named]?.name || o.named}`;
-  if (o.collect) return `Collect ${o.item} from ${o.collect.map(nm).join(' or ')}`;
-  if (o.inspect) return `Inspect ${o.inspect}`;
-  return `Kill ${o.kill.map(nm).join(', ')}${o.dungeon ? ' in the Ossuary' : ''}${o.near === 'waste' ? ' in the Waste' : ''}`;
+  if (o.named) return `Defeat ${world.names[o.named] || MOBS[o.named]?.name || o.named}`;
+  const where = o.dungeon ? ' in the Ossuary' : o.near === 'waste' ? ' in the Grey Waste' : o.reef ? ' on the Drowned Reef' : '';
+  if (o.collect) return `Collect ${n} ${o.item}${n > 1 && !/s$/.test(o.item) && !/silk|ectoplasm|bacon/i.test(o.item) ? 's' : ''} from ${orList([...new Set(o.collect.map(k => plural(nm(k))))])}${where}`;
+  return `Defeat ${n} ${orList([...new Set(o.kill.map(k => n > 1 ? plural(nm(k)) : nm(k)))])}${where}`;
 }
 function tabBags(body) {
   body.appendChild(el(`<p style="margin-top:0">Gold: <b style="color:var(--acc)">${S.gold}</b> · Potions: 🧪 ${S.pots.hpot} · 💧 ${S.pots.mpot} · Bags ${S.bag.length}/30</p>`));
@@ -623,74 +625,117 @@ function tabSocial(body) {
   body.appendChild(el(`<h3 style="font:700 13px Cinzel;margin:10px 0 4px;color:var(--dim)">Chat log</h3>`));
   body.appendChild(el(`<div id="log">${S.log.slice(-60).reverse().map(l => `<div class="ch-${l.ch}">${l.from ? `<b>${l.ch === 'gen' ? '[General] ' : l.ch === 'guild' ? '[Guild] ' : ''}${esc(l.from)}:</b> ` : ''}${esc(l.text)}</div>`).join('')}</div>`));
 }
-const spName = sp => GIVERS[sp]?.name || sp;
+const spName = sp => sp === 'you' ? S.heroName : GIVERS[sp]?.name || sp;
 function sayHtml(lines, def) {
-  return lines.map(l => { const [sp, t] = typeof l === 'string' ? [def, l] : l; return `<div class="say${sp === def ? '' : ' alt'}"><b>${esc(spName(sp))}</b><p>${esc(Game.fill(t))}</p></div>`; }).join('');
+  return '<div class="says">' + (lines || []).map(l => { const [sp, t] = typeof l === 'string' ? [def, l] : l; return `<div class="say${sp === 'you' ? ' me' : sp === def ? '' : ' alt'}">${sp ? `<b>${esc(spName(sp))}</b>` : ''}<p>${esc(Game.fill(t))}</p></div>`; }).join('') + '</div>';
 }
-let dlgQ = null, dlgReply = null, reopenAfterScene = null;
-function giverQuests(k) {
-  return Game.questsFor(k).filter(q => { const st = Game.questState(q); return (q.giver === k && (st === 'open' || st === 'active')) || (Game.turnToOf(q) === k && st === 'done'); })
-    .sort((a, b) => (Game.questState(b) === 'done') - (Game.questState(a) === 'done') || (b.story ? 1 : 0) - (a.story ? 1 : 0) || a.lvl - b.lvl);
-}
+let conv = null, reopenAfterScene = null;
+const ACCEPT_LINES = ["Thank you, {hero}. I'll be right here when you get back.", 'Wonderful. Good luck out there, and do try to come back in one piece.', "I knew I could count on you. Off you go, then."];
+const pickOf = a => a && a.length ? a[Math.floor(Math.random() * a.length)] : null;
+// a conversation with someone who gives quests: a greeting, then things you can say
 function openGiver(k) {
-  const g = GIVERS[k]; dlgQ = null; dlgReply = null;
-  const qs = giverQuests(k);
-  if (qs.length === 1) dlgQ = qs[0].id;
-  openSheet(g.name, body => {
-    const qs = giverQuests(k), h = S.hero;
-    body.appendChild(el(`<p class="dim" style="margin-top:0">${esc(Game.fill(g.title))}</p>`));
-    // after a turn-in: the reply and what you got
-    if (dlgReply) {
-      body.appendChild(el(sayHtml(dlgReply.lines, dlgReply.def)));
-      const b = el(`<div class="acts"><button class="pri">${qs.length ? 'Continue' : 'Farewell'}</button></div>`); b.onclick = () => { dlgReply = null; dlgQ = qs.length === 1 ? qs[0].id : null; if (!qs.length) closeSheet(); else refreshSheet(); }; body.appendChild(b);
+  const T = TALK[k] || {};
+  conv = { k, view: 'menu', lines: [pickOf(T.greet) || 'Hello there.'] };
+  const ready = Game.turnInsFor(k)[0]; if (ready) conv = { k, view: 'done', q: ready };
+  openSheet(GIVERS[k].name, renderConv);
+}
+function renderConv(body) {
+  const c = conv, k = c.k, g = GIVERS[k], T = TALK[k] || {}, h = S.hero;
+  body.appendChild(el(`<p class="dim" style="margin:0 0 6px">${esc(Game.fill(g.title || ''))}</p>`));
+  const go = (o) => { Object.assign(conv, o); refreshSheet(); };
+  const opts = (list) => { const box = el('<div class="opts"></div>'); for (const [label, fn, cls] of list) { const b = el(`<button class="opt ${cls || ''}">${label}</button>`); b.onclick = fn; box.appendChild(b); } body.appendChild(box); };
+  const q = c.q;
+  if (c.view === 'menu' || c.view === 'reply') {
+    body.appendChild(el(sayHtml(c.lines, k)));
+    const list = [];
+    for (const r of Game.turnInsFor(k)) list.push([`▸ I've done what you asked. <span class="qn">${esc(r.name)}</span>`, () => go({ view: 'done', q: r }), 'hl']);
+    const off = Game.nextOffer(k);
+    if (off) list.push([`▸ ${off.story ? "What's going on?" : 'Is there anything I can help you with?'} <span class="qn">${off.story ? 'Main story · ' : ''}${esc(off.name)}</span>`, () => go({ view: 'offer', q: off }), 'hl']);
+    for (const a of Game.activeFrom(k)) list.push([`▸ About "${esc(a.name)}"…`, () => go({ view: 'active', q: a })]);
+    for (const t of (T.topics || [])) if (!t.after || S.quests[t.after]?.state === 'turned') list.push([`▸ ${esc(Game.fill(t.q))}`, () => go({ view: 'topic', t })]);
+    list.push(['▸ Farewell.', () => closeSheet()]);
+    opts(list);
+    return;
+  }
+  if (c.view === 'topic') {
+    body.appendChild(el(sayHtml([['you', c.t.q], ...c.t.a], k)));
+    opts([['▸ I see. Let me ask you something else.', () => go({ view: 'menu', lines: [] })], ['▸ Farewell.', () => closeSheet()]]);
+    return;
+  }
+  body.appendChild(el(`<h3 class="qt">${esc(q.name)} <span class="dim">· level ${q.lvl}${q.story ? ' · main story' : ''}</span></h3>`));
+  if (c.view === 'offer') {
+    body.appendChild(el(sayHtml(q.say || [q.text], q.giver)));
+    body.appendChild(el(`<p class="obj"><b>Objective:</b> ${esc(objText(q))}.<br><span class="dim">Reward: ${q.xp} xp and ${q.gold} gold${q.gear ? ', plus a piece of gear' : ''}.${q.lvl > h.lvl ? ` <span style="color:#ff8a6a">Level ${q.lvl} is recommended.</span>` : ''}</span></p>`));
+    const a = el('<div class="acts"><button class="pri" data-a="acc">Accept</button><button data-a="dec">Decline</button></div>');
+    a.onclick = ev => {
+      const act = ev.target.dataset.a; if (!act) return;
+      if (act === 'acc') {
+        Game.acceptQuest(q); refreshKeys(true);
+        if (S.pendingScene) { reopenAfterScene = q.obj.talk && Game.turnToOf(q) === k ? k : null; closeSheet(); return; }
+        if (q.obj.talk && Game.turnToOf(q) === k) go({ view: 'done' });
+        else go({ view: 'reply', lines: [pickOf(ACCEPT_LINES)] });
+      } else { Game.declineQuest(q); go({ view: 'reply', lines: [T.decline || 'Very well. Perhaps another time.'] }); }
+    };
+    body.appendChild(a);
+    return;
+  }
+  if (c.view === 'active') {
+    const st = S.quests[q.id];
+    body.appendChild(el(sayHtml([q.story ? "Any luck so far? I'm counting on you, {hero}." : "How is it going? Come back and see me when it's done."], k)));
+    body.appendChild(el(`<p class="obj"><b>Objective:</b> ${esc(objText(q))}: <b style="color:var(--acc)">${q.obj.at ? 'not there yet' : st.n + ' / ' + q.obj.n}</b></p>`));
+    opts([['▸ I\'m working on it.', () => go({ view: 'menu', lines: ["Good. I'll be here."] })], ['▸ Farewell.', () => closeSheet()]]);
+    return;
+  }
+  if (c.view === 'done') {
+    const def = Game.turnToOf(q);
+    body.appendChild(el(sayHtml(q.done || ['Well done, and thank you.'], def)));
+    const a = el(`<div class="acts col">${q.choices ? q.choices.map((ch, i) => `<button class="pri" data-c="${i}">${esc(Game.fill(ch.t))}</button>`).join('') : '<button class="pri" data-c="-1">Complete the quest</button>'}</div>`);
+    a.onclick = ev => {
+      const cc = ev.target.dataset.c; if (cc === undefined) return;
+      const reply = Game.turnIn(q, +cc >= 0 ? +cc : null);
+      refreshKeys(true);
+      const lines = [...(reply ? [reply] : []), ['', `Quest complete: ${q.name}. You earn ${q.xp} xp and ${q.gold} gold.`]];
+      if (S.pendingScene) { closeSheet(); return; }
+      go({ view: 'reply', lines, k: def });
+    };
+    body.appendChild(a);
+  }
+}
+// ---------- inspecting someone ----------
+const PERSONA_TXT = { chill: 'Easygoing, and plays for the fun of it.', tryhard: 'Wants every fight to be perfect, and every drop.', joker: "Never manages to stay serious for more than a minute.", newbie: 'Still learning the ropes, and asks a lot of questions.', veteran: 'Has seen it all, and will happily tell you about it.', grumpy: 'Complains about everything, and shows up every single time.', friendly: 'One of your oldest friends.' };
+function conText(t) {
+  const d = t.lvl - S.hero.lvl;
+  if (d <= -3) return ['#9a9a9a', 'should be an easy fight'];
+  if (d < 0) return ['#5fd35a', 'should be no trouble'];
+  if (d === 0) return ['#e8e0c8', 'looks like an even fight'];
+  if (d <= 2) return ['#ffd34d', 'looks like a tough fight'];
+  return ['#ff5a3a', 'looks dangerous: bring friends'];
+}
+export function openInspect(t) {
+  if (!t) return;
+  openSheet(t.name, body => {
+    if (t.mob) {
+      const M = MOBS[t.mob], [col, con] = conText(t);
+      const tags = [t.boss ? 'Boss' : t.boss2 ? 'Mini-boss' : t.named ? 'Named' : t.elite ? 'Elite' : null, M.undead ? 'Undead' : M.beast ? 'Beast' : M.human ? 'Humanoid' : null].filter(Boolean).join(' · ');
+      body.appendChild(el(`<div class="card"><h3 style="color:${col}">Level ${t.lvl} ${esc(t.name)}</h3><p style="margin:2px 0">${esc(S.hero.name)}, this ${con}.${tags ? ` <span class="dim">${tags}.</span>` : ''}</p>
+        <p class="lore" style="margin:6px 0">${esc(Game.fill(MOB_LORE[t.mob] || 'Little is known about this creature.'))}</p>
+        <p class="dim" style="margin:2px 0">Health ${Math.round(t.hp)} / ${t.maxHp}.${M.weak ? ` Weak to ${M.weak}.` : ''}${M.resist ? ` Resists ${M.resist}.` : ''}${M.caster ? ' Casts spells from range.' : ''}${M.healer ? ' Heals its allies.' : ''}</p></div>`));
       return;
     }
-    const q = dlgQ && QUESTS.find(x => x.id === dlgQ);
-    if (!q) {
-      if (!qs.length) { const idle = (g.idle && g.idle.length) ? g.idle[(S.frame >> 6) % g.idle.length] : 'Nothing for you right now. Come back when you have grown a little.'; body.appendChild(el(sayHtml([idle], k))); return; }
-      for (const x of qs) {
-        const st = Game.questState(x), mk = st === 'done' && Game.turnToOf(x) === k ? '?' : st === 'open' ? '!' : '…';
-        const c = el(`<div class="card qpick"><b style="color:${mk === '…' ? 'var(--dim)' : '#ffd34d'}">${mk}</b> ${esc(x.name)} <span class="dim">· level ${x.lvl}${x.story ? ' · main story' : ''}</span></div>`);
-        c.onclick = () => { dlgQ = x.id; refreshSheet(); }; body.appendChild(c);
-      }
+    if (t.cls) {
+      const C = CLASSES[t.cls], f = t.fake, fam = { Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔮' }[C.family];
+      const rel = t.isHero ? 'This is you.' : f?.bff ? 'Your friend. Always your level, and always plays the role your group is missing.' : t.inParty ? 'In your group.' : f?.friend ? 'On your friends list.' : '';
+      body.appendChild(el(`<div class="card"><h3>${fam} ${esc(t.name)}</h3><p style="margin:2px 0">Level ${t.lvl} ${esc(C.name)} · ${esc(C.family)} · ${esc(C.role === 'dps' ? 'damage' : C.role)}</p>
+        ${f?.guild ? `<p class="dim" style="margin:2px 0">&lt;${esc(f.guild)}&gt;</p>` : ''}${f ? `<p style="margin:4px 0">${esc(PERSONA_TXT[f.bff ? 'friendly' : f.persona] || '')}</p>` : ''}${rel ? `<p class="dim" style="margin:2px 0">${rel}</p>` : ''}
+        <p class="dim" style="margin:4px 0 0">Health ${Math.round(t.hp)} / ${t.maxHp} · Power ${Math.round(t.power)} · Armor ${Math.round(t.armor)}</p></div>`));
+      if (f && !t.inParty && !t.dead) { const a = el(`<div class="acts"><button class="pri">Invite to group</button><button>${f.friend ? 'Unfriend' : 'Add friend'}</button></div>`); a.children[0].onclick = () => { Game.invite(t); closeSheet(); }; a.children[1].onclick = () => { Game.befriend(t); refreshSheet(); }; body.appendChild(a); }
       return;
     }
-    const st = Game.questState(q), back = qs.length > 1 ? '<button data-a="back">Back</button>' : '';
-    body.appendChild(el(`<h3 style="margin:2px 0 6px">${esc(q.name)} <span class="dim" style="font:500 12px Alegreya Sans">· level ${q.lvl}${q.story ? ' · main story' : ''}</span></h3>`));
-    if (st === 'open') {
-      body.appendChild(el(sayHtml(q.say, q.giver)));
-      body.appendChild(el(`<p class="obj">${esc(objText(q))}${q.obj.n > 1 ? ` (${q.obj.n})` : ''}<br><span class="dim">Reward: ${q.xp} xp, ${q.gold} gold${q.gear ? ', a piece of gear' : ''}${q.lvl > h.lvl + 1 ? ` · <span style="color:#ff8a6a">level ${q.lvl} recommended</span>` : ''}</span></p>`));
-      const a = el(`<div class="acts"><button class="pri" data-a="acc">Accept</button>${back}<button data-a="no">Not now</button></div>`);
-      a.onclick = ev => {
-        const act = ev.target.dataset.a;
-        if (act === 'acc') {
-          Game.acceptQuest(q);
-          if (S.pendingScene) { reopenAfterScene = Game.turnToOf(q) === k && q.obj.talk ? k : null; closeSheet(); return; }
-          dlgQ = q.obj.talk && Game.turnToOf(q) === k ? q.id : null;
-          if (!dlgQ && !giverQuests(k).length) { closeSheet(); toast('Quest accepted'); return; }
-        }
-        if (act === 'back') dlgQ = null;
-        if (act === 'no') { closeSheet(); return; }
-        refreshSheet();
-      };
-      body.appendChild(a);
-    } else if (st === 'active') {
-      body.appendChild(el(sayHtml([q.story ? 'Any luck? I\'m counting on you.' : 'How goes it?'], k)));
-      body.appendChild(el(`<p class="obj">${esc(objText(q))}: <b style="color:var(--acc)">${q.obj.at ? 'not there yet' : S.quests[q.id].n + ' / ' + q.obj.n}</b></p>`));
-      const a = el(`<div class="acts">${back}<button data-a="no">Farewell</button></div>`); a.onclick = ev => { if (ev.target.dataset.a === 'back') { dlgQ = null; refreshSheet(); } else closeSheet(); }; body.appendChild(a);
-    } else if (st === 'done') {
-      const def = Game.turnToOf(q);
-      body.appendChild(el(sayHtml(q.done || ['Well done.'], def)));
-      const a = el(`<div class="acts col">${q.choices ? q.choices.map((c, i) => `<button class="pri" data-c="${i}">${esc(Game.fill(c.t))}</button>`).join('') : '<button class="pri" data-c="-1">Complete</button>'}</div>`);
-      a.onclick = ev => {
-        const c = ev.target.dataset.c; if (c === undefined) return;
-        const reply = Game.turnIn(q, +c >= 0 ? +c : null);
-        refreshKeys(true);
-        dlgReply = { lines: [...(reply ? [reply] : []), `Quest complete: +${q.xp} xp, +${q.gold} gold.`].map((l, i) => typeof l === 'string' && i === (reply ? 1 : 0) ? ['', l] : l), def };
-        if (S.pendingScene) { closeSheet(); return; }
-        refreshSheet();
-      };
-      body.appendChild(a);
+    if (t.team === 'npc' && !t.prop && !t.corpse) {
+      const T = t.giver ? TALK[t.giver] : t.banker ? TALK.banker : null;
+      const bio = T?.bio || (t.storyNpc ? (Array.isArray(VILLAGER_LINES[t.name]) ? 'One of the villagers of Little Hollin, getting on with life as best they can.' : VILLAGER_LINES[t.name] ? 'One of Little Hollin\'s residents. Not all of them are still breathing.' : '') : t.guard ? 'A member of the town guard, keeping the gates safe.' : t.vendor ? 'A merchant who sells supplies and buys whatever you bring back.' : '');
+      body.appendChild(el(`<div class="card"><h3>${esc(t.name)}</h3>${t.title ? `<p class="dim" style="margin:0 0 4px">${esc(Game.fill(t.title))}</p>` : ''}<p class="lore" style="margin:4px 0">${esc(Game.fill(bio || 'Nothing remarkable, at first glance.'))}</p></div>`));
+      const a = el(`<div class="acts"><button class="pri">${t.banker ? 'Open bank' : 'Talk'}</button></div>`); a.firstChild.onclick = () => { closeSheet(); interact(t); }; body.appendChild(a);
     }
   });
 }
@@ -778,7 +823,7 @@ export function showTitle(forceNew) {
   let pick = 'bulwark';
   const has = Game.hasSave() && !forceNew;
   const T = $('titleIn');
-  T.innerHTML = `<h1>Single-Player MMO</h1><div class="sub">Build 4 · the Vale's story · a century after the summoner wars</div>
+  T.innerHTML = `<h1>Single-Player MMO</h1><div class="sub">Build 4.2 · the Vale's story · a century after the summoner wars</div>
     ${has ? '<button class="pri" id="contBtn" style="width:100%;margin-bottom:12px">Continue</button>' : ''}
     <div class="card" style="text-align:left"><h3>New hero</h3><input type="text" id="heroName" maxlength="14" placeholder="Hero name" value="${pickName()}">
     ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Cinzel;color:var(--acc)">${f}s</p><div class="clsPick">${CLASS_KEYS.filter(k => CLASSES[k].family === f).map(k => { const c = CLASSES[k]; return `<div class="card" data-k="${k}" style="border-color:${c.color}"><b style="color:${c.color}">${roleIcon(k)} ${c.name}</b><p>${esc(c.blurb)}</p></div>`; }).join('')}</div>`).join('')}
@@ -845,7 +890,7 @@ export function init() {
   $('tgtX').addEventListener('pointerup', clearTgt); $('tgtX').onclick = clearTgt;
   $('tgtBtns').onclick = ev => {
     const a = ev.target.dataset.a, t = S.target; if (!a || !t) return;
-    if (a === 'inv') Game.invite(t); if (a === 'fr') Game.befriend(t); if (a === 'kick') Game.kick(t); if (a === 'talk') interact(t); if (a === 'loot') openLoot(t);
+    if (a === 'inv') Game.invite(t); if (a === 'fr') Game.befriend(t); if (a === 'kick') Game.kick(t); if (a === 'talk') interact(t); if (a === 'loot') openLoot(t); if (a === 'insp') openInspect(t);
     $('tgtBtns')._s = null;
   };
   // the long-press callout menu on iOS

@@ -4,6 +4,7 @@ import { CLASSES, CLASS_KEYS, MOBS, QUESTS, GIVERS, FAKE_NAMES, PERSONAS, GUILDS
 import * as Sea from './sea.js';
 import { LORE, SCENES, PERKS } from './story.js';
 import './valeplus.js';
+import './dialogue.js';
 import { FAMILIES } from './data.js';
 import * as Cb from './combat.js';
 import * as AI from './ai.js';
@@ -412,9 +413,20 @@ export function switchClass(cls) {
 // ---------- quests ----------
 export const questsFor = giver => QUESTS.filter(q => (q.giver === giver || q.turnTo === giver) && (!q.cls || q.cls === S.heroCls));
 export const turnToOf = q => q.turnTo || q.giver;
+// quest givers offer one quest at a time, in order: the story first, then the lowest level; a declined quest waits at the back
+export function offerQueue(k) {
+  const h = S.hero, dec = S.declined || {};
+  return QUESTS.map((q, i) => [q, i]).filter(([q]) => q.giver === k && (!q.cls || q.cls === S.heroCls) && questState(q) === 'open' && q.lvl <= h.lvl + (q.story ? 2 : 1))
+    .sort(([a, i], [b, j]) => (dec[a.id] ? 1 : 0) - (dec[b.id] ? 1 : 0) || (b.story ? 1 : 0) - (a.story ? 1 : 0) || a.lvl - b.lvl || i - j).map(([q]) => q);
+}
+export const nextOffer = k => offerQueue(k)[0] || null;
+export const turnInsFor = k => QUESTS.filter(q => turnToOf(q) === k && S.quests[q.id]?.state === 'done' && (!q.cls || q.cls === S.heroCls));
+export const activeFrom = k => QUESTS.filter(q => q.giver === k && S.quests[q.id]?.state === 'active');
+export function declineQuest(q) { S.declined = S.declined || {}; S.declined[q.id] = (S.declined[q.id] || 0) + 1; }
 export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
 export function acceptQuest(q) {
   S.quests[q.id] = { state: q.obj.talk ? 'done' : 'active', n: 0 };
+  if (S.declined) delete S.declined[q.id];
   chat('sys', null, `Quest accepted: ${q.name}`);
   if (q.rival && S.zone === 'coast') spawnRival(q.rival);
   if (q.sceneOnAccept && !S.scenesSeen[q.sceneOnAccept]) S.pendingScene = q.sceneOnAccept;
