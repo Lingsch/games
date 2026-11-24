@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Summoners</title>
+<meta name="apple-mobile-web-app-title" content="Summoners">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="theme-color" content="#0b0a10">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* VOICE: a dark-fantasy war camp at golden hour; terse, with a grim wink
+   IDEA: a summoner's grimoire laid over a living, cel-shaded battlefield
+   PICTURE: the battlefield owns the screen; the HUD is a few small dark plates tucked in the corners
+   COLOUR and TYPE: night slate plates, parchment ink, one accent per summoner; Cinzel + Alegreya Sans
+   LAYOUT: stats top-left, map top-right, messages as a quiet feed under the stats, spells bottom-right */
+:root{color-scheme:dark;--bg:#11161a;--ink:#eee4cc;--dim:#b3a891;--acc:#ff6a2b;--plate:rgba(14,18,21,.72);--line:rgba(238,228,204,.14);--good:#9be36b;--bad:#ff5a48;
+  --st:max(6px,env(safe-area-inset-top));--sb:max(10px,env(safe-area-inset-bottom));--sl:max(6px,env(safe-area-inset-left));--sr:max(6px,env(safe-area-inset-right))}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.35 "Alegreya Sans",system-ui,sans-serif;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+canvas{display:block}
+body>canvas{position:fixed;inset:0;width:100%;height:100%}
+.hide{display:none!important}
+#vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 60%,rgba(10,6,4,.45))}
+#hurt{position:fixed;inset:0;pointer-events:none;background:radial-gradient(circle,transparent 50%,rgba(200,30,20,.5));opacity:0;transition:opacity .25s}
+.plate{background:var(--plate);border:1px solid var(--line);border-radius:10px;padding:5px 8px;-webkit-backdrop-filter:blur(5px);backdrop-filter:blur(5px)}
+button{font:600 14px "Alegreya Sans",sans-serif;color:var(--ink);background:rgba(238,228,204,.07);border:1px solid var(--line);border-radius:10px;min-height:40px;padding:0 12px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+button:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button:disabled{opacity:.4}
+#stats{position:fixed;top:var(--st);left:var(--sl);width:150px;font-size:12px;line-height:1.25}
+#lvl{font:700 12px Cinzel,serif;color:var(--acc);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar{height:5px;border-radius:3px;background:rgba(255,255,255,.12);margin-top:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:100%}
+#hpBar{background:#d9544a}#manaBar{background:#4fb0e8}.bar.thin{height:2px}#xpBar{background:#e0b040}
+#res{display:flex;gap:7px;margin-top:3px;font-variant-numeric:tabular-nums}
+#res span::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:3px}
+#res .g::before{background:#e0b040} #pots{position:fixed;left:var(--sl);bottom:calc(var(--sb) + var(--barH) + 8px);display:flex;gap:5px} .pot{width:44px;height:40px;padding:0;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;border:1.5px solid var(--pc);background:rgba(20,16,12,.72)} .pot b{font-size:14px;color:var(--pc)}.pot small{font-size:9px;color:var(--dim)}.pot.hp{--pc:#ff6a6a}.pot.mp{--pc:#6aa8ff}.pot.fury{--pc:#ffa040}.pot.none{opacity:.4} .gearbtns{display:flex;gap:6px;margin-bottom:8px}.gearbtns button{flex:1;padding:8px 0;font-size:13px} .slots{grid-template-columns:repeat(4,1fr)!important}.item .pow{color:#ffb060;font-size:12px;margin-top:2px}.item .setl{font-size:11.5px;color:#7fd88a;margin-top:2px}.item .setl span{opacity:.55;margin-right:4px}.item .setl span.on{opacity:1;font-weight:700} #res .e::before{background:#c07af0}  .build{font-size:12px;text-align:left;line-height:1.35}.build b{color:var(--acc);margin-right:4px} .uchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}.uchip{font-size:10.5px;padding:1px 6px;border-radius:6px;border:1px solid var(--r);color:var(--r)} .spl .acts{display:flex;gap:6px;margin-top:5px}.spl .acts button{padding:5px 10px;font-size:12px}.spl .acts button[disabled]{opacity:.4} .ucards{display:grid;grid-template-columns:1fr;gap:5px;margin-top:6px}.ucard{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:7px 9px;border:1.5px solid var(--r);border-radius:9px;background:color-mix(in srgb,var(--r) 12%,#17130f)} .ucard small{color:var(--r);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em}.ucard b{color:var(--r)!important;font-size:13.5px}.ucard span{font-size:12.5px;color:var(--ink)} .sealed{text-align:left;font-size:12px;border:1px dashed #8a6fb0;border-radius:9px;padding:7px 9px;color:var(--dim)}.sealed b{color:#c8a6ff;margin-right:4px}.sealed div{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}.sealed span{padding:1px 7px;border-radius:6px;background:#2a2236;color:#a88fcc;font-size:11px} .tabs{display:flex;gap:6px;margin-bottom:8px}.tabs button{flex:1;padding:7px 0;font-size:13px}.tabs button.on{background:var(--acc);color:#1a1208} .tabs button[data-n]::after,#bookBtn[data-g]::before{content:attr(data-n);margin-left:5px;background:#e04a2a;color:#fff;border-radius:8px;padding:0 5px;font-size:11px} .tree{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}.branch>b{display:block;text-align:center;font:700 12px Cinzel,serif;color:var(--c);margin-bottom:4px} .node{display:block;width:100%;margin-bottom:4px;padding:5px 4px;text-align:left;font-size:11px;line-height:1.25;border-left:3px solid var(--c);opacity:.45} .node b{display:block;font-size:11.5px}.node.can{opacity:1;box-shadow:0 0 0 1px var(--c)}.node.got{opacity:1;background:color-mix(in srgb,var(--c) 30%,#1b1712)} .slots{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-bottom:8px}.gslot{padding:5px 3px;font-size:10.5px;min-height:54px;text-align:center;border-top:3px solid var(--c,#555)} .gslot small{display:block;color:var(--dim)}.item{display:block;width:100%;text-align:left;margin-bottom:5px;padding:7px 9px;border-left:4px solid var(--c);font-size:12px} .item b{color:var(--c)}.item i{display:block;color:var(--dim);font-size:11.5px;margin-top:2px}.item .acts{display:flex;gap:6px;margin-top:5px}.item .acts button{padding:4px 10px;font-size:12px} .relics{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:8px}.relic{padding:4px 8px;border:1px solid #e0b040;border-radius:6px;font-size:11.5px} #res .i::before{background:#7f9bb0}#res .c::before{background:#c07af0} #res .s::before{background:#9a958a}#res .e::before{background:#ff7a2a}
+.row{display:flex;justify-content:space-between;gap:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.dim,.row span:first-child{color:var(--dim)}
+#buffs{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px}#buffs:empty{display:none}
+#buffs span{font-size:11px;border:1px solid var(--c);color:var(--c);border-radius:6px;padding:0 4px}
+#mapbox{position:fixed;top:var(--st);right:var(--sr);display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+#mini{width:124px;height:124px;border-radius:8px;border:1px solid var(--line);background:#222}
+#menuBtn{min-height:30px;padding:0 10px;font-size:12.5px;background:var(--plate)}
+#boss{position:fixed;left:50%;transform:translateX(-50%);top:var(--st);width:min(260px,calc(100% - 270px));display:none;text-align:center;pointer-events:none}
+#boss.show{display:block}
+#bossName{font:700 11.5px Cinzel,serif;text-shadow:0 1px 3px #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#boss .bar{height:5px;margin-top:2px}#bossBar{background:#c0392b}
+@media(max-width:420px){#boss{top:calc(var(--st) + 98px);left:auto;right:var(--sr);transform:none;width:150px}}
+#feed{position:fixed;top:calc(var(--st) + 98px);left:var(--sl);width:min(240px,55vw);display:flex;flex-direction:column;gap:3px;pointer-events:none;z-index:3}
+.msg{font-size:12.5px;line-height:1.25;padding:3px 7px;border-radius:7px;background:rgba(10,12,14,.5);border-left:2px solid var(--dim);text-shadow:0 1px 2px #000;transition:opacity .7s}
+.msg.good{border-left-color:var(--good)}.msg.bad{border-left-color:var(--bad)}.msg.lore{border-left-color:var(--acc)}
+.msg b{display:block;font:700 12.5px Cinzel,serif;color:var(--acc)}.msg i{color:var(--ink)}
+.msg.out{opacity:0}
+:root{--barH:110px}@media(min-aspect-ratio:4/3){:root{--barH:58px}}
+#acts{position:fixed;right:var(--sr);bottom:calc(var(--sb) + var(--barH) + 8px);display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+#topacts{display:flex;gap:6px;align-items:stretch}
+#spellbar{position:fixed;left:var(--sl);right:var(--sr);bottom:var(--sb);display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px}
+@media(min-aspect-ratio:4/3){#spellbar{grid-template-columns:repeat(12,minmax(0,1fr));max-width:900px;margin:0 auto}}
+.sb{position:relative;width:100%;height:52px;min-height:0;border-radius:12px;border:2px solid var(--c);background:var(--plate);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3px;line-height:1.05;touch-action:none}
+.sb.empty{border:1.5px dashed rgba(238,228,204,.25);background:rgba(20,16,12,.35)}.sb.empty small{font-size:18px}
+.sb .rk{position:absolute;top:1px;right:4px;font:700 9.5px Cinzel,serif;color:var(--c);font-style:normal}
+.sb b{font-size:10px;color:var(--c);text-align:center;overflow-wrap:break-word;hyphens:auto;max-width:100%}.sb small{font-size:10.5px;color:var(--dim);margin-top:2px}
+.sb.poor{opacity:.45}
+.sb kbd{position:absolute;top:2px;left:5px;font:10px "Alegreya Sans",sans-serif;color:var(--dim)}
+@media(pointer:coarse){.sb kbd{display:none}}
+.nope{animation:nope .3s}@keyframes nope{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+#bookBtn{position:relative;min-height:36px;padding:0 10px;font:700 12px Cinzel,serif;background:var(--plate);border-color:var(--acc);color:var(--acc)}
+#bookBtn[data-n]::after{content:attr(data-n);position:absolute;top:-6px;right:-6px;background:var(--acc);color:#120b06;border-radius:9px;font:700 11px "Alegreya Sans",sans-serif;padding:0 5px}
+#orders{display:flex;gap:4px}
+.ob{display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--plate);border:2px solid var(--c,var(--good));touch-action:none;line-height:1.05;padding:1px 6px;min-height:36px}
+.ob b{color:var(--c,var(--good));font:700 11.5px Cinzel,serif}.ob small{font-size:10.5px;color:var(--ink)}
+.ob.big{width:84px}.ob.sq{width:42px;padding:1px}.ob.sq b{font:700 9.5px "Alegreya Sans",sans-serif;white-space:nowrap}.ob.sq small{font-size:9.5px}
+.ob.on{background:var(--c,var(--good))}.ob.on b,.ob.on small{color:#120b06}
+#cityBtn{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--barH) + 8px);min-height:34px;background:var(--acc);color:#1a0f08;border-color:var(--acc);font:700 12.5px Cinzel,serif}
+#stick{position:fixed;width:116px;height:116px;border-radius:50%;border:2px solid rgba(238,228,204,.25);pointer-events:none;display:none;transform:translate(-50%,-50%)}
+#nub{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px;border-radius:50%;background:rgba(238,228,204,.35)}
+.panel{position:fixed;inset:0;z-index:8;display:grid;place-items:center;padding:calc(var(--st) + 10px) 14px calc(var(--sb) + 10px);background:radial-gradient(circle at 50% 30%,rgba(30,40,44,.9),rgba(8,10,12,.97));overflow:auto}
+.panel>div{width:min(620px,100%)}
+.panel h1{font:700 clamp(28px,7vw,46px)/1.05 Cinzel,serif;margin:0 0 6px;text-align:center;color:var(--acc);text-wrap:balance}
+.panel h2{font:700 22px/1.1 Cinzel,serif;margin:0 0 6px;color:var(--acc)}
+.panel p{color:var(--dim);margin:0 0 14px;text-align:center}
+.stack{display:flex;flex-direction:column;gap:8px}
+.stack>button{min-height:48px;font:700 15px Cinzel,serif}
+.primary{background:var(--acc);color:#1a0f08;border-color:var(--acc)}
+input,textarea{font:16px "Alegreya Sans",sans-serif;color:var(--ink);background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+textarea{height:80px;resize:none}
+.classes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:6px}
+@media(max-width:560px){.classes{grid-template-columns:minmax(0,1fr)}}
+.cls{text-align:left;padding:10px 12px;border:2px solid var(--line);border-radius:12px;display:flex;flex-direction:column;gap:2px;min-height:auto}
+.cls b{font:700 16px Cinzel,serif;color:var(--c)}.cls em{font-style:normal;font-size:12.5px;color:var(--c)}.cls small{font-size:13px;color:var(--dim);font-weight:400}
+.cls.sel{border-color:var(--c);background:rgba(238,228,204,.08);box-shadow:0 0 14px -4px var(--c)}
+.up{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--line);border-radius:12px}
+.up small{display:block;color:var(--dim)}.pips{color:var(--acc);letter-spacing:2px}
+/* spellbook */
+#book .head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.loadout{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:4px;margin-bottom:10px}
+.lslot{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:4px 5px;border:2px solid var(--line);border-radius:9px;text-align:left;min-height:46px}
+.lslot small{color:var(--dim);font-size:10px;font-weight:400}.lslot b{color:var(--c);font-size:11px;line-height:1.1}
+.lslot.sel{border-color:var(--acc);background:rgba(255,106,43,.1)}
+.learn{border:1px solid var(--acc);border-radius:12px;padding:8px;margin-bottom:10px}
+.learn>b{font:700 14px Cinzel,serif;color:var(--acc)}
+.offers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-top:6px}
+.chips{display:flex;gap:6px;margin-bottom:8px;overflow-x:auto}
+.chips button{min-height:34px;border-radius:17px;padding:0 14px}
+.chips button.on{background:var(--acc);color:#120b06;border-color:var(--acc)}
+.spl{display:flex;flex-direction:column;align-items:stretch;gap:2px;text-align:left;padding:8px 10px;border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;width:100%;min-height:auto;margin-bottom:6px;font-weight:400}
+.spl b{color:var(--c);font-size:14.5px}.spl .meta{font-size:11.5px;color:var(--dim)}.spl .lab{font-weight:700;font-size:13px;color:var(--ink)}
+.spl i{font-size:12.5px;font-style:normal;color:var(--ink);opacity:.75}
+.spl .tag.new,.spl .tag.up{margin:0 6px 0 0;background:var(--acc)}.spl .tag.up{background:#7fd36a}
+.spl .tag{display:inline-block;margin-left:6px;font-size:11px;color:#120b06;background:var(--c);border-radius:5px;padding:0 5px;font-weight:700}
+.spl.locked{opacity:.4}
+#log{max-height:140px;overflow:auto;font-size:12.5px;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:6px 8px}
+.plot{border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.plot>small{color:var(--dim)}
+.plot button{display:grid;grid-template-columns:1fr auto;text-align:left;gap:0 10px;padding:6px 10px}
+.plot button small{grid-column:1;color:var(--dim);font-weight:400}.plot button em{grid-row:1/3;grid-column:2;align-self:center;font-style:normal;color:#e0b040}
+.plot button.poor{opacity:.5}
+#plots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:12px 0}
+@media(max-width:600px){#plots{grid-template-columns:minmax(0,1fr)}}
+#load,#gen{position:fixed;inset:0;display:grid;place-items:center;font:700 20px Cinzel,serif;color:var(--dim);background:var(--bg);z-index:20}
+#gen{background:rgba(17,22,26,.92)}
+@media(prefers-reduced-motion:reduce){.msg,#hurt{transition:none}}
+</style></head><body>
+<div id="vig"></div><div id="hurt"></div>
+<div id="hud" class="hide">
+  <div id="stats" class="plate">
+    <div id="lvl">Summoner</div>
+    <div class="bar" title="Health"><i id="hpBar"></i></div>
+    <div class="bar" title="Mana"><i id="manaBar"></i></div>
+    <div class="bar thin" title="Experience"><i id="xpBar"></i></div>
+    <div id="res"></div>
+    <div class="row"><span id="horde">Horde</span><span id="threat">Threat</span></div>
+    <div id="buffs"></div>
+  </div>
+  <div id="mapbox"><canvas id="mini" width="248" height="248"></canvas><button id="menuBtn">Menu</button></div>
+  <div id="boss" class="plate"><div id="bossName"></div><div class="bar"><i id="bossBar"></i></div></div>
+  <div id="feed"></div>
+  <button id="cityBtn" class="hide">Build</button>
+  <div id="acts">
+    <div id="topacts"><div id="orders"></div><button id="bookBtn">Book</button></div>
+  </div>
+  <div id="pots"></div>
+  <div>
+    <div id="spellbar"></div>
+  </div>
+</div>
+<div id="stick"><div id="nub"></div></div>
+
+<div id="title" class="panel hide"><div>
+  <h1>Summoners</h1>
+  <p>A roguelite horde run. The world is new every time, and death is final. Choose who you are this time.</p>
+  <div class="classes" id="classes"></div>
+  <div class="stack">
+    <button id="btnContinue" class="primary hide">Continue run</button>
+    <button id="btnNew" class="primary">New run</button>
+    <input id="seedIn" placeholder="Seed (optional)" inputmode="numeric" aria-label="World seed">
+    <button id="btnShop">Spend embers</button>
+    <button id="tCodeBtn">Load a save code</button>
+    <div id="tCodeBox" class="hide stack"><textarea id="tCodeIn" aria-label="Save code" placeholder="Paste your save code here"></textarea><div style="display:flex;gap:6px"><button id="tPaste" style="flex:1">Paste</button><button id="tCodeGo" class="primary" style="flex:2">Load this run</button></div></div>
+  </div>
+  <p id="titleEmbers" style="margin-top:12px"></p>
+</div></div>
+
+<div id="book" class="panel hide"><div>
+  <div class="head"><h2 id="bookTitle">Spellbook</h2><button id="bookClose" class="primary">Done</button></div>
+  <div class="tabs" id="bookTabs"><button data-tab="spells" class="on">Spells</button><button data-tab="gear">Gear</button></div>
+  <div id="tabSpells">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><div class="dim" style="font-size:12px;flex:1">Your 12 spell keys. Tap two keys to swap them. Put on bar fills the selected key, or the first empty one.</div><button id="sortBtn" style="padding:6px 12px;font-size:12.5px">Sort</button></div>
+  <div class="loadout" id="loadout"></div>
+  <div id="learn"></div>
+  <div class="chips" id="filters"></div>
+  <div id="spellList"></div>
+  <div class="dim" id="bookCount" style="font-size:12.5px;text-align:center;margin-top:4px"></div>
+  </div>
+  <div id="tabSkills" class="hide"></div>
+  <div id="tabGear" class="hide"></div>
+</div></div>
+
+<div id="shop" class="panel hide"><div>
+  <h2>Embers</h2><p id="shopEmbers" style="text-align:left"></p>
+  <div id="shopList" class="stack"></div>
+  <div class="stack" style="margin-top:14px"><button id="shopBack">Back</button></div>
+</div></div>
+
+<div id="over" class="panel hide"><div>
+  <h1>Your summoner has fallen</h1>
+  <p>The horde scatters. Somewhere, a kinder fire is lit.</p>
+  <div id="overStats" class="plate stack" style="gap:4px;padding:10px 12px"></div>
+  <p id="overEmbers" style="color:var(--acc);font:700 22px Cinzel,serif;margin:14px 0"></p>
+  <div class="stack"><button id="overShop" class="primary">Spend embers</button><button id="overNew">Back to title</button></div>
+</div></div>
+
+<div id="menu" class="panel hide"><div class="stack">
+  <h2>Paused</h2>
+  <button id="resume" class="primary">Resume</button>
+  <button id="fullBtn">Full screen</button>
+  <div id="fullNote" class="dim hide" style="font-size:13px"></div>
+  <button id="saveNow">Save now</button>
+  <button id="copyCode">Copy save code</button>
+  <button id="loadCode">Load a save code</button>
+  <div id="codeBox" class="hide stack"><textarea id="codeIn" aria-label="Save code"></textarea><button id="codeGo">Load this code</button></div>
+  <div class="dim" style="margin-top:4px">Controls</div>
+  <button id="optSquads"></button>
+  <button id="optTap"></button>
+  <button id="optAssist"></button>
+  <button id="olBtn">Outlines: on</button>
+  <button id="zoomBtn">Change zoom</button>
+  <div class="dim" style="margin-top:4px">Recent messages <span id="fps"></span></div>
+  <div id="log"></div>
+  <button id="abandon">Abandon run</button>
+</div></div>
+
+<div id="cityPanel" class="panel hide"><div>
+  <h2 id="cityTitle"></h2><p id="citySub" style="text-align:left"></p>
+  <div id="plots"></div>
+  <div class="stack"><button id="cityClose" class="primary">Done</button></div>
+</div></div>
+<div id="load">Kindling the world…</div>
+<div id="gen" class="hide">Shaping a new world…</div>
+<script type="module" src="./js/main.js"></script>
+</body></html>
