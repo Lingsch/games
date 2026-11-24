@@ -36,6 +36,7 @@ function ruinGloom(h) {
   const d = Math.hypot(h.x - world.ruin.x, h.z - world.ruin.z); const k = clamp(1 - (d - world.ruin.R) / 30, 0, 1); if (k > 0) { R.scene.fog.color.lerp(C('#3a3646'), k * .7); R.sun.intensity *= 1 - k * .45; } }
 
 // ---------- the hero ----------
+let follow = null;
 function moveHero(dt, inp) {
   const h = S.hero; if (!h || h.dead) { if (h) h.moving = 0; return; }
   const fx = Math.sin(S.camYaw), fz = Math.cos(S.camYaw), rx = -Math.cos(S.camYaw), rz = Math.sin(S.camYaw);
@@ -54,6 +55,13 @@ function moveHero(dt, inp) {
     h.moving = Math.min(1, h.moving + dt * 8);
     // the camera drifts back behind you when you run forward
     if (S.time - UI.input.lastDragT > 1.2 && inp.mz < -.4) S.camYaw += wrapA(h.yaw - S.camYaw) * Math.min(1, dt * 1.6);
+  } else if (!h.casting && !Cb.rooted(h) && !Cb.ccd(h) && (follow = Game.autoFollowPoint())) {
+    const dx = follow.x - h.x, dz = follow.z - h.z, d = Math.hypot(dx, dz), sp = Math.min(h.spd * Cb.spdOf(h), d / dt);
+    h.sit = false;
+    h.x += dx / d * sp * dt; h.z += dz / d * sp * dt; collide(h, h.r);
+    h.yaw += wrapA(Math.atan2(dx, dz) - h.yaw) * Math.min(1, dt * 10);
+    h.moving = Math.min(1, h.moving + dt * 8);
+    S.camYaw += wrapA(h.yaw - S.camYaw) * Math.min(1, dt * .8);
   } else {
     h.moving = Math.max(0, h.moving - dt * 8);
     const t = S.target;
@@ -82,8 +90,24 @@ function camera(dt) {
   R.cam.lookAt(tx + fx * 2, ty + .2 - S.camPitch * .8, tz + fz * 2);
 }
 
+// ---------- story scenes ----------
+const scFrom = new THREE.Vector3(), scLook = new THREE.Vector3(), scLookNow = new THREE.Vector3();
+let scKey = '';
+function sceneCam(dt) {
+  const sc = S.scene, sh = sc.shots[sc.i], sp = sh && world.spots[sh.spot];
+  if (!sp) { Game.endScene(); return; }
+  const by = hgt(sp.x, sp.z);
+  scFrom.set(sp.x + sh.from[0], by + sh.from[1], sp.z + sh.from[2]); scLook.set(sp.x + sh.look[0], by + sh.look[1], sp.z + sh.look[2]);
+  const key = sc.id + sc.i, cut = scKey === '' || Math.abs(R.cam.position.distanceTo(scFrom)) > 60;
+  if (key !== scKey && cut) { R.cam.position.copy(scFrom); scLookNow.copy(scLook); }
+  scKey = key;
+  const k = Math.min(1, dt * 1.6);
+  R.cam.position.lerp(scFrom, k); scLookNow.lerp(scLook, k);
+  R.cam.lookAt(scLookNow);
+}
 // ---------- drawing ----------
 const o3 = new THREE.Object3D(), up = new THREE.Vector3(0, 1, 0), tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
+let drawDt = 1 / 60;
 function draw() {
   for (const k in R.kinds) R.kinds[k].n = 0;
   let ns = 0, na = 0;
@@ -98,7 +122,9 @@ function draw() {
     let y = e.y, rotX = 0;
     if (e.mob) { const M = MOBS[e.mob]; if (M.fly && !e.dead) y += M.fly + Math.sin(R.uTime.value * 3 + e.id) * .15; }
     if (e.dead && !e.corpse) { const f = Math.min(1, (S.time - e.deadT) * 3); rotX = -Math.PI / 2 * f; y += .2 * f; }
-    o3.position.set(e.x, y, e.z); o3.rotation.set(rotX, e.yaw, 0, 'YXZ'); o3.scale.setScalar(e.scale || 1); o3.updateMatrix();
+    if (e.isHero || e.rx === undefined || Math.abs(e.x - e.rx) + Math.abs(e.z - e.rz) > 4) { e.rx = e.x; e.rz = e.z; e.ryaw = e.yaw; }
+    else { const k = Math.min(1, drawDt * 14); e.rx += (e.x - e.rx) * k; e.rz += (e.z - e.rz) * k; e.ryaw += wrapA(e.yaw - e.ryaw) * Math.min(1, drawDt * 12); }
+    o3.position.set(e.rx, y, e.rz); o3.rotation.set(rotX, e.ryaw, 0, 'YXZ'); o3.scale.setScalar(e.scale || 1); o3.updateMatrix();
     const i = K.n++;
     K.mesh.setMatrixAt(i, o3.matrix);
     const a = e.anim; K.anim.setXYZW(i, a.ph, e.dead ? 0 : a.mv, a.atk, a.flash);
@@ -112,7 +138,7 @@ function draw() {
   R.arrows.count = na; R.arrows.instanceMatrix.needsUpdate = true;
   // the target ring, and boss telegraphs on the ground
   const t = S.target;
-  if (t && !t.remove) { R.selRing.visible = true; R.selRing.position.set(t.x, hgt(t.x, t.z) + .07, t.z); R.selRing.scale.setScalar(Math.max(.9, (t.r || .5) * 2.2)); R.selRing.material.color.set(Cb.isEnemy(S.hero, t) ? '#ff4a3a' : t.team === 'npc' ? '#ffd34d' : '#5fd35a'); }
+  if (t && !t.remove) { R.selRing.visible = true; R.selRing.position.set(t.rx ?? t.x, hgt(t.x, t.z) + .07, t.rz ?? t.z); R.selRing.scale.setScalar(Math.max(.9, (t.r || .5) * 2.2)); R.selRing.material.color.set(Cb.isEnemy(S.hero, t) ? '#ff4a3a' : t.team === 'npc' ? '#ffd34d' : '#5fd35a'); }
   else R.selRing.visible = false;
   R.clearTelegraphs();
   for (const g of S.dangers) {
@@ -128,7 +154,11 @@ function loop() {
   requestAnimationFrame(loop);
   const now = performance.now(), dt = Math.max(0, Math.min(.05, (now - last) / 1000)); last = now;
   R.uTime.value = now / 1000;
-  if (S.running && S.hero) {
+  if (S.running && S.hero && S.scene) {
+    // a story scene: the world holds still while the camera tells it
+    sceneCam(dt); dayNight(S.time); ruinGloom(S.hero);
+  } else if (S.running && S.hero) {
+    scKey = '';
     const inp = UI.pollInput();
     moveHero(dt, inp);
     Game.tick(dt);
@@ -140,7 +170,7 @@ function loop() {
     R.cam.position.set(Math.cos(t * .04) * 60, 22, Math.sin(t * .04) * 60); R.cam.lookAt(0, 6, 0);
     dayNight(t * 6);
   }
-  draw();
+  drawDt = dt; draw();
   R.magic.update(dt); R.dust.update(dt);
   R.renderer.render(R.scene, R.cam);
   UI.update(dt);

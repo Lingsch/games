@@ -5,6 +5,7 @@ import { cam } from './render.js';
 import { world, hgt, regionAt, REGION_NAMES } from './world.js';
 import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName } from './data.js';
 import * as Sea from './sea.js';
+import { LORE, PERKS } from './story.js';
 import * as Cb from './combat.js';
 import * as Game from './game.js';
 
@@ -120,7 +121,7 @@ export function cycleTarget() {
 
 // ---------- input: joystick, camera drag, taps ----------
 const v3 = new THREE.Vector3();
-function screenOf(e, yOff = 1) { v3.set(e.x, e.y + yOff * (e.scale || 1), e.z).project(cam); return { x: (v3.x + 1) / 2 * innerWidth, y: (1 - v3.y) / 2 * innerHeight, behind: v3.z > 1 }; }
+function screenOf(e, yOff = 1) { v3.set(e.rx ?? e.x, e.y + yOff * (e.scale || 1), e.rz ?? e.z).project(cam); return { x: (v3.x + 1) / 2 * innerWidth, y: (1 - v3.y) / 2 * innerHeight, behind: v3.z > 1 }; }
 function pickAt(x, y) {
   let best = null, bd = 1e9;
   for (const e of S.ents) {
@@ -128,7 +129,7 @@ function pickAt(x, y) {
     if (e.dead && !(e.mob && e.loot?.length && e.lootFor === 'party') && !(e.cls && e.inParty)) continue;
     if (dist(e, S.hero) > 70) continue;
     const s = screenOf(e, e.mob ? .9 : 1); if (s.behind) continue;
-    const dd = Math.hypot(s.x - x, s.y - y), lim = 42 * Math.max(1, e.scale || 1) + 18 * (e.boss ? 2 : 0);
+    const dd = Math.hypot(s.x - x, s.y - y), lim = 56 * Math.max(1, e.scale || 1) + 18 * (e.boss ? 2 : 0);
     if (dd < lim && dd + dist(e, S.hero) * .5 < bd) { bd = dd + dist(e, S.hero) * .5; best = e; }
   }
   return best;
@@ -138,8 +139,12 @@ let joyId = null, joyO = null;
 function onDown(ev) {
   if (ev.target.closest('button,#sheet,#title,.pf,#mini,#death,#tgt')) return;
   const p = { id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, x: ev.clientX, y: ev.clientY, t: performance.now(), moved: 0 };
-  const leftZone = ev.clientX < innerWidth * .5 && ev.clientY > innerHeight * .3 && ev.pointerType !== 'mouse';
-  if (leftZone && joyId === null) { joyId = ev.pointerId; joyO = { x: ev.clientX, y: ev.clientY }; const j = $('joy'); j.style.display = 'block'; j.style.left = joyO.x + 'px'; j.style.top = joyO.y + 'px'; j.firstChild.style.transform = ''; p.joy = true; }
+  // the joystick lives in the bottom-left corner: only touches that start on it move you; everywhere else is for tapping and turning
+  const j = $('joy'), r = j.getBoundingClientRect(), jc = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  if (joyId === null && Math.hypot(ev.clientX - jc.x, ev.clientY - jc.y) < r.width * .75) {
+    joyId = ev.pointerId; joyO = jc; j.classList.add('on'); p.joy = true;
+    const jx = clamp(ev.clientX - jc.x, -46, 46), jy = clamp(ev.clientY - jc.y, -46, 46); j.firstChild.style.transform = `translate(${jx}px,${jy}px)`; input.mx = jx / 46; input.mz = jy / 46;
+  }
   touches.set(ev.pointerId, p);
 }
 function onMove(ev) {
@@ -159,7 +164,7 @@ function onMove(ev) {
     if (input.pinch) S.camDist = clamp(S.camDist * input.pinch / dd, 3.5, 16);
     input.pinch = dd; return;
   }
-  if (p.moved > 8 && (ev.pointerType !== 'mouse' || ev.buttons)) {
+  if (p.moved > 14 && (ev.pointerType !== 'mouse' || ev.buttons)) {
     S.camYaw -= dx * .006; S.camPitch = clamp(S.camPitch + dy * .004, -.15, 1.15); input.lastDragT = S.time;
   }
 }
@@ -167,8 +172,8 @@ function onUp(ev) {
   const p = touches.get(ev.pointerId); touches.delete(ev.pointerId);
   if ([...touches.values()].filter(o => !o.joy).length < 2) input.pinch = null;
   if (!p) return;
-  if (p.joy) { joyId = null; input.mx = input.mz = 0; $('joy').style.display = 'none'; return; }
-  if (p.moved < 10 && performance.now() - p.t < 400) {
+  if (p.joy) { joyId = null; input.mx = input.mz = 0; $('joy').classList.remove('on'); $('joy').firstChild.style.transform = ''; return; }
+  if (p.moved < 18 && performance.now() - p.t < 550) {
     const e = pickAt(ev.clientX, ev.clientY);
     if (e) tapEntity(e); else if (S.target) { S.target = null; }
   }
@@ -216,12 +221,15 @@ function updateAct() {
   else if (S.corpse && S.corpse.ent && dist(h, S.corpse) < 6) { label = 'Recover your gear'; actFn = () => Game.lootCorpse(); }
   else {
     const t = S.target;
-    if (t && t.team === 'npc' && !t.corpse && dist(h, t) < 7) { label = 'Talk to ' + t.name.split(' ')[0]; actFn = () => interact(t); }
+    if (t && t.prop && dist(h, t) < 6 && Game.inspectLabel(t)) { label = Game.inspectLabel(t); actFn = () => { const lore = Game.inspect(t); if (lore) openLore(lore); }; }
+    else if (t && t.team === 'npc' && !t.corpse && !t.prop && dist(h, t) < 7) { label = (t.banker ? 'Bank with ' : 'Talk to ') + t.name.split(' ')[0]; actFn = () => interact(t); }
     else if (t && t.mob && t.dead && t.loot?.length && t.lootFor === 'party' && dist(h, t) < 7) { label = 'Loot'; actFn = () => openLoot(t); }
     else {
       const body = S.ents.find(e => e.mob && e.dead && e.lootFor === 'party' && (e.loot?.length) && dist(e, h) < 5);
-      if (body) { label = 'Loot ' + body.name; actFn = () => openLoot(body); }
-      else { const n = S.ents.find(e => e.team === 'npc' && !e.corpse && dist(e, h) < 4.5); if (n) { label = 'Talk to ' + n.name.split(' ')[0]; actFn = () => interact(n); } }
+      const pr = !body && S.ents.find(e => e.prop && !e.remove && dist(e, h) < 4.5 && Game.inspectLabel(e));
+      if (pr) { label = Game.inspectLabel(pr); actFn = () => { const lore = Game.inspect(pr); if (lore) openLore(lore); }; }
+      else if (body) { label = 'Loot ' + body.name; actFn = () => openLoot(body); }
+      else { const n = S.ents.find(e => e.team === 'npc' && !e.corpse && !e.prop && !e.remove && dist(e, h) < 4.5); if (n) { label = (n.banker ? 'Bank with ' : 'Talk to ') + n.name.split(' ')[0]; actFn = () => interact(n); } }
     }
     if (!label) { const a = Sea.action(); if (a) { label = a.label; actFn = a.fn; } }
   }
@@ -229,7 +237,10 @@ function updateAct() {
 }
 function interact(n) {
   if (dist(S.hero, n) > 8) { toast('Too far away'); return; }
-  if (n.giver) openGiver(n.giver);
+  if (n.prop) { const lore = Game.inspect(n); if (lore) openLore(lore); }
+  else if (n.banker) openBank();
+  else if (n.giver) openGiver(n.giver);
+  else if (n.idle?.length || n.storyNpc) chat('say', n.name, Game.fill((n.idle && n.idle.length ? n.idle : ['Ghosts! In my parlour! Again!', 'Lovely weather for a haunting.'])[(Math.random() * 2) | 0 % 2] || 'Hello.'));
   else if (n.vendor) openVendor(n);
   else if (n.armory) openBook('char');
   else if (n.bindstone) { S.bind = { zone: S.zone, x: n.x, z: n.z + 1.5 }; const pl = placeAt(n.x, n.z); chat('sys', null, 'You are bound here.'); toast('Bound to ' + (pl ? pl.name : world.names.town)); Game.save(); }
@@ -264,7 +275,7 @@ function updateFrames() {
     if (aggro && !d.querySelector('.aggro')) { const a = document.createElement('span'); a.className = 'aggro'; d.appendChild(a); } else if (!aggro) d.querySelector('.aggro')?.remove();
   });
   let cmds = $('cmds');
-  if (mates.length && !cmds) { cmds = document.createElement('div'); cmds.id = 'cmds'; cmds.innerHTML = ['follow', 'assist', 'hold', 'pull'].map(c => `<button data-c="${c}">${{ follow: 'Follow', assist: 'Assist', hold: 'Hold', pull: 'Pull' }[c]}</button>`).join(''); cmds.onclick = ev => { const c = ev.target.dataset.c; if (c) Game.partyCommand(c); }; box.appendChild(cmds); }
+  if (mates.length && !cmds) { cmds = document.createElement('div'); cmds.id = 'cmds'; cmds.innerHTML = ['follow', 'assist', 'hold', 'pull', 'clear'].map(c => `<button data-c="${c}">${{ follow: 'Follow', assist: 'Assist', hold: 'Hold', pull: 'Pull', clear: 'Clear' }[c]}</button>`).join(''); cmds.onclick = ev => { const c = ev.target.dataset.c; if (c) Game.partyCommand(c); }; box.appendChild(cmds); }
   if (cmds) { cmds.style.display = mates.length ? '' : 'none'; box.appendChild(cmds); cmds.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.c === S.cmd)); }
   // target
   const t = S.target, tf = $('tgt');
@@ -316,8 +327,8 @@ function updateFrames() {
   const tr = $('track'), r = tf.classList.contains('hide') ? null : tf.getBoundingClientRect();
   tr.style.top = (r && (innerWidth / innerHeight < 4 / 3) ? r.bottom + 6 : (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--st')) || 6) + 112) + 'px';
   if (innerWidth / innerHeight >= 4 / 3) tr.style.top = '120px';
-  const qs = QUESTS.filter(q => S.quests[q.id] && S.quests[q.id].state !== 'turned').slice(0, 3);
-  const tq = qs.map(q => { const st = S.quests[q.id]; return `<div>${esc(q.name)}: <b>${st.state === 'done' ? 'done ✓' : st.n + '/' + q.obj.n}</b></div>`; }).join('');
+  const qs = QUESTS.filter(q => S.quests[q.id] && S.quests[q.id].state !== 'turned').sort((a, b) => (b.story ? 1 : 0) - (a.story ? 1 : 0)).slice(0, 3);
+  const tq = qs.map(q => { const st = S.quests[q.id]; return `<div>${esc(q.name)}: <b>${st.state === 'done' ? (q.obj.talk || q.obj.at ? 'talk to ' + esc(GIVERS[Game.turnToOf(q)].name.split(' ').pop()) : 'done ✓') : q.obj.at ? 'travel' : st.n + '/' + q.obj.n}</b></div>`; }).join('');
   if (tr._s !== tq) { tr.innerHTML = tq; tr._s = tq; }
   // xp, cast bar
   $('xpFill').style.width = h.lvl >= MAX_LVL ? '100%' : pct(h.xp, xpNeed(h.lvl)) + '%';
@@ -354,6 +365,7 @@ function updatePlates(dt) {
     if (e.dead && !(e.mob && e.loot?.length && e.lootFor === 'party')) continue;
     if (e.mob && !(e === S.target || (e.engaged && [...e.threat.keys()].some(k => S.party.includes(k))) || e.named || e.boss) && !e.dead) continue;
     if (e.guard && dd > 15) continue;
+    if (e.prop && (dd > 22 || !Game.inspectLabel(e))) continue;
     list.push(e);
   }
   list.sort((a, b) => dist(a, h) - dist(b, h)); list.length = Math.min(list.length, 26);
@@ -372,8 +384,9 @@ function updatePlates(dt) {
     let html = '', col = '#fff';
     if (e.team === 'npc') {
       let mk = '';
-      if (e.giver) { const qs = Game.questsFor(e.giver); if (qs.some(q => S.quests[q.id]?.state === 'done')) mk = '?'; else if (qs.some(q => Game.questState(q) === 'open' && q.lvl <= h.lvl + 1)) mk = '!'; }
-      col = e.corpse ? '#8dffef' : '#ffd34d';
+      if (e.giver) mk = questMark(e.giver);
+      col = e.corpse || e.prop ? '#8dffef' : '#ffd34d';
+      if (e.prop) { html = `✦ ${esc(e.name)}`; if (d._s !== html) { d.innerHTML = html; d._s = html; } d.style.color = col; d.style.opacity = clamp(1.4 - dist(e, h) / 25, .4, 1); return; }
       html = `${mk ? `<span class="mk">${mk}</span>` : ''}${esc(e.name)}${e.title ? `<small>${esc(e.title)}</small>` : ''}`;
     } else if (e.mob) {
       col = e.dead ? '#cfcfcf' : Cb.conColor(h.lvl, e.lvl);
@@ -400,6 +413,12 @@ function updatePlates(dt) {
 // ---------- minimap ----------
 let zoneName = '';
 const placeAt = (x, z) => (world.places || []).find(p => Math.hypot(x - p.x, z - p.z) < p.R);
+export function questMark(k) {
+  const h = S.hero, qs = Game.questsFor(k);
+  if (qs.some(q => Game.turnToOf(q) === k && S.quests[q.id]?.state === 'done')) return '?';
+  if (qs.some(q => q.giver === k && Game.questState(q) === 'open' && q.lvl <= h.lvl + 1)) return '!';
+  return '';
+}
 function updateMini() {
   if (S.frame % 3) return;
   const c = $('mini'), g = c.getContext('2d'), h = S.hero, W = c.width, span = 140, sc = W / span;
@@ -414,7 +433,7 @@ function updateMini() {
     if (e.mob) { if (e.engaged || e === S.target) dot(e.x, e.z, e.boss ? 6 : 3.5, e === S.target ? '#fff' : '#ff4a3a'); else if (e.named || e.boss) dot(e.x, e.z, 4, '#ff9a3a'); }
     else if (e.inParty && !e.isHero) dot(e.x, e.z, 4, '#5fd3ff');
     else if (e.fake) dot(e.x, e.z, 2.5, '#d8d8ff');
-    else if (e.giver) { const qs = Game.questsFor(e.giver); const mk = qs.some(q => S.quests[q.id]?.state === 'done') ? '?' : qs.some(q => Game.questState(q) === 'open' && q.lvl <= h.lvl + 1) ? '!' : ''; if (mk) { const [px, pz] = P(e.x, e.z); g.fillStyle = '#ffd34d'; g.font = 'bold 18px Cinzel'; g.textAlign = 'center'; g.fillText(mk, px, pz + 6); } }
+    else if (e.giver) { const qs = Game.questsFor(e.giver); const mk = questMark(e.giver); if (mk) { const [px, pz] = P(e.x, e.z); g.fillStyle = '#ffd34d'; g.font = 'bold 18px Cinzel'; g.textAlign = 'center'; g.fillText(mk, px, pz + 6); } }
   }
   if (Sea.sea.ferry) { const f = Sea.sea.ferry; dot(f.x, f.z, 5, '#ffd34d'); }
   for (const d of world.docks || []) dot(d.x, d.z, 2.5, '#c8a878');
@@ -447,10 +466,10 @@ let bookTab = 'char';
 export function openBook(tab) {
   if (tab) bookTab = tab;
   openSheet('Book', body => {
-    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Spells'], ['quests', 'Quests'], ['bags', 'Bags'], ['social', 'Social']].map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
+    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Spells'], ['quests', 'Quests'], ['bags', 'Bags'], ['lore', 'Lore'], ['social', 'Social']].map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
     tabs.onclick = ev => { const t = ev.target.dataset.t; if (t) { bookTab = t; refreshSheet(); } };
     body.appendChild(tabs);
-    ({ char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, social: tabSocial })[bookTab](body);
+    ({ char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial })[bookTab](body);
   });
 }
 function tabChar(body) {
@@ -459,6 +478,17 @@ function tabChar(body) {
     <div class="grid2" style="margin-top:6px"><div><div class="stat"><span>Health</span><span>${h.maxHp}</span></div><div class="stat"><span>${h.resType}</span><span>${h.resMax}</span></div><div class="stat"><span>Power</span><span>${Math.round(h.power)}</span></div></div>
     <div><div class="stat"><span>Armor</span><span>${Math.round(h.armor)}</span></div><div class="stat"><span>Crit</span><span>${(h.crit * 100).toFixed(1)}%</span></div><div class="stat"><span>XP</span><span>${h.lvl >= MAX_LVL ? 'max' : Math.round(h.xp) + ' / ' + xpNeed(h.lvl)}</span></div></div></div>
     <p>Gold: ${S.gold}</p></div>`));
+  // progression across classes: the level 10 lock, faster xp, account bonuses, perks
+  { const fam = FAMILIES.map(f => { const b = Game.famBest(f); return `<span class="fam ${b >= 10 ? 'ok' : ''}">${{ Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔮' }[f]} ${f} ${b}${b >= 10 ? ' ✓' : ''}</span>`; }).join('');
+    const locked = Game.lockedAt10(), A = h.acct || {}, boost = Math.round(Game.xpBoost() * 100);
+    body.appendChild(el(`<div class="card"><h3>Your classes</h3><div class="fams">${fam}</div>
+      <p style="margin:6px 0 2px">${locked ? 'Levels above 10 are <b style="color:#ff8a6a">locked</b> until you have one class from each family at level 10.' : 'Level 10 lock lifted. Every class can level to 20.'} ${Game.raidReady() ? 'Raid ready: one class from each family at 20.' : '<span class="dim">The raid needs one class from each family at 20.</span>'}</p>
+      <p class="dim" style="margin:2px 0">Faster xp for this class: <b style="color:var(--acc)">+${boost}%</b> (20% for each other class at 10+). Account bonus for every class: +${A.sta || 0} stamina, +${A.pow || 0} power.${S.vetXp > 0 ? ` Veteran xp banked: <b style="color:#c8a2ff">${Math.round(S.vetXp)}</b> (doubles xp for classes that can still level).` : ''}</p></div>`));
+    const open = Game.perksOpen();
+    const pc = el(`<div class="card"><h3>Perks <span class="dim" style="font:500 12px Alegreya Sans">· ${S.perks.length}/2 slotted · each class at level 10 unlocks one</span></h3><div class="perks">${CLASS_KEYS.map(k => { const P = PERKS[k], on = S.perks.includes(k), ok = open.includes(k); return `<button data-p="${k}" class="perk ${on ? 'on' : ''}" ${ok ? '' : 'disabled'}><span>${P.icon}</span><b>${esc(P.name)}</b><small>${ok ? esc(P.desc) : CLASSES[k].name + ' 10'}</small></button>`; }).join('')}</div></div>`);
+    pc.onclick = ev => { const b = ev.target.closest('button'); if (b && b.dataset.p) { Game.togglePerk(b.dataset.p); refreshSheet(); } };
+    body.appendChild(pc);
+  }
   const g = S.gear[S.heroCls];
   body.appendChild(el('<h3 style="font:700 13px Cinzel;margin:8px 0 4px;color:var(--dim)">Equipped</h3>'));
   for (const sl of SLOTS) {
@@ -505,21 +535,53 @@ function tabSpells(body) {
   if (Object.values(C.abilities).some(a => a.kind === 'ult')) body.appendChild(el(`<p class="dim" style="font-size:12px">Ultimates charge from fighting: damage dealt, damage taken and healing done fill the gold strip on the key.</p>`));
 }
 let pendingSpell = null, swapEdit = -1, editPick = -1;
+function tabLore(body) {
+  const ids = Object.keys(LORE), got = ids.filter(id => S.lore[id]);
+  body.appendChild(el(`<p class="dim" style="margin-top:0">Pages found: <b style="color:var(--acc)">${got.length} / ${ids.length}</b>. Look for glowing lecterns ✦ around the world.</p>`));
+  for (const id of ids) {
+    if (!S.lore[id]) { body.appendChild(el('<div class="card dim">An undiscovered page.</div>')); continue; }
+    const c = el(`<div class="card"><h3>${esc(LORE[id].title)}</h3><p class="lore">${esc(Game.fill(LORE[id].text))}</p></div>`); body.appendChild(c);
+  }
+}
+export function openLore(id) { openSheet('Lore', body => { body.appendChild(el(`<div class="card"><h3>${esc(LORE[id].title)}</h3><p class="lore">${esc(Game.fill(LORE[id].text))}</p></div>`)); const b = el('<button>All lore</button>'); b.onclick = () => openBook('lore'); body.appendChild(b); }); }
+// the bank: shared by all your classes
+function openBank() {
+  openSheet('Bank', body => {
+    body.appendChild(el(`<p class="dim" style="margin-top:0">Your bank is shared by every class. ${S.bank.length} / ${Game.BANK_SLOTS} slots.</p>`));
+    body.appendChild(el('<h3 style="font:700 13px Cinzel;margin:4px 0;color:var(--dim)">In the bank</h3>'));
+    if (!S.bank.length) body.appendChild(el('<p class="dim">Empty.</p>'));
+    for (const it of S.bank) { const c = el(`<div class="card it" style="--c:${RARITY[it.rarity || 0].c}">${itemHtml(it)}<div class="acts"><button>Take</button></div></div>`); c.querySelector('button').onclick = () => { Game.bankTake(it); refreshSheet(); }; body.appendChild(c); }
+    body.appendChild(el('<h3 style="font:700 13px Cinzel;margin:10px 0 4px;color:var(--dim)">In your bags</h3>'));
+    if (!S.bag.length) body.appendChild(el('<p class="dim">Your bags are empty.</p>'));
+    for (const it of S.bag) { const c = el(`<div class="card it" style="--c:${RARITY[it.rarity || 0].c}">${itemHtml(it)}<div class="acts"><button>Store</button></div></div>`); c.querySelector('button').onclick = () => { Game.bankStore(it); refreshSheet(); }; body.appendChild(c); }
+  });
+}
+// ---------- story scenes: letterboxed captions over the game camera ----------
+function updateScene() {
+  const sc = S.scene, box = $('scene');
+  document.body.classList.toggle('inscene', !!sc);
+  if (!sc) { box.classList.add('hide'); if (reopenAfterScene && !sheetOpen()) { const k = reopenAfterScene; reopenAfterScene = null; openGiver(k); } return; }
+  box.classList.remove('hide');
+  const shot = sc.shots[sc.i], key = sc.id + sc.i;
+  if (box._k !== key) { box._k = key; $('sceneWho').textContent = shot.who ? spName(shot.who) : ''; $('sceneWho').style.display = shot.who ? '' : 'none'; $('sceneTxt').textContent = Game.fill(shot.text); $('sceneTxt').classList.toggle('narr', !shot.who); }
+}
 function tabQuests(body) {
   const act = QUESTS.filter(q => S.quests[q.id] && S.quests[q.id].state !== 'turned');
   if (!act.length) body.appendChild(el(`<p class="dim">No quests yet. Look for the <b style="color:#ffd34d">!</b> over people's heads in ${esc(world.names.town)}.</p>`));
   for (const q of act) {
     const st = S.quests[q.id];
-    body.appendChild(el(`<div class="card"><h3>${esc(q.name)} <span class="dim" style="font:500 12px Alegreya Sans">· level ${q.lvl}</span></h3><p>${esc(q.text)}</p><p style="color:var(--ink)">${objText(q)}: <b style="color:var(--acc)">${st.state === 'done' ? 'Done. Return to ' + GIVERS[q.giver].name + '.' : st.n + ' / ' + q.obj.n}</b></p></div>`));
+    body.appendChild(el(`<div class="card"><h3>${esc(q.name)} <span class="dim" style="font:500 12px Alegreya Sans">· level ${q.lvl}</span></h3><p>${esc(Game.fill(q.text))}</p><p style="color:var(--ink)">${q.story ? '<b style="color:#c8a2ff">Main story</b> · ' : ''}${objText(q)}: <b style="color:var(--acc)">${st.state === 'done' ? (q.obj.talk || q.obj.at ? 'Talk to ' : 'Done. Return to ') + GIVERS[Game.turnToOf(q)].name + '.' : q.obj.at ? 'travel there' : st.n + ' / ' + q.obj.n}</b></p></div>`));
   }
   const done = QUESTS.filter(q => S.quests[q.id]?.state === 'turned');
   if (done.length) body.appendChild(el(`<p class="dim" style="font-size:12px">Completed: ${done.map(q => esc(q.name)).join(', ')}</p>`));
 }
 function objText(q) {
   const o = q.obj, nm = k => MOBS[k].name;
-  if (o.named) return `Kill ${world.names[o.named]}`;
+  if (o.what) return Game.fill(o.what);
+  if (o.named) return `Kill ${world.names[o.named] || MOBS[o.named]?.name || o.named}`;
   if (o.collect) return `Collect ${o.item} from ${o.collect.map(nm).join(' or ')}`;
-  return `Kill ${o.kill.map(nm).join(', ')}${o.dungeon ? ' in the Ossuary' : ''}`;
+  if (o.inspect) return `Inspect ${o.inspect}`;
+  return `Kill ${o.kill.map(nm).join(', ')}${o.dungeon ? ' in the Ossuary' : ''}${o.near === 'waste' ? ' in the Waste' : ''}`;
 }
 function tabBags(body) {
   body.appendChild(el(`<p style="margin-top:0">Gold: <b style="color:var(--acc)">${S.gold}</b> · Potions: 🧪 ${S.pots.hpot} · 💧 ${S.pots.mpot} · Bags ${S.bag.length}/30</p>`));
@@ -561,19 +623,75 @@ function tabSocial(body) {
   body.appendChild(el(`<h3 style="font:700 13px Cinzel;margin:10px 0 4px;color:var(--dim)">Chat log</h3>`));
   body.appendChild(el(`<div id="log">${S.log.slice(-60).reverse().map(l => `<div class="ch-${l.ch}">${l.from ? `<b>${l.ch === 'gen' ? '[General] ' : l.ch === 'guild' ? '[Guild] ' : ''}${esc(l.from)}:</b> ` : ''}${esc(l.text)}</div>`).join('')}</div>`));
 }
+const spName = sp => GIVERS[sp]?.name || sp;
+function sayHtml(lines, def) {
+  return lines.map(l => { const [sp, t] = typeof l === 'string' ? [def, l] : l; return `<div class="say${sp === def ? '' : ' alt'}"><b>${esc(spName(sp))}</b><p>${esc(Game.fill(t))}</p></div>`; }).join('');
+}
+let dlgQ = null, dlgReply = null, reopenAfterScene = null;
+function giverQuests(k) {
+  return Game.questsFor(k).filter(q => { const st = Game.questState(q); return (q.giver === k && (st === 'open' || st === 'active')) || (Game.turnToOf(q) === k && st === 'done'); })
+    .sort((a, b) => (Game.questState(b) === 'done') - (Game.questState(a) === 'done') || (b.story ? 1 : 0) - (a.story ? 1 : 0) || a.lvl - b.lvl);
+}
 function openGiver(k) {
-  const g = GIVERS[k];
+  const g = GIVERS[k]; dlgQ = null; dlgReply = null;
+  const qs = giverQuests(k);
+  if (qs.length === 1) dlgQ = qs[0].id;
   openSheet(g.name, body => {
-    body.appendChild(el(`<p class="dim" style="margin-top:0">${esc(g.title)}</p>`));
-    let any = false;
-    for (const q of Game.questsFor(k)) {
-      const st = Game.questState(q); if (st === 'locked' || st === 'turned') continue;
-      any = true;
-      const c = el(`<div class="card"><h3>${st === 'done' ? '? ' : st === 'open' ? '! ' : ''}${esc(q.name)} <span class="dim" style="font:500 12px Alegreya Sans">· level ${q.lvl}</span></h3><p>${esc(q.text)}</p><p style="color:var(--ink)">${objText(q)} (${q.obj.n}). Reward: ${q.xp} xp, ${q.gold} gold${q.gear ? ', a piece of gear' : ''}.</p><div class="acts">${st === 'open' ? '<button class="pri" data-a="acc">Accept</button>' : st === 'done' ? '<button class="pri" data-a="turn">Complete</button>' : `<span class="dim">In progress: ${S.quests[q.id].n}/${q.obj.n}</span>`}</div></div>`);
-      c.onclick = ev => { const a = ev.target.dataset.a; if (a === 'acc') Game.acceptQuest(q); if (a === 'turn') { Game.turnIn(q); toast('Quest complete'); } refreshSheet(); };
-      body.appendChild(c);
+    const qs = giverQuests(k), h = S.hero;
+    body.appendChild(el(`<p class="dim" style="margin-top:0">${esc(Game.fill(g.title))}</p>`));
+    // after a turn-in: the reply and what you got
+    if (dlgReply) {
+      body.appendChild(el(sayHtml(dlgReply.lines, dlgReply.def)));
+      const b = el(`<div class="acts"><button class="pri">${qs.length ? 'Continue' : 'Farewell'}</button></div>`); b.onclick = () => { dlgReply = null; dlgQ = qs.length === 1 ? qs[0].id : null; if (!qs.length) closeSheet(); else refreshSheet(); }; body.appendChild(b);
+      return;
     }
-    if (!any) body.appendChild(el('<p class="dim">"Nothing for you right now. Come back when you\'ve grown a little."</p>'));
+    const q = dlgQ && QUESTS.find(x => x.id === dlgQ);
+    if (!q) {
+      if (!qs.length) { const idle = (g.idle && g.idle.length) ? g.idle[(S.frame >> 6) % g.idle.length] : 'Nothing for you right now. Come back when you have grown a little.'; body.appendChild(el(sayHtml([idle], k))); return; }
+      for (const x of qs) {
+        const st = Game.questState(x), mk = st === 'done' && Game.turnToOf(x) === k ? '?' : st === 'open' ? '!' : '…';
+        const c = el(`<div class="card qpick"><b style="color:${mk === '…' ? 'var(--dim)' : '#ffd34d'}">${mk}</b> ${esc(x.name)} <span class="dim">· level ${x.lvl}${x.story ? ' · main story' : ''}</span></div>`);
+        c.onclick = () => { dlgQ = x.id; refreshSheet(); }; body.appendChild(c);
+      }
+      return;
+    }
+    const st = Game.questState(q), back = qs.length > 1 ? '<button data-a="back">Back</button>' : '';
+    body.appendChild(el(`<h3 style="margin:2px 0 6px">${esc(q.name)} <span class="dim" style="font:500 12px Alegreya Sans">· level ${q.lvl}${q.story ? ' · main story' : ''}</span></h3>`));
+    if (st === 'open') {
+      body.appendChild(el(sayHtml(q.say, q.giver)));
+      body.appendChild(el(`<p class="obj">${esc(objText(q))}${q.obj.n > 1 ? ` (${q.obj.n})` : ''}<br><span class="dim">Reward: ${q.xp} xp, ${q.gold} gold${q.gear ? ', a piece of gear' : ''}${q.lvl > h.lvl + 1 ? ` · <span style="color:#ff8a6a">level ${q.lvl} recommended</span>` : ''}</span></p>`));
+      const a = el(`<div class="acts"><button class="pri" data-a="acc">Accept</button>${back}<button data-a="no">Not now</button></div>`);
+      a.onclick = ev => {
+        const act = ev.target.dataset.a;
+        if (act === 'acc') {
+          Game.acceptQuest(q);
+          if (S.pendingScene) { reopenAfterScene = Game.turnToOf(q) === k && q.obj.talk ? k : null; closeSheet(); return; }
+          dlgQ = q.obj.talk && Game.turnToOf(q) === k ? q.id : null;
+          if (!dlgQ && !giverQuests(k).length) { closeSheet(); toast('Quest accepted'); return; }
+        }
+        if (act === 'back') dlgQ = null;
+        if (act === 'no') { closeSheet(); return; }
+        refreshSheet();
+      };
+      body.appendChild(a);
+    } else if (st === 'active') {
+      body.appendChild(el(sayHtml([q.story ? 'Any luck? I\'m counting on you.' : 'How goes it?'], k)));
+      body.appendChild(el(`<p class="obj">${esc(objText(q))}: <b style="color:var(--acc)">${q.obj.at ? 'not there yet' : S.quests[q.id].n + ' / ' + q.obj.n}</b></p>`));
+      const a = el(`<div class="acts">${back}<button data-a="no">Farewell</button></div>`); a.onclick = ev => { if (ev.target.dataset.a === 'back') { dlgQ = null; refreshSheet(); } else closeSheet(); }; body.appendChild(a);
+    } else if (st === 'done') {
+      const def = Game.turnToOf(q);
+      body.appendChild(el(sayHtml(q.done || ['Well done.'], def)));
+      const a = el(`<div class="acts col">${q.choices ? q.choices.map((c, i) => `<button class="pri" data-c="${i}">${esc(Game.fill(c.t))}</button>`).join('') : '<button class="pri" data-c="-1">Complete</button>'}</div>`);
+      a.onclick = ev => {
+        const c = ev.target.dataset.c; if (c === undefined) return;
+        const reply = Game.turnIn(q, +c >= 0 ? +c : null);
+        refreshKeys(true);
+        dlgReply = { lines: [...(reply ? [reply] : []), `Quest complete: +${q.xp} xp, +${q.gold} gold.`].map((l, i) => typeof l === 'string' && i === (reply ? 1 : 0) ? ['', l] : l), def };
+        if (S.pendingScene) { closeSheet(); return; }
+        refreshSheet();
+      };
+      body.appendChild(a);
+    }
   });
 }
 function openVendor(n) {
@@ -619,6 +737,10 @@ function openMap() {
       g.font = '12px Alegreya Sans';
       for (const cp of world.camps) label(cp.kind === 'bandit' ? 'Bandits (3-5)' : 'Orcs (5-7)', cp.x, cp.z);
       label(`${world.names.tusk} (8)`, world.hollow.x, world.hollow.z + 12);
+      g.font = 'bold 13px Cinzel';
+      for (const p of world.extraPlaces || []) label(p.name, p.x, p.z - p.R - 4);
+      g.font = '12px Alegreya Sans';
+      label('Pale Choir (4-5)', world.spots.choircamp.x, world.spots.choircamp.z + 14); label('Boars (3-5)', -190, -20); label('Spiders (4-5)', world.spots.spiders.x, world.spots.spiders.z + 22); label('Harpies (6-8)', world.spots.crag.x + 16, world.spots.crag.z + 20); label('Deacon (8-9)', world.spots.deacon.x, world.spots.deacon.z + 14);
     } else {
       for (const p of world.places) label(p.name.replace('The ', ''), p.x, p.z - p.R - 6);
       g.font = '12px Alegreya Sans';
@@ -656,7 +778,7 @@ export function showTitle(forceNew) {
   let pick = 'bulwark';
   const has = Game.hasSave() && !forceNew;
   const T = $('titleIn');
-  T.innerHTML = `<h1>Single-Player MMO</h1><div class="sub">Build 3 · levels 1-20 · the Saltreach Coast · a century after the summoner wars</div>
+  T.innerHTML = `<h1>Single-Player MMO</h1><div class="sub">Build 4 · the Vale's story · a century after the summoner wars</div>
     ${has ? '<button class="pri" id="contBtn" style="width:100%;margin-bottom:12px">Continue</button>' : ''}
     <div class="card" style="text-align:left"><h3>New hero</h3><input type="text" id="heroName" maxlength="14" placeholder="Hero name" value="${pickName()}">
     ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Cinzel;color:var(--acc)">${f}s</p><div class="clsPick">${CLASS_KEYS.filter(k => CLASSES[k].family === f).map(k => { const c = CLASSES[k]; return `<div class="card" data-k="${k}" style="border-color:${c.color}"><b style="color:${c.color}">${roleIcon(k)} ${c.name}</b><p>${esc(c.blurb)}</p></div>`; }).join('')}</div>`).join('')}
@@ -681,6 +803,8 @@ function afterStart() {
 export function update(dt) {
   if (!S.running || !S.hero) return;
   S.frame++;
+  updateScene();
+  if (S.scene) return;
   updateFrames(); refreshKeys(); updateChat(); updatePlates(dt); updateMini(); updateAct();
   { const h = S.hero, br = $('breath'), show = h.breath !== undefined && h.breath < Sea.BREATH_MAX - .01 && !h.dead; br.classList.toggle('hide', !show); if (show) br.firstElementChild.style.width = (h.breath / Sea.BREATH_MAX * 100) + '%'; }
   const dead = S.hero.dead;
@@ -711,11 +835,14 @@ export function init() {
   $('menuBtn').onclick = openMenu;
   $('mini').onclick = openMap;
   $('act').onclick = doAct;
+  $('scene').addEventListener('pointerup', ev => { ev.stopPropagation(); if (ev.target.id === 'sceneSkip') Game.endScene(); else Game.nextShot(); });
+  $('scene').addEventListener('pointerdown', ev => ev.stopPropagation());
   $('sitBtn').onclick = toggleSit;
   $('hpotBtn').onclick = () => err(Game.drinkPot('hpot'));
   $('mpotBtn').onclick = () => err(Game.drinkPot('mpot'));
   $('releaseBtn').onclick = () => Game.release();
-  $('tgtX').onclick = ev => { ev.stopPropagation(); S.target = null; if (S.hero) S.hero.autoOn = false; };
+  const clearTgt = ev => { ev.stopPropagation(); ev.preventDefault(); S.target = null; if (S.hero) S.hero.autoOn = false; };
+  $('tgtX').addEventListener('pointerup', clearTgt); $('tgtX').onclick = clearTgt;
   $('tgtBtns').onclick = ev => {
     const a = ev.target.dataset.a, t = S.target; if (!a || !t) return;
     if (a === 'inv') Game.invite(t); if (a === 'fr') Game.befriend(t); if (a === 'kick') Game.kick(t); if (a === 'talk') interact(t); if (a === 'loot') openLoot(t);

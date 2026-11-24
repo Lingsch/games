@@ -132,10 +132,12 @@ export const depthAt = (x, z) => world.water === null ? 0 : Math.max(0, world.wa
 
 let zoneGens = {};
 export function registerZone(name, fn) { zoneGens[name] = fn; }
+// Build 4: the Vale's story places hook in here (js/valeplus.js)
+export const valeHooks = { terrain: null, build: null };
 // build a zone: 'vale' (the starting zone), 'coast', or 'fleet' (the instance)
 export function generateWorld(seed, zone = 'vale') {
   disposeWorld();
-  world.seed = seed; world.zone = zone; world.water = null; world.regionFn = null; world.regionNames = null; world.places = []; world.zoneLines = []; world.towns = []; world.camps = []; world.ferries = []; world.docks = [];
+  world.seed = seed; world.zone = zone; world.water = null; world.regionFn = null; world.regionNames = null; world.places = []; world.zoneLines = []; world.towns = []; world.camps = []; world.ferries = []; world.docks = []; world.props = []; world.storyNpcs = []; world.spots = {}; world.extraPlaces = []; world.clearSpots = [];
   if (zone !== 'vale') return zoneGens[zone](seed);
   return generateVale(seed);
 }
@@ -161,6 +163,8 @@ function generateVale(seed) {
     H[zi * HN + xi] = h;
   }
   town.base = hgt(0, 0); ruin.base = hgt(ruin.x, ruin.z);
+  world.clearSpots = []; world.extraPlaces = []; world.props = []; world.storyNpcs = []; world.spots = {};
+  if (valeHooks.terrain) valeHooks.terrain({ rng, town, ruin });
   // ground colour by region, blended near borders
   const REG_COL = [new THREE.Color('#9ea455'), new THREE.Color('#a89d5e'), new THREE.Color('#58763a'), new THREE.Color('#6d6878')];
   const SZ = 2 * WH + 40, gGeo = new THREE.PlaneGeometry(SZ, SZ, 300, 300).rotateX(-Math.PI / 2);
@@ -306,10 +310,11 @@ function generateVale(seed) {
   hallPacks.forEach(([x, z], i) => { for (let k = 0; k < 3; k++) put({ x: rx + x + k * 1.8, z: rz + z + (k % 2) * 1.5, mob: k === 1 ? 'wraith' : 'ghoul', lvl: [9, 9], respawn: 180, camp: 'rh' + i, area: 4, dungeon: true, elite: true }); });
   put({ x: rx, z: rz - 21, mob: 'abom', lvl: [10, 10], respawn: 420, named: 'boss', area: 4, dungeon: true, boss: true });
 
+  if (valeHooks.build) valeHooks.build({ rng, town, ruin, put, tryPos, okSpot });
   // ---------- scenery ----------
   const lists = { pine: [], oak: [], dead: [], rock: [], grock: [] }, tufts = [], tcol = [];
   const clear = (x, z) => Math.hypot(x - town.x, z - town.z) < town.R + 6 || Math.hypot(x - ruin.x, z - ruin.z) < ruin.R + 4 || Math.abs(x) < 5 && Math.abs(z) < 210 ||
-    world.camps.some(c => Math.hypot(x - c.x, z - c.z) < 12) || sp.some(s => Math.hypot(s.x - x, s.z - z) < 2.5);
+    world.camps.some(c => Math.hypot(x - c.x, z - c.z) < 12) || sp.some(s => Math.hypot(s.x - x, s.z - z) < 2.5) || world.clearSpots.some(c => Math.hypot(x - c.x, z - c.z) < c.r);
   const dens = [[['oak', .05], ['rock', .03]], [['oak', .04], ['rock', .05], ['dead', .01]], [['pine', .42], ['oak', .12], ['rock', .04]], [['dead', .12], ['grock', .07]]];
   for (let n = 0; n < 45000; n++) {
     const x = (rng() * 2 - 1) * (WH - 10), z = (rng() * 2 - 1) * (WH - 10);
@@ -348,7 +353,7 @@ function generateVale(seed) {
   { const o = new THREE.Object3D(); mts.forEach((t, i) => { o.position.set(t[0], t[1], t[2]); o.rotation.y = t[3]; o.scale.set(20 + rng() * 22, 26 + rng() * 40, 20 + rng() * 22); o.updateMatrix(); mtMesh.setMatrixAt(i, o.matrix); }); }
 
   // places for the map and zone names, and the zone line at the east end of the Kingsroad
-  world.places = [{ name: world.names.town, x: town.x, z: town.z, R: town.R + 2, kind: 'town' }, { name: world.names.ruin, x: ruin.x, z: ruin.z, R: ruin.R, kind: 'dungeon' }];
+  world.places = [{ name: world.names.town, x: town.x, z: town.z, R: town.R + 2, kind: 'town' }, { name: world.names.ruin, x: ruin.x, z: ruin.z, R: ruin.R, kind: 'dungeon' }, ...world.extraPlaces];
   world.towns = [{ name: world.names.town, x: town.x, z: town.z }];
   { const zx = WH - 14, zz = Math.sin(zx * .02) * 12; world.zoneLines.push({ x: zx, z: zz, r: 9, to: 'coast', label: 'To the Saltreach Coast (levels 11-20)' }); zoneMarker(zx, zz, Math.PI / 2); }
   // minimap base

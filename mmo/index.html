@@ -10,7 +10,6 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" href="icon-192.png">
-<meta name="theme-color" content="#0b0a10">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Alegreya+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
 <style>
@@ -55,7 +54,7 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 .pf.dead{opacity:.45}.pf.sel{box-shadow:0 0 0 2px #fff}
 .pf .cast{position:absolute;right:4px;top:2px;font-size:10px;color:var(--acc)}
 .pf .aggro{position:absolute;right:-6px;top:6px;width:9px;height:9px;border-radius:50%;background:var(--bad);box-shadow:0 0 6px var(--bad)}
-#cmds{display:flex;gap:2px;margin-top:2px;width:150px}#cmds button{flex:1;min-height:24px;padding:0 2px;font-size:9.5px;background:var(--plate)}#cmds button.on{background:var(--acc);color:#1a1208}
+#cmds{display:flex;gap:2px;margin-top:2px;width:172px}#cmds button{flex:1;min-height:26px;padding:0 1px;font-size:9px;background:var(--plate)}#cmds button.on{background:var(--acc);color:#1a1208}
 
 #mapbox{position:fixed;top:var(--st);right:var(--sr);display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 #mini{width:76px;height:76px;border-radius:50%;border:2px solid var(--line);background:#222;cursor:pointer}
@@ -65,7 +64,7 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 #mapbtns button[data-n]::after{content:attr(data-n);margin-left:4px;background:#e04a2a;color:#fff;border-radius:7px;padding:0 4px;font-size:10px}
 
 #tgt{position:fixed;top:calc(var(--st) + 112px);right:var(--sr);width:150px;padding:3px 6px}
-#tgtX{position:absolute;top:-8px;right:-8px;width:24px;height:24px;min-height:0;padding:0;border-radius:50%;font-size:12px;line-height:1;background:#2a2f34;border:1px solid var(--line)}
+#tgtX{position:absolute;top:3px;right:3px;width:30px;height:30px;z-index:5;touch-action:manipulation;min-height:0;padding:0;border-radius:50%;font-size:12px;line-height:1;background:#2a2f34;border:1px solid var(--line)}
 #tgt .bar{margin-top:3px}
 #tgtSub{display:flex;flex-wrap:wrap;justify-content:space-between;font-size:9.5px;color:var(--dim);margin-top:2px;column-gap:6px}
 #tgtCast{margin-top:3px}#tgtCast i{background:#c08aff}
@@ -79,7 +78,7 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 #track{position:fixed;right:var(--sr);width:150px;font-size:10px;line-height:1.3;text-align:right;color:var(--dim);text-shadow:0 1px 2px #000,0 0 3px #000;pointer-events:none}
 #track b{color:var(--acc);font-weight:700}
 
-@media(min-aspect-ratio:4/3){#tgt{top:var(--st);right:auto;left:50%;transform:translateX(-50%);width:200px}#party{top:calc(var(--st) + 56px)}}
+@media(min-aspect-ratio:4/3){#tgt{top:calc(var(--st) + 6px);right:auto;left:50%;transform:translateX(-50%);width:200px}#party{top:calc(var(--st) + 56px)}}
 
 /* bottom: chat, utility buttons, the bar */
 #chat{position:fixed;right:var(--sr);bottom:calc(var(--sb) + var(--barH) + 46px);width:min(220px,54vw);display:flex;flex-direction:column;gap:1px;pointer-events:none;font-size:10.5px;line-height:1.25;text-shadow:0 1px 2px #000,0 0 3px #000}
@@ -90,7 +89,7 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 #util button{min-height:30px;min-width:34px;padding:0 6px;font-size:13px;background:var(--plate);position:relative}
 #util button small{position:absolute;right:2px;bottom:0;font-size:10px;font-weight:700}
 #util button .cd{position:absolute;inset:0;border-radius:9px;background:rgba(0,0,0,.55)}
-#act{position:fixed;left:var(--sl);bottom:calc(var(--sb) + var(--barH) + 48px);font-size:13px!important;min-height:34px!important;min-height:40px;font-size:15px;background:var(--acc);color:#1a1208;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+#act{position:fixed;left:var(--sl);bottom:calc(var(--sb) + var(--barH) + 164px);font-size:13px!important;min-height:34px!important;min-height:40px;font-size:15px;background:var(--acc);color:#1a1208;box-shadow:0 2px 10px rgba(0,0,0,.4)}
 #castbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--barH) + 100px);width:200px;padding:3px 6px;text-align:center;font-size:11.5px}
 #castbar .bar{margin-top:2px}#castbar i{background:var(--acc)}
 #xp{position:fixed;left:var(--sl);right:var(--sr);bottom:calc(var(--sb) + var(--barH) + 3px);height:3px}
@@ -123,8 +122,9 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 .ft.big{font-size:19px}
 
 /* joystick */
-#joy{position:fixed;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;border:2px solid rgba(238,228,204,.25);background:rgba(10,12,14,.25);pointer-events:none;display:none}
-#joy i{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px 0 0 -23px;border-radius:50%;background:rgba(238,228,204,.35)}
+#joy{position:fixed;left:calc(var(--sl) + 12px);bottom:calc(var(--sb) + var(--barH) + 50px);width:104px;height:104px;border-radius:50%;border:2px solid rgba(238,228,204,.3);background:rgba(10,12,14,.3);pointer-events:none;opacity:.6;transition:opacity .15s}#joy.on{opacity:1}
+@media(min-aspect-ratio:4/3){#joy{bottom:calc(var(--sb) + 10px)}}
+#joy i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(238,228,204,.4)}
 
 /* panels */
 #sheet{position:fixed;inset:0;background:rgba(6,8,10,.55);display:flex;align-items:flex-end;justify-content:center;z-index:20}
@@ -167,6 +167,24 @@ input[type=text]{width:100%;background:#0e1214;color:var(--ink);border:1px solid
 #tip{position:fixed;z-index:25;max-width:240px;padding:7px 9px;font-size:12.5px;pointer-events:none}
 #tip b{color:var(--acc)}
 #load{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;font:700 18px Cinzel,serif;color:var(--acc);background:var(--bg);z-index:40}
+
+/* Build 4: dialogue, scenes, lore, perks */
+.say{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:12px 12px 12px 3px;padding:6px 10px;margin:0 0 6px}
+.say b{font:700 12px Cinzel,serif;color:var(--acc)}.say p{margin:2px 0 0;font-size:15px;line-height:1.35}
+.say.alt{border-radius:12px 12px 3px 12px;margin-left:16px;background:rgba(140,180,255,.06)}.say.alt b{color:#9fd0ff}
+p.obj{border-left:3px solid var(--acc);padding:2px 8px;margin:8px 0}
+.acts.col{flex-direction:column;align-items:stretch}.acts.col button{text-align:left}
+.qpick{cursor:pointer;font-size:15px}
+.fams{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}.fam{border:1px solid var(--line);border-radius:8px;padding:2px 7px;font-size:13px;color:var(--dim)}.fam.ok{color:#9fe68a;border-color:#4a7a3a}
+.perks{display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-top:5px}.perk{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:5px 7px;min-height:0}
+.perk span{font-size:16px}.perk b{font-size:12px}.perk small{font-size:11px;color:var(--dim);line-height:1.2}.perk.on{box-shadow:0 0 0 2px var(--acc)}.perk:disabled{opacity:.4}
+p.lore{font-style:italic;line-height:1.45}
+#scene{position:fixed;inset:0;z-index:40}#scene .lb{position:absolute;left:0;right:0;background:#000}#scene .top{top:0;height:12vh}#scene .bot{bottom:0;min-height:22vh;display:flex;align-items:center;justify-content:center;padding:10px 16px calc(var(--sb) + 8px)}
+#sceneCap{max-width:560px;text-align:center}#sceneCap b{font:700 15px Cinzel,serif;color:var(--acc)}#sceneCap p{margin:4px 0;font-size:16px;line-height:1.4;color:#f2ead8}#sceneCap p.narr{font-style:italic;color:#d8d0c0}#sceneCap small{color:var(--dim);font-size:11px}
+#sceneSkip{position:absolute;right:calc(var(--sr) + 6px);top:calc(var(--st) + 6px);z-index:41;min-height:0;padding:5px 12px;font-size:13px;opacity:.8}
+body.inscene #hud,body.inscene #plates,body.inscene #joy,body.inscene #toast{visibility:hidden}
+@media(min-aspect-ratio:4/3){#act{bottom:calc(var(--sb) + 124px)}}
+#tgt .fname{padding-right:28px}
 </style>
 </head>
 <body>
@@ -214,6 +232,7 @@ input[type=text]{width:100%;background:#0e1214;color:var(--ink);border:1px solid
 </div>
 
 <div id="death" class="hide"><div class="plate"><h2>You have died</h2><p id="deathTxt" class="dim"></p><div class="acts" style="justify-content:center"><button id="releaseBtn" class="pri">Release to bind stone</button></div></div></div>
+<div id="scene" class="hide"><div class="lb top"></div><div class="lb bot"><div id="sceneCap"><b id="sceneWho"></b><p id="sceneTxt"></p><small>Tap to continue</small></div></div><button id="sceneSkip">Skip</button></div>
 <div id="sheet" class="hide"><div id="sheetIn"><div id="sheetHead"><h2 id="sheetTitle"></h2><button id="sheetX">Close</button></div><div id="sheetBody"></div></div></div>
 <div id="title" class="hide"><div id="titleIn"></div></div>
 <div id="toast"></div>

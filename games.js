@@ -19,10 +19,10 @@ window.GAMES = [
   {
     title: "Single-Player MMO",
     folder: "mmo",
-    version: "Build 3",
+    version: "Build 4.1",
     updated: "November 2026",
     kind: "Tab-target MMO, solo",
-    blurb: "The same world, a hundred years after the summoner wars. Group with AI companions, compete with fake players, and sail the Saltreach Coast to the Sunken Fleet.",
+    blurb: "The same world, a hundred years after the summoner wars. Uncover the Gravelord's plot in the Vale with your two friends, then sail the Saltreach Coast to the Sunken Fleet.",
     facts: ["16 classes", "Levels 1–20", "2 zones"],
     accent: "#63b7c9"
   }

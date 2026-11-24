@@ -33,17 +33,20 @@ export function makeMob(key, lvl, o = {}) {
 }
 export const buffSum = (e, k) => { let s = 0; for (const b of e.buffs) if (b.data[k]) s += b.data[k]; return s; };
 export const hasBuff = (e, id) => e.buffs.some(b => b.id === id);
+const NOACCT = {};
 export function recalc(e) {
   if (e.cls) {
     const C = CLASSES[e.cls], L = e.lvl;
     const frac = e.maxHp > 0 ? e.hp / e.maxHp : 1;
-    e.maxHp = Math.round((C.hp[0] + C.hp[1] * L + e.gearSta * 8) * (1 + buffSum(e, 'hp')));
+    // the hero's account-wide bonuses and slotted perks (Build 4)
+    const A = e.acct || NOACCT;
+    e.maxHp = Math.round((C.hp[0] + C.hp[1] * L + (e.gearSta + (A.sta || 0)) * 8) * (1 + buffSum(e, 'hp') + (A.hpP || 0)));
     if (!e.dead) e.hp = Math.min(e.maxHp, Math.max(1, Math.round(frac * e.maxHp)));
-    e.power = (C.pow[0] + C.pow[1] * L + e.gearPow) * (1 + buffSum(e, 'pow'));
-    e.armor = (e.gearArm + L * 3) * (1 + buffSum(e, 'armor'));
-    e.crit = .05 + e.gearCrit / 100 + buffSum(e, 'crit');
-    e.dodge = .03 + (C.dodge ? C.dodge + L * .006 : 0) + buffSum(e, 'dodge');
-    e.parry = (C.parry ? C.parry + L * .006 : 0) + buffSum(e, 'parry');
+    e.power = (C.pow[0] + C.pow[1] * L + e.gearPow + (A.pow || 0)) * (1 + buffSum(e, 'pow') + (A.powP || 0));
+    e.armor = (e.gearArm + L * 3) * (1 + buffSum(e, 'armor') + (A.armorP || 0));
+    e.crit = .05 + e.gearCrit / 100 + buffSum(e, 'crit') + (A.crit || 0);
+    e.dodge = .03 + (C.dodge ? C.dodge + L * .006 : 0) + buffSum(e, 'dodge') + (A.dodge || 0);
+    e.parry = (C.parry ? C.parry + L * .006 : 0) + buffSum(e, 'parry') + (A.parry || 0);
     if (C.res === 'mana') { const mf = e.resMax > 0 ? e.res / e.resMax : 1; e.resMax = Math.round((C.mana[0] + C.mana[1] * L) * (1 + buffSum(e, 'mana'))); e.res = Math.min(e.resMax, mf * e.resMax); }
     else e.resMax = 100;
   } else if (e.mob) {
@@ -88,7 +91,7 @@ export const conColor = (L, mob) => { const dL = mob - L; return dL >= 3 ? '#ff4
 export function addThreat(mob, src, amt) {
   if (!mob.mob || mob.dead || mob.evading) return;
   const k = roleOf(src) === 'tank' ? (src.pet ? 2.6 : 2.2) : 1;
-  mob.threat.set(src, (mob.threat.get(src) || 0) + amt * k * (1 + buffSum(src, 'threat')));
+  mob.threat.set(src, (mob.threat.get(src) || 0) + amt * k * (1 + buffSum(src, 'threat') + (src.acct?.threatP || 0)));
   mob.combatT = S.time; src.combatT = S.time;
   const own = ownerOf(src);
   if (!mob.tagged) mob.tagged = own.inParty ? 'party' : own.fake?.group ? own.fake.group : own;
@@ -178,13 +181,14 @@ export function damage(src, tgt, amt, school = 'phys', opts = {}) {
   const col = src.isHero ? SCHOOL_COL[school] || '#fff' : tgt.isHero ? '#ff6a5a' : null;
   if (col) floatText(tgt, (crit ? amt + '!' : '' + amt), col, crit);
   if (ownerOf(src).inParty) { const o = ownerOf(src); S.meter[o.id] = (S.meter[o.id] || 0) + amt; }
+  if (M && M.yields && tgt.hp < tgt.maxHp * .18 && hooks.onYield && hooks.onYield(tgt, src)) { tgt.hp = Math.max(1, tgt.hp); return amt; }
   if (tgt.hp <= 0) kill(tgt, src);
   return amt;
 }
 export function heal(src, tgt, amt, quiet = false) {
   if (!tgt || tgt.dead) return 0;
   let crit = !quiet && Math.random() < src.crit;
-  amt = Math.round(amt * (crit ? 1.5 : 1) * rnd(.95, 1.05));
+  amt = Math.round(amt * (crit ? 1.5 : 1) * rnd(.95, 1.05) * (1 + (src.acct?.healP || 0) + (tgt.acct?.healIn || 0)));
   const real = Math.min(amt, tgt.maxHp - tgt.hp);
   tgt.hp += real;
   if ((src.isHero || tgt.isHero) && (!quiet || src.isHero) && amt > 0) floatText(tgt, '+' + amt, '#7dff7a', crit);
@@ -230,7 +234,7 @@ export function updateBuffs(e, dt) {
   if (changed) recalc(e);
 }
 export const slowOf = e => { let s = 0; for (const b of e.buffs) if (b.data.slow) s = Math.max(s, b.data.slow); return s; };
-export const spdOf = e => (1 - slowOf(e)) * (1 + buffSum(e, 'spd'));
+export const spdOf = e => (1 - slowOf(e)) * (1 + buffSum(e, 'spd') + (e.acct?.spdP || 0));
 export const chainOf = e => e.buffs.find(b => b.id === 'chain')?.data.stacks || 0;
 export const ccd = e => e.buffs.some(b => b.data.mez || b.data.stun);
 export const rooted = e => e.buffs.some(b => b.data.root);
@@ -475,13 +479,13 @@ export function updateAuto(e, dt) {
 export function regen(e, dt) {
   if (e.dead) return;
   const ooc = !inCombat(e), sit = e.sit && ooc;
-  const hpR = ooc ? (sit ? .06 : .012) : 0, inner = 1 + buffSum(e, 'regen');
+  const hpR = (ooc ? (sit ? .06 : .012) : 0) * (1 + (e.acct?.regenP || 0)), inner = 1 + buffSum(e, 'regen') + (e.acct?.resP || 0);
   if (hpR && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * hpR * dt);
   if (e.resType === 'mana') {
     const five = S.time - e.lastCast > 5;
     const r = (sit ? .06 : five ? (ooc ? .015 : .01) : .004) * inner;
     e.res = Math.min(e.resMax, e.res + e.resMax * r * dt);
-  } else if (RES[e.resType]?.kind === 'regen') e.res = Math.min(100, e.res + RES[e.resType].rate * (hasBuff(e, 'moon') ? 2 : 1) * dt);
+  } else if (RES[e.resType]?.kind === 'regen') e.res = Math.min(100, e.res + RES[e.resType].rate * (hasBuff(e, 'moon') ? 2 : 1) * (1 + (e.acct?.resP || 0)) * dt);
   else if (RES[e.resType]?.kind === 'build' && ooc) e.res = Math.max(0, e.res - RES[e.resType].decay * dt);
   if (e.mob && !e.engaged && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * .05 * dt);
 }
@@ -531,14 +535,18 @@ function mobDied(e, src) {
 }
 export function giveXp(p, amt) {
   if (amt <= 0) return;
+  if (p.isHero && hooks.xpMod) amt = Math.round(hooks.xpMod(p, amt));
+  const cap = p.isHero && hooks.lvlCap ? hooks.lvlCap(p) : MAX_LVL;
   if (p.lvl >= MAX_LVL) { p.xp = 0; return; }
+  if (p.lvl >= cap) { const was = p.xp || 0; p.xp = Math.min(xpNeed(p.lvl) - 1, was + amt); if (hooks.onOverflow) hooks.onOverflow(p, was + amt - p.xp); if (p.xp >= xpNeed(p.lvl) - 1 && hooks.onCapped) hooks.onCapped(p); return; }
   p.xp = (p.xp || 0) + amt;
   if (p.isHero) floatText(p, `+${amt} xp`, '#c8a2ff');
-  while (p.lvl < MAX_LVL && p.xp >= xpNeed(p.lvl)) {
+  while (p.lvl < cap && p.xp >= xpNeed(p.lvl)) {
     p.xp -= xpNeed(p.lvl); p.lvl++;
     recalc(p); p.hp = p.maxHp; if (p.resType !== 'rage') p.res = p.resMax;
     R.burst(p.x, p.y + 1, p.z, 40, [1, .85, .4], 3, 1.2, .7);
     hooks.onLevel(p);
   }
   if (p.lvl >= MAX_LVL) p.xp = 0;
+  else if (p.lvl >= cap) { if (hooks.onOverflow && p.xp > xpNeed(p.lvl) - 1) hooks.onOverflow(p, p.xp - (xpNeed(p.lvl) - 1)); p.xp = Math.min(p.xp, xpNeed(p.lvl) - 1); if (p.xp >= xpNeed(p.lvl) - 1 && hooks.onCapped) hooks.onCapped(p); }
 }

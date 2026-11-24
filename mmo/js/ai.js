@@ -539,12 +539,26 @@ export function companionAI(e, dt) {
   if (e.pull) {
     const p = e.pull, ab = PULL_AB[e.cls];
     if (p.phase === 'go') {
+      const rng = Math.min(20, (CLASSES[e.cls].abilities[ab]?.range || 20)) - 1.5, d = p.tgt ? dist(e, p.tgt) : 0;
       if (!p.tgt || p.tgt.dead) { e.pull = null; }
-      else if (dist(e, p.tgt) < 20 && !blocked(e.x, e.z, p.tgt.x, p.tgt.z)) { if (tryUse(e, ab, p.tgt) || p.tgt.engaged) { p.phase = 'back'; chat('party', e.name, pick(CHAT.pull).replace('{t}', p.tgt.name)); } }
-      else goTo(e, p.tgt.x, p.tgt.z, dt, 18);
+      else if (p.tgt.threat?.has(e) || (d < rng && !blocked(e.x, e.z, p.tgt.x, p.tgt.z) && tryUse(e, ab, p.tgt))) { p.phase = 'back'; chat('party', e.name, pick(CHAT.pull).replace('{t}', p.tgt.name)); }
+      else if (d < 3.5) { face(e, p.tgt, dt); Cb.addThreat(p.tgt, e, 10); e.anim.atk = 1; } // ability not ready: body pull
+      else goTo(e, p.tgt.x, p.tgt.z, dt, d < rng + 4 ? 2.5 : rng - .5);
       return;
     }
-    if (p.phase === 'back') { if (goTo(e, p.spot.x, p.spot.z, dt, 1.5)) e.pull = null; else return; }
+    if (p.phase === 'back') { if (dist(e, p.spot) < 4 || goTo(e, p.spot.x, p.spot.z, dt, 3)) e.pull = null; else return; }
+  }
+  const ord = S.campOrder;
+  if (!inFight && ord && ord.mode === 'clear' && ord.tank === e) {
+    const left = S.ents.filter(m => m.mob && !m.dead && !m.remove && isEnemy(e, m) && !m.charmed && Math.hypot(m.x - ord.c.x, m.z - ord.c.z) < ord.r).sort((a, b) => dist(a, e) - dist(b, e));
+    const t = left[0];
+    if (t) {
+      e.sit = false;
+      if (dist(e, t) > 3.2) { goTo(e, t.x, t.z, dt, 2.4, .9); return; }
+      face(e, t, dt); e.target = t;
+      if (!tryUse(e, PULL_AB[e.cls], t)) { Cb.addThreat(t, e, 10); e.anim.atk = 1; }
+      return;
+    }
   }
   if (inFight) {
     e.sit = false;
@@ -613,15 +627,25 @@ export function companionAI(e, dt) {
   if (healerTurnOoc(e, group)) return;
   if (upkeepBuffs(e, group)) return;
   // follow in formation, rest when the group rests
-  const slot = group.indexOf(e), a = hero.yaw + Math.PI + (slot - 3) * .45, r = 3 + (slot % 2) * 1.6;
+  const slot = group.indexOf(e), a = formYaw() + Math.PI + (slot - 3) * .5, r = 3 + (slot % 2) * 1.6;
   const fx = hero.x + Math.sin(a) * r, fz = hero.z + Math.cos(a) * r;
   if (S.cmd === 'hold' && e.holdAt) { if (moveToward(e, e.holdAt.x, e.holdAt.z, dt, .6)) rest(e); return; }
   // a companion that falls far behind or stays stuck on a wall catches up
   if ((e.stuckT || 0) > 2.5 && dist(e, hero) > 6) e.followStuck = (e.followStuck || 0) + dt; else e.followStuck = 0;
   if (dist(e, hero) > 45 || e.followStuck > 1.5) { e.x = fx + rnd(-1, 1); e.z = fz + rnd(-1, 1); e.y = hgt(e.x, e.z); e.stuckT = 0; e.followStuck = 0; e.navT = 0; }
   const far = Math.hypot(fx - e.x, fz - e.z);
-  if (far > 1.2) goTo(e, fx, fz, dt, .8, far > 8 ? 1.3 : 1);
-  else rest(e);
+  // start moving only when you're well off your spot, then walk until you're on it
+  if (far > 2.6) e.following = true; else if (far < .9) e.following = false;
+  if (e.following) goTo(e, fx, fz, dt, .7, far > 8 ? 1.3 : far < 3.5 ? Math.max(.6, Math.min(1, (hero.moving || 0) + .2)) : 1);
+  else { e.moving = Math.max(0, e.moving - dt * 6); rest(e); }
+}
+// the way the group faces: follows where you walk, and holds still while you stand
+let fYaw = null, fX = 0, fZ = 0;
+function formYaw() {
+  const h = S.hero; if (fYaw === null) { fYaw = h.yaw; fX = h.x; fZ = h.z; }
+  const dx = h.x - fX, dz = h.z - fZ, d = Math.hypot(dx, dz);
+  if (d > 2) { const want = Math.atan2(dx, dz); fYaw = fYaw + wrapA(want - fYaw) * .35; fX = h.x; fZ = h.z; }
+  return fYaw;
 }
 function healerTurnOoc(e, group) { if (CLASSES[e.cls].role !== 'healer' || e.casting) return false; return healerTurn(e, group, false); }
 function rest(e) {

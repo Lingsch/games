@@ -2,6 +2,9 @@
 import { S, rnd, irnd, pick, dist, chat, floatText, clamp, TAU, fct } from './core.js';
 import { CLASSES, CLASS_KEYS, MOBS, QUESTS, GIVERS, FAKE_NAMES, PERSONAS, GUILDS, CHAT, xpNeed, defaultBar, randomGear, makeItem, WTYPE, WEAR, POTIONS, NAMED_NAMES, MAX_LVL, roleOf, startRes, BASE_NAMES, SETS, SIGNATURE } from './data.js';
 import * as Sea from './sea.js';
+import { LORE, SCENES, PERKS } from './story.js';
+import './valeplus.js';
+import { FAMILIES } from './data.js';
 import * as Cb from './combat.js';
 import * as AI from './ai.js';
 import { generateWorld, world, hgt, REGION_NAMES, regionAt, collide, depthAt } from './world.js';
@@ -43,14 +46,18 @@ export function newGame(cls, heroName, seed = (Math.random() * 1e9) | 0) {
   for (const k of CLASS_KEYS) { S.classes[k] = { lvl: 1, xp: 0 }; S.gear[k] = starterGear(k); S.bar[k] = defaultBar(k); }
   S.heroCls = cls; S.heroName = heroName;
   S.pops = {}; S.bind = null; S.zone = 'vale'; S.pole = false;
+  S.flags = {}; S.lore = {}; S.perks = []; S.bank = []; S.used = {}; S.scenesSeen = {}; S.vetXp = 0;
   startWorld({ zone: 'vale' });
+  S.pendingScene = 'intro';
+  makeFriends();
   chat('sys', null, `Welcome to ${world.names.town}. Tap a fake player to invite them, or open Social to see who's around.`);
-  chat('sys', null, 'Quest givers have a ! over their heads. Your group can be up to 6.');
+  chat('sys', null, 'Quest givers have a ! over their heads. Wick the gravedigger is waiting outside the north gate. Your group can be up to 6.');
 }
 // fake players as plain data, so they keep their levels between zones and saves
-export function fakeData(f) { return { name: f.name, cls: f.cls, lvl: f.lvl, xp: f.xp || 0, pal: f.pal || 1, persona: f.fake.persona, guild: f.fake.guild, mood: f.fake.mood, friend: f.fake.friend, bonusPow: f.bonusPow || 0, bonusSta: f.bonusSta || 0, bonusArm: f.bonusArm || 0 }; }
+export function fakeData(f) { return { name: f.name, cls: f.cls, lvl: f.lvl, xp: f.xp || 0, pal: f.pal || 1, persona: f.fake.persona, guild: f.fake.guild, mood: f.fake.mood, friend: f.fake.friend, bff: !!f.fake.bff, bonusPow: f.bonusPow || 0, bonusSta: f.bonusSta || 0, bonusArm: f.bonusArm || 0 }; }
 function startWorld(opts = {}) {
   const zone = opts.zone || 'vale', old = S.hero;
+  S.scene = null; S.pendingScene = null; S.sceneEnd = null;
   S.ents.length = 0; S.party = []; S.dangers = []; S.meter = {}; S.target = null; S.dead = false; Cb.projectiles.length = 0;
   if (!opts.keepLog) S.log.length = 0;
   S.zone = zone; world.fleetT = 0; world.underwater = false;
@@ -58,12 +65,12 @@ function startWorld(opts = {}) {
   const tw = world.town, a = opts.arrive || { x: tw.x + 1, z: tw.z + 4 };
   const hero = Cb.makeHuman(S.heroCls, S.classes[S.heroCls].lvl, { name: S.heroName, isHero: true, inParty: true, x: a.x, z: a.z, pal: 0 });
   hero.xp = S.classes[S.heroCls].xp; hero.kind = CLASSES[S.heroCls].models[0];
-  applyGear(hero, S.corpse ? {} : S.gear[S.heroCls]); hero.hp = hero.maxHp; hero.res = startRes(hero);
+  hero.acct = acctBonus(); applyGear(hero, S.corpse ? {} : S.gear[S.heroCls]); hero.hp = hero.maxHp; hero.res = startRes(hero);
   if (old && opts.carryHero && !old.dead) { hero.buffs = old.buffs.filter(b => b.dur > 20).map(b => ({ ...b, src: hero })); Cb.recalc(hero); hero.hp = Math.max(1, Math.round(hero.maxHp * old.hp / old.maxHp)); hero.res = old.res; hero.ult = old.ult; hero.yaw = old.yaw; }
   S.hero = hero; S.party = [hero];
   townsfolk(zone);
   // mobs
-  for (const sp of world.spawns) spawn(sp);
+  for (const sp of world.spawns) if (!(sp.gate && S.flags[sp.gate + 'Yielded'])) spawn(sp);
   if (zone === 'coast') for (const q of QUESTS) if (q.rival && S.quests[q.id]?.state === 'active') spawnRival(q.rival);
   // fake players live in each zone
   makeFakes(zone === 'fleet' ? [] : S.pops?.[zone] || null, zone);
@@ -73,11 +80,189 @@ function startWorld(opts = {}) {
   Sea.setupZone();
   S.running = true;
 }
+// ---------- your two friends: always your level, always the roles you're missing ----------
+const NEED = { tank: ['healer', 'dps'], healer: ['tank', 'dps'], dps: ['tank', 'healer'] };
+const FRIEND_CLS = { tank: ['bulwark', 'bladewarden', 'wardancer'], healer: ['cleric', 'lifebinder', 'aegis'], dps: ['longwatch', 'elementalist', 'knifeshade', 'warlock', 'blightblade'] };
+const FRIEND_HI = { tank: 'Shields up. I\'ll take the hits.', healer: "I've got heals. Don't stand in fire.", dps: "I'll make things fall over." };
+export function makeFriends() {
+  if (S.friendsMade) return;
+  S.friendsMade = true;
+  const used = new Set([...S.fakes.map(f => f.name), S.heroName]);
+  const names = ['Tamsin', 'Brannoc', 'Mirelle', 'Odo', 'Finch', 'Rowena', 'Garrick', 'Ysolde'].filter(n => !used.has(n)).sort(() => Math.random() - .5);
+  const room = 6 - S.party.length;
+  if (room <= 0) return;
+  const need = NEED[CLASSES[S.heroCls].role];
+  S.friends = need.slice(0, room).map((role, i) => ({ name: names[i] || 'Friend ' + (i + 1), pal: 1 + i, persona: 'friendly' }));
+  S.friends.forEach((fr, i) => {
+    const cls = pick(FRIEND_CLS[need[i]]);
+    const f = addMate({ name: fr.name, cls, lvl: S.hero.lvl, pal: fr.pal, persona: fr.persona, guild: null, friend: true, bff: true }, S.hero);
+    chat('party', f.name, FRIEND_HI[need[i]]);
+  });
+  chat('sys', null, `Your friends ${S.friends.map(f => f.name).join(' and ')} have joined your group. They always match your level and fill the roles you need. Orders are under the party frames: Pull and Clear send your tank into a camp.`);
+}
+// keep friends at your level, and swap their classes to fill whatever role you're not playing
+export function syncFriends() {
+  const h = S.hero; if (!h) return;
+  const bffs = S.party.filter(p => p.fake?.bff);
+  if (!bffs.length) return;
+  const need = [...NEED[CLASSES[S.heroCls].role]];
+  // whoever already fills a needed role keeps it
+  const keep = new Map();
+  for (const f of bffs) { const r = CLASSES[f.cls].role, i = need.indexOf(r); if (i >= 0) { keep.set(f, r); need.splice(i, 1); } }
+  for (const f of bffs) {
+    let cls = f.cls;
+    if (!keep.has(f) && need.length) { const r = need.shift(); cls = pick(FRIEND_CLS[r]); }
+    if (cls !== f.cls || f.lvl !== h.lvl) {
+      const swap = cls !== f.cls, frac = f.dead ? .5 : f.hp / f.maxHp, at = { x: f.x, z: f.z };
+      S.party = S.party.filter(p => p !== f); S.fakes = S.fakes.filter(p => p !== f); f.remove = true; f.dead = true;
+      for (const p of petsOfAll(f)) { p.remove = true; p.dead = true; }
+      const n = addMate({ ...fakeData(f), cls, lvl: h.lvl, xp: 0, hp: frac, bff: true, friend: true }, h);
+      n.x = at.x; n.z = at.z; n.y = hgt(at.x, at.z);
+      if (swap) chat('party', n.name, `Switching to my ${CLASSES[cls].name}. ${FRIEND_HI[CLASSES[cls].role]}`);
+    }
+  }
+}
+const petsOfAll = f => S.ents.filter(e => e.pet && e.owner === f);
+// ---------- camp orders: the tank pulls the camp one at a time, or clears straight through; you follow the tank ----------
+const tankOf = () => S.party.find(p => !p.isHero && !p.dead && CLASSES[p.cls].role === 'tank');
+export function campOrder(mode) {
+  const h = S.hero, tank = tankOf();
+  if (!tank) { chat('sys', null, CLASSES[S.heroCls].role === 'tank' ? "You're the tank: lead the way in yourself." : 'You need a tank in your group to pull or clear a camp.'); return; }
+  const t0 = S.target && S.target.mob && !S.target.dead && Cb.isEnemy(h, S.target) ? S.target : S.ents.filter(m => m.mob && !m.dead && !m.remove && Cb.isEnemy(h, m) && !m.charmed && dist(m, h) < 50).sort((a, b) => dist(a, h) - dist(b, h))[0];
+  if (!t0) { chat('sys', null, 'No camp nearby. Walk closer to the enemies you want cleared.'); return; }
+  // the camp is everything that spawns with this enemy, or everything close around it
+  const mates = t0.camp ? S.ents.filter(m => m.mob && !m.dead && m.camp === t0.camp) : [t0];
+  let cx = 0, cz = 0; for (const m of mates) { cx += m.x; cz += m.z; } cx /= mates.length; cz /= mates.length;
+  S.campOrder = { mode, c: { x: cx, z: cz }, r: Math.max(12, ...mates.map(m => Math.hypot(m.x - cx, m.z - cz) + 6)), spot: { x: h.x, z: h.z }, tank, said: {} };
+  S.cmd = mode; S.target = null;
+  chat('party', h.name, mode === 'pull' ? `${tank.name}, pull that camp to us. One at a time.` : `${tank.name}, take us through. Clear the camp.`);
+  chat('party', tank.name, mode === 'pull' ? pick(["On it. Stay here, I'll bring them to you.", 'Pulling. Get ready.']) : pick(['Follow me in!', "Right behind me, everyone. Let's go."]));
+}
+export const campLeft = () => { const o = S.campOrder; return o ? S.ents.filter(m => m.mob && !m.dead && !m.remove && Cb.isEnemy(S.hero, m) && !m.charmed && Math.hypot(m.x - o.c.x, m.z - o.c.z) < o.r) : []; };
+function campTick() {
+  const o = S.campOrder; if (!o) return;
+  const tank = o.tank;
+  if (!tank || tank.dead || !S.party.includes(tank) || S.hero.dead) { S.campOrder = null; S.cmd = 'follow'; return; }
+  const left = campLeft(), fighting = S.ents.some(m => m.mob && !m.dead && m.threat && [...m.threat.keys()].some(k => S.party.includes(k)) && !m.evading);
+  if (!left.length && !fighting) { chat('party', tank.name, pick(['Camp clear!', "That's the lot. Camp's clear.", 'All clear. Nice work.'])); S.campOrder = null; S.cmd = 'follow'; for (const p of S.party) p.pull = null; return; }
+  // help: if you've no target, take the tank's
+  if ((!S.target || S.target.dead) && tank.target && !tank.target.dead && Cb.isEnemy(S.hero, tank.target)) S.target = tank.target;
+  if (o.mode === 'pull') {
+    if (tank.pull || fighting || !left.length) return;
+    const ready = S.party.every(p => p.dead || (p.hp > p.maxHp * .7 && !(p.resType === 'mana' && p.res < p.resMax * .45)));
+    if (!ready) { if (!o.said.rest) { o.said.rest = 1; chat('party', tank.name, 'Resting up before the next pull.'); } return; }
+    o.said.rest = 0;
+    const t = left.sort((a, b) => Math.hypot(a.x - o.spot.x, a.z - o.spot.z) - Math.hypot(b.x - o.spot.x, b.z - o.spot.z))[0];
+    tank.pull = { tgt: t, phase: 'go', spot: { ...o.spot } };
+  }
+}
+// where you walk on your own while an order runs (null: stay put)
+export function autoFollowPoint() {
+  const o = S.campOrder, h = S.hero; if (!o || !o.tank || o.tank.dead) return null;
+  const t = o.tank;
+  if (o.mode === 'pull' && (t.pull || Math.hypot(t.x - o.spot.x, t.z - o.spot.z) > 10)) return Math.hypot(h.x - o.spot.x, h.z - o.spot.z) > 2.5 ? o.spot : null;
+  const d = dist(h, t), keep = CLASSES[S.heroCls].melee ? 4 : 8;
+  if (d < keep + 1.5) return null;
+  const a = Math.atan2(h.x - t.x, h.z - t.z);
+  return { x: t.x + Math.sin(a) * keep, z: t.z + Math.cos(a) * keep };
+}
+// the Vale's story people and the things you can inspect; rebuilt when a choice changes who is where
+const flagIs = ([k, v]) => S.flags[k] === v;
+export function storyFolk() {
+  if (S.zone !== 'vale') return;
+  for (const e of S.ents) if (e.storyNpc || e.prop) { e.remove = true; e.dead = true; }
+  for (const n of world.storyNpcs) {
+    if (n.when && !flagIs(n.when)) continue;
+    if (n.unless && flagIs(n.unless)) continue;
+    if (n.yieldNpc && S.quests.m8?.state !== 'done') continue; // Ansel waits at the chapel only after he yields
+    const g = GIVERS[n.key];
+    const e = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, storyNpc: true, name: n.name || g?.name, title: n.title ?? g?.title ?? '', kind: n.kind || g?.model, x: n.x, z: n.z, giver: g && n.key !== 'banker' ? n.key : null, banker: n.key === 'banker', idle: g?.idle });
+    e.yaw = n.yaw || 0; e.y = hgt(e.x, e.z);
+    if (g && n.key !== 'villager') S.npcs[n.key] = e;
+  }
+  for (const p of world.props) {
+    if (p.lore && S.lore[p.lore] && !(p.tag !== 'lore' && needFor(p))) continue;
+    const e = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, prop: p, name: p.lore ? LORE[p.lore].title : p.name, kind: p.kind, x: p.x, z: p.z, scale: p.scale });
+    e.yaw = p.yaw; e.y = hgt(e.x, e.z);
+  }
+}
+const OBJ_VERB = { grave: 'Examine the grave', headstone: 'Set the headstone upright', bell: 'Ring the bell', wardstone: 'Touch the ward stone', journal: "Read Corwin's journal" };
+function needFor(p) { return QUESTS.find(q => q.obj.inspect === p.tag && S.quests[q.id]?.state === 'active' && !(S.used[q.id] || []).includes(p.id)); }
+// what the action button says for a prop, or null if there's nothing to do with it
+export function inspectLabel(e) {
+  const p = e.prop; if (!p) return null;
+  if (needFor(p)) return OBJ_VERB[p.tag] || 'Inspect';
+  if (p.lore && !S.lore[p.lore]) return 'Read: ' + LORE[p.lore].title;
+  return null;
+}
+export function inspect(e) {
+  const p = e.prop, h = S.hero; if (!p || dist(h, e) > 6) return null;
+  const q = needFor(p);
+  let read = null;
+  if (q) {
+    (S.used[q.id] = S.used[q.id] || []).push(p.id);
+    const st = S.quests[q.id]; st.n = Math.min(q.obj.n, st.n + 1);
+    floatText(h, `${q.name} ${st.n}/${q.obj.n}`, '#ffd34d');
+    if (p.tag === 'grave') chat('sys', null, pick(['The earth is heaped outward. Whatever left this grave dug its way up.', 'Claw marks on the inside of the coffin lid. Lots of them.', 'Footprints lead out of the grave and north. Bare feet. Very bony feet.']));
+    if (p.tag === 'headstone') { chat('sys', null, 'You heave the headstone upright.'); e.kind = 'shrine'; e.remove = true; e.dead = true; }
+    if (p.tag === 'bell') { chat('sys', null, 'BONNNG. The bell rings out over Hollin... and something in the fields answers.'); R.burst(e.x, e.y + 2, e.z, 30, [1, .9, .5], 3, 1, .6); for (let k = 0; k < 2; k++) { const g = Cb.makeMob('ghost', irnd(4, 5), { x: e.x + rnd(-9, 9), z: e.z + rnd(-9, 9), home: { x: e.x, z: e.z }, add: true }); g.y = hgt(g.x, g.z); Cb.addThreat(g, h, 5); } }
+    if (p.tag === 'wardstone') { chat('sys', null, 'The runes flare blue. The stone hums, faintly approving.'); R.burst(e.x, e.y + 1.5, e.z, 30, [.5, .8, 1], 2.5, 1, .6); }
+    if (st.n >= q.obj.n) { st.state = 'done'; chat('sys', null, `${q.name}: done! Return to ${GIVERS[q.turnTo || q.giver].name}.`); }
+  }
+  if (p.lore && !S.lore[p.lore]) { S.lore[p.lore] = true; read = p.lore; chat('sys', null, `Lore found: ${LORE[p.lore].title}. (${Object.keys(S.lore).length}/${Object.keys(LORE).length} · Book → Lore)`); }
+  if (p.tag === 'lore' && S.lore[p.lore]) { e.remove = true; e.dead = true; }
+  save();
+  return read;
+}
+// ---------- progression: the level 10 lock, faster xp for later classes, account bonuses, perks ----------
+export const levelOf = k => (k === S.heroCls && S.hero ? S.hero.lvl : S.classes[k]?.lvl || 1);
+export const famBest = f => Math.max(...CLASS_KEYS.filter(k => CLASSES[k].family === f).map(levelOf));
+export const lockedAt10 = () => FAMILIES.some(f => famBest(f) < 10);
+export const raidReady = () => FAMILIES.every(f => famBest(f) >= 20);
+export const perksOpen = () => CLASS_KEYS.filter(k => levelOf(k) >= 10);
+export const xpBoost = () => Math.min(.6, .2 * CLASS_KEYS.filter(k => k !== S.heroCls && levelOf(k) >= 10).length);
+export function acctBonus() {
+  const n10 = CLASS_KEYS.filter(k => levelOf(k) >= 10).length, n20 = CLASS_KEYS.filter(k => levelOf(k) >= 20).length;
+  const a = { sta: n10 + n20, pow: n20 };
+  S.perks = (S.perks || []).filter(k => levelOf(k) >= 10).slice(0, 2);
+  for (const k of S.perks) for (const [key, v] of Object.entries(PERKS[k].data)) a[key] = (a[key] || 0) + v;
+  return a;
+}
+export function refreshAcct() { const h = S.hero; if (!h) return; h.acct = acctBonus(); Cb.recalc(h); }
+export function togglePerk(k) {
+  if (levelOf(k) < 10) return;
+  const i = S.perks.indexOf(k);
+  if (i >= 0) S.perks.splice(i, 1); else if (S.perks.length < 2) S.perks.push(k); else { chat('sys', null, 'You can slot two perks. Remove one first.'); return; }
+  refreshAcct(); save();
+}
+let cappedSaid = false;
+// ---------- the bank, shared by every class ----------
+export const BANK_SLOTS = 40;
+export function bankStore(it) { if (S.bank.length >= BANK_SLOTS) { chat('sys', null, 'Your bank is full.'); return; } S.bag = S.bag.filter(b => b !== it); S.bank.push(it); save(); }
+export function bankTake(it) { if (S.bag.length >= 30) { chat('sys', null, 'Your bags are full.'); return; } S.bank = S.bank.filter(b => b !== it); S.bag.push(it); save(); }
+// ---------- story scenes ----------
+export function playScene(id, onEnd) {
+  const shots = SCENES[id]; if (!shots || S.scene) return false;
+  if (shots.some(sh => !world.spots[sh.spot])) return false;
+  S.scenesSeen[id] = true; S.scene = { id, shots, i: 0, t: 0, onEnd };
+  if (S.hero) { S.hero.casting = null; S.hero.moving = 0; }
+  return true;
+}
+export function nextShot() {
+  const sc = S.scene; if (!sc) return;
+  sc.i++; sc.t = 0;
+  if (sc.i >= sc.shots.length) { S.scene = null; if (sc.onEnd) sc.onEnd(); }
+}
+export function endScene() { const sc = S.scene; S.scene = null; if (sc?.onEnd) sc.onEnd(); }
+// fill {town}, {hero} and friends into story text
+export function fill(t) {
+  return String(t).replace(/\{(\w+)\}/g, (m, k) => k === 'hero' ? S.heroName : k === 'cls' ? CLASSES[S.heroCls].name : world.names?.[k] || (k === 'town' ? 'town' : m));
+}
 // a fake player (from saved data) joins your group beside you
 function addMate(d, hero) {
   const f = Cb.makeHuman(d.cls, d.lvl, { name: d.name, pal: d.pal || 1, x: hero.x + rnd(-2.5, 2.5), z: hero.z + rnd(-2.5, 2.5) });
   f.kind = CLASSES[d.cls].models[d.pal || 1]; f.xp = d.xp || 0; f.bonusPow = d.bonusPow || 0; f.bonusSta = d.bonusSta || 0; f.bonusArm = d.bonusArm || 0;
-  f.fake = { persona: d.persona, guild: d.guild, mood: d.mood || 0, friend: !!d.friend, state: 'party', group: null };
+  f.fake = { persona: d.persona, guild: d.guild, mood: d.mood || 0, friend: !!d.friend, bff: !!d.bff, state: 'party', group: null };
   fakeGear(f); f.hp = Math.max(1, Math.round(f.maxHp * (d.hp ?? 1))); f.res = d.res !== undefined ? f.resMax * d.res : startRes(f);
   f.inParty = true; S.party.push(f); S.fakes.push(f);
   return f;
@@ -94,9 +279,10 @@ function townsfolk(zone) {
     S.npcs.bind = npc({ name: 'Bind Stone', title: 'Bind here', kind: 'corpse', x: tw.x + N.bind.x, z: tw.z + N.bind.z, bindstone: true, scale: 1.6 });
     if (!S.bind) S.bind = { zone: 'vale', x: S.npcs.bind.x, z: S.npcs.bind.z + 1.5 };
     for (const [x, z] of N.guards) guard(tw, tw.x + x, tw.z + z, 'Town Guard');
+    storyFolk();
     return;
   }
-  const VEND = { port: 'Wexley the Chandler', fort: 'Quartermaster Bell', vill: 'Netmender Pell' };
+  const VEND = { port: 'Wexley the Chandler', fort: 'Quartermaster Bell', vill: 'Netmender Briggs' };
   for (const t of world.towns) {
     for (const [type, key, dx, dz] of t.npcs) {
       const x = t.x + dx, z = t.z + dz;
@@ -106,6 +292,10 @@ function townsfolk(zone) {
       if (type === 'armory') npc({ name: 'Mistress Hale', title: 'Armory (change class)', kind: 'guard', x, z, armory: true });
     }
     for (const [dx, dz] of t.guards) guard(t, t.x + dx, t.z + dz, t.key === 'fort' ? 'Halyard Marine' : 'Port Watch');
+    if (t.key === 'port') {
+      S.npcs.banker = npc({ name: GIVERS.banker.name, title: GIVERS.banker.title, kind: 'villager2', x: t.x - 7, z: t.z + 9, banker: true });
+      if (S.quests.m16) S.npcs.wick = npc({ name: GIVERS.wick.name, title: 'Came along', kind: 'wick', x: t.x + 4, z: t.z - 3, giver: 'wick' });
+    }
   }
 }
 function guard(t, x, z, name) { return Cb.makeEnt({ team: 'ally', name, kind: 'guard', x, z, guard: true, lvl: 30, maxHp: 9000, hp: 9000, power: 260, armor: 900, spd: 7, home: { x, z }, townC: { x: t.x, z: t.z, R: t.R } }); }
@@ -196,24 +386,16 @@ export function kick(f) {
 }
 export function befriend(f) { if (!f.fake) return; f.fake.friend = !f.fake.friend; chat('sys', null, f.fake.friend ? `${f.name} is now your friend. Friends always say yes when they're free.` : `${f.name} removed from friends.`); save(); }
 export function partyCommand(cmd) {
-  S.cmd = cmd;
-  // monks and bards are the best pullers, then any tank
-  const mates = S.party.filter(p => p !== S.hero && !p.dead);
-  const puller = mates.find(p => p.cls === 'monk') || mates.find(p => p.cls === 'bard') || mates.find(p => roleOf(p) === 'tank');
-  if (cmd === 'pull') {
-    S.cmd = 'follow';
-    const t = S.target;
-    if (!puller) { chat('sys', null, 'You need a tank, Monk or Bard companion to pull for you.'); return; }
-    if (!t || !t.mob || t.dead) { chat('sys', null, 'Target the enemy you want pulled first.'); return; }
-    puller.pull = { tgt: t, phase: 'go', spot: { x: S.hero.x, z: S.hero.z } };
-    return;
-  }
+  if (cmd === 'pull' || cmd === 'clear') { campOrder(cmd); return; }
+  S.cmd = cmd; S.campOrder = null;
+  for (const p of S.party) p.pull = null;
   if (cmd === 'hold') for (const p of S.party) p.holdAt = { x: p.x, z: p.z };
   chat('party', S.hero.name, { follow: 'Follow me.', assist: 'Assist me — attack my target.', hold: 'Hold here.' }[cmd]);
 }
 
 // ---------- class switching ----------
 export function switchClass(cls) {
+  S.campOrder = null; if (S.cmd === 'pull' || S.cmd === 'clear') S.cmd = 'follow';
   const h = S.hero;
   if (Cb.inCombat(h)) { chat('sys', null, "You can't change class in combat."); return false; }
   if (h.dead) return false;
@@ -221,35 +403,51 @@ export function switchClass(cls) {
   for (const p of S.ents) if (p.pet && p.pet.owner === h && !p.charmed) { p.dead = true; p.remove = true; }
   S.heroCls = cls; h.cls = cls; h.lvl = S.classes[cls].lvl; h.xp = S.classes[cls].xp;
   h.resType = CLASSES[cls].res; h.kind = CLASSES[cls].models[0]; h.buffs = []; h.cds = {}; h.casting = null; h.ult = 0; h.autoOn = false;
-  h.resMax = 0; applyGear(h, S.gear[cls]); h.hp = h.maxHp; h.res = startRes(h);
+  h.resMax = 0; h.acct = acctBonus(); applyGear(h, S.gear[cls]); h.hp = h.maxHp; h.res = startRes(h);
   R.burst(h.x, h.y + 1, h.z, 30, [1, .9, .6], 2.5, 1, .6);
   chat('sys', null, `You are now a level ${h.lvl} ${CLASSES[cls].name}.`);
   save(); return true;
 }
 
 // ---------- quests ----------
-export const questsFor = giver => QUESTS.filter(q => q.giver === giver && (!q.cls || q.cls === S.heroCls));
-export function questState(q) { return S.quests[q.id]?.state || (q.pre && S.quests[q.pre]?.state !== 'turned' ? 'locked' : 'open'); }
-export function acceptQuest(q) { S.quests[q.id] = { state: 'active', n: 0 }; chat('sys', null, `Quest accepted: ${q.name}`); if (q.rival && S.zone === 'coast') spawnRival(q.rival); save(); }
-export function turnIn(q) {
-  const st = S.quests[q.id]; if (!st || st.state !== 'done') return;
+export const questsFor = giver => QUESTS.filter(q => (q.giver === giver || q.turnTo === giver) && (!q.cls || q.cls === S.heroCls));
+export const turnToOf = q => q.turnTo || q.giver;
+export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
+export function acceptQuest(q) {
+  S.quests[q.id] = { state: q.obj.talk ? 'done' : 'active', n: 0 };
+  chat('sys', null, `Quest accepted: ${q.name}`);
+  if (q.rival && S.zone === 'coast') spawnRival(q.rival);
+  if (q.sceneOnAccept && !S.scenesSeen[q.sceneOnAccept]) S.pendingScene = q.sceneOnAccept;
+  save();
+}
+export function turnIn(q, choice = null) {
+  const st = S.quests[q.id]; if (!st || st.state !== 'done') return null;
+  const ch = q.choices ? q.choices[choice ?? 0] : null;
   st.state = 'turned';
+  if (ch) { Object.assign(S.flags, ch.set || {}); if (ch.gold) S.gold += ch.gold; st.choice = choice ?? 0; }
   S.gold += q.gold;
   Cb.giveXp(S.hero, q.xp);
   chat('sys', null, `Quest complete: ${q.name}. +${q.xp} xp, +${q.gold} gold.`);
-  if (q.gear) { const it = randomGear(q.lvl + 1, S.heroCls, .2); if (it.rarity < 1) { it.rarity = 1; } addToBag(it); chat('loot', null, `You receive ${it.name}.`); }
+  if (q.gear || ch?.gear) { const it = randomGear(q.lvl + 1, S.heroCls, .2); if (it.rarity < 1) { it.rarity = 1; } addToBag(it); chat('loot', null, `You receive ${it.name}.`); }
   if (q.signature) { const c = q.signature, t = WTYPE[c][0]; const it = makeItem({ name: SIGNATURE[c], slot: 'weapon', type: t, lvl: 16, rarity: 3, signature: true, stats: { pow: 32, sta: 14, crit: 3 }, value: 200 }); addToBag(it); chat('loot', null, `You receive your signature weapon: ${it.name}!`); }
+  if (q.lore && !S.lore[q.lore]) { S.lore[q.lore] = true; chat('sys', null, `Lore found: ${LORE[q.lore].title}. (Book → Lore)`); }
+  // choices move people around the Vale
+  if (['m8', 'h5', 'm13'].includes(q.id)) storyFolk();
+  if (q.id === 'm16') S.flags.wickCoast = true;
   save();
+  return ch ? ch.reply : null;
 }
 function questProgress(mob, near) {
   if (mob.tagged !== 'party' || !near.includes(S.hero) && !S.party.some(p => near.includes(p))) return;
   for (const q of QUESTS) {
     const st = S.quests[q.id]; if (!st || st.state !== 'active') continue;
     const o = q.obj; let hit = false;
-    if (o.kill && o.kill.includes(mob.mob) && (!o.dungeon || mob.dungeon) && (!o.reef || mob.spawn?.area === 5) && !mob.named && !mob.add) hit = true;
+    const nearOk = !o.near || (o.near === 'waste' ? regionAt(mob.x, mob.z) === 3 : world.spots[o.near] && Math.hypot(mob.x - world.spots[o.near].x, mob.z - world.spots[o.near].z) < 70);
+    if (o.kill && o.kill.includes(mob.mob) && nearOk && (!o.dungeon || mob.dungeon) && (!o.reef || mob.spawn?.area === 5) && !mob.named && !mob.add) hit = true;
+    if (o.kill && o.kill.includes(mob.mob) && mob.add && mob.mob === 'ghost' && nearOk) hit = true;
     if (o.named && mob.named === o.named) hit = true;
     if (o.collect && o.collect.includes(mob.mob)) { if (Math.random() < o.chance) { hit = true; chat('loot', null, `You loot ${o.item}.`); } }
-    if (hit) { st.n = Math.min(o.n, st.n + 1); floatText(S.hero, `${q.name} ${st.n}/${o.n}`, '#ffd34d'); if (st.n >= o.n) { st.state = 'done'; chat('sys', null, `${q.name}: done! Return to ${GIVERS[q.giver].name}.`); } }
+    if (hit) { st.n = Math.min(o.n, st.n + 1); floatText(S.hero, `${q.name} ${st.n}/${o.n}`, '#ffd34d'); if (st.n >= o.n) { st.state = 'done'; chat('sys', null, `${q.name}: done! Return to ${GIVERS[turnToOf(q)].name}.`); } }
   }
 }
 
@@ -291,6 +489,29 @@ export function assignLoot(mob, it, who) {
 
 // ---------- death and the corpse run ----------
 Cb.setHooks({
+  xpMod(p, amt) {
+    let a = amt * (1 + xpBoost());
+    // veteran xp, earned while another class sat at the cap, doubles what this class earns until it runs out
+    if (!(lockedAt10() && p.lvl >= 10) && p.lvl < MAX_LVL && S.vetXp > 0) { const x = Math.min(a, S.vetXp); S.vetXp -= x; a += x; }
+    return a;
+  },
+  onOverflow(p, over) { if (over > 0) S.vetXp = Math.min(40000, (S.vetXp || 0) + Math.round(over)); },
+  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : MAX_LVL),
+  onCapped(p) { if (cappedSaid) return; cappedSaid = true; chat('sys', null, `Level 10 cap: to go past 10, first reach level 10 with one class from each family (${FAMILIES.join(', ')}). See Book → Character. Extra xp becomes veteran xp, which doubles xp for your lower classes until it's spent.`); },
+  onYield(m, src) {
+    // he only surrenders to your group, and only while you're on his quest
+    const q = QUESTS.find(q => q.obj.named === m.named && q.obj.yield), st = q && S.quests[q.id];
+    if (!st || st.state !== 'active' || !Cb.ownerOf(src)?.inParty) return false;
+    m.hp = Math.max(1, m.hp); m.team = 'npc'; m.threat.clear(); m.engaged = false; m.target = null; m.buffs = []; m.casting = null; m.mcast = null;
+    for (const e of S.ents) if (e.mob && e.threat) e.threat.delete(m);
+    if (S.target === m) S.target = null;
+    if (m.spawn) { m.spawn.alive = null; m.spawn.timer = 99999; }
+    S.flags.anselYielded = true;
+    floatText(m, 'I yield!', '#ffd34d', true); chat('say', m.name, 'Enough! Enough, I yield!');
+    st.n = 1; st.state = 'done'; chat('sys', null, `${q.name}: done! Talk to ${m.name}.`);
+    m.remove = true; m.dead = true; storyFolk(); save();
+    return true;
+  },
   onHumanDeath(e) {
     if (e.isHero) {
       S.dead = true; S.deathAt = { x: e.x, z: e.z }; chat('sys', null, 'You have died.');
@@ -301,6 +522,10 @@ Cb.setHooks({
   },
   onMobDeath(mob, credit, near) {
     if (mob.tagged === 'party') questProgress(mob, near);
+    if (mob.mob === 'abom' && mob.tagged === 'party' && !S.scenesSeen.gravelord) {
+      const g = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, name: 'The Gravelord', title: 'An echo', kind: 'gravelord', x: world.spots.crypt.x, z: world.spots.crypt.z - 3, storyNpc: true, scale: 1.3 }); g.y = hgt(g.x, g.z) + .5;
+      S.pendingScene = 'gravelord'; S.sceneEnd = () => { g.remove = true; g.dead = true; R.burst(g.x, g.y + 1.5, g.z, 60, [.5, 1, .6], 3, 1.2, .8); };
+    }
     if (mob.boss && mob.mob === 'abom') { chat('sys', null, `${mob.name} falls. The Ossuary is quiet.`); for (const p of S.party) if (p !== S.hero) { chat('party', p.name, pick(['GG!!', 'we did it', 'gg nice tanking', 'loot time'])); break; } S.dangers = []; }
     if (mob.named === 'captain' && mob.tagged !== 'party') chat('gen', credit[0]?.name || 'Someone', `got ${mob.name}, sorry campers`);
     if (mob.named === 'admiral') {
@@ -313,6 +538,8 @@ Cb.setHooks({
     if (p.isHero) {
       S.classes[S.heroCls] = { lvl: p.lvl, xp: p.xp };
       chat('sys', null, `You reached level ${p.lvl}!`);
+      if (p.lvl === 10) { chat('sys', null, `Your ${CLASSES[p.cls].name} unlocked a perk: ${PERKS[p.cls].name} (${PERKS[p.cls].desc}) Slot it in Book → Character. Every other class now earns xp faster.`); }
+      refreshAcct();
       const nw = Object.values(CLASSES[p.cls].abilities).filter(a => a.lvl === p.lvl);
       for (const a of nw) chat('sys', null, `New ability: ${a.name}. ${a.desc}`);
       for (const q of S.party) if (q !== p && Math.random() < .6) setTimeout(() => chat('party', q.name, pick(CHAT.gz)), 600 + Math.random() * 1500);
@@ -363,7 +590,7 @@ function guardAI(g, dt) {
 }
 
 // ---------- the world ticking ----------
-let chatT = 8, groupT = 30, saveT = 30;
+let chatT = 8, groupT = 30, saveT = 30, atT = 0;
 export function tick(dt) {
   S.time += dt;
   const h = S.hero;
@@ -406,7 +633,22 @@ export function tick(dt) {
     chat('sys', null, 'The seabed shakes. Something enormous rises from the dark beyond the flagship!');
     R.burst(0, 3, -60, 80, [.3, .7, .9], 6, 1.6, 1.2);
   }
-  for (const sp of world.spawns) if (!sp.alive) { sp.timer -= dt; if (sp.timer <= 0 && !nearParty(sp, 25)) spawn(sp); }
+  for (const sp of world.spawns) if (!sp.alive) { sp.timer -= dt; if (sp.timer <= 0 && !nearParty(sp, 25) && !(sp.gate && S.flags[sp.gate + 'Yielded'])) spawn(sp); }
+  if ((atT -= dt) <= 0) {
+    atT = .5;
+    syncFriends(); campTick();
+    for (const q of QUESTS) {
+      if (!q.obj.at || S.quests[q.id]?.state !== 'active') continue;
+      const sp = world.spots[q.obj.at]; if (!sp || S.zone !== 'vale') continue;
+      if (Math.hypot(h.x - sp.x, h.z - sp.z) < (q.obj.r || 10)) {
+        S.quests[q.id].state = 'done'; S.quests[q.id].n = 1;
+        chat('sys', null, `${q.name}: done! ${q.turnTo ? 'Talk to ' + GIVERS[q.turnTo].name + '.' : 'Return to ' + GIVERS[q.giver].name + '.'}`);
+        if (q.sceneAt && !S.scenesSeen[q.sceneAt]) S.pendingScene = q.sceneAt;
+        save();
+      }
+    }
+  }
+  if (S.pendingScene && !S.scene && !h.dead) { const id = S.pendingScene, end = S.sceneEnd; S.pendingScene = null; S.sceneEnd = null; playScene(id, end); }
   Cb.updateProjectiles(dt);
   AI.updateDangers(dt);
   // the general chat channel, and fake players forming groups
@@ -441,7 +683,7 @@ function separate() {
         if (fixedE && fixedO) continue;
         let we = (o.r || .5) ** 2 * (e.isHero ? .25 : 1), wo = (e.r || .5) ** 2 * (o.isHero ? .25 : 1);
         if (fixedE) { we = 0; wo = 1; } else if (fixedO) { we = 1; wo = 0; }
-        const tot = we + wo || 1, over = (min - d) * .6;
+        const tot = we + wo || 1, over = (min - d) * .35;
         e.x -= nx * over * we / tot; e.z -= nz * over * we / tot; o.x += nx * over * wo / tot; o.z += nz * over * wo / tot;
         if (we) pushed.add(e); if (wo) pushed.add(o);
       }
@@ -484,6 +726,7 @@ export function snapshot() {
   return {
     v: 2, seed: S.seed, heroName: S.heroName, heroCls: S.heroCls, classes: S.classes, gold: S.gold, pots: S.pots, quests: S.quests, bar: S.bar, time: S.time,
     zone: S.zone, hx: h ? h.x : 0, hz: h ? h.z : 0, bind: S.bind, pole: !!S.pole, pops,
+    flags: S.flags, lore: S.lore, perks: S.perks, vetXp: S.vetXp || 0, friendsMade: !!S.friendsMade, friends: S.friends || [], bank: S.bank.map(strip), used: S.used, scenesSeen: S.scenesSeen,
     gear: Object.fromEntries(Object.entries(S.gear).map(([k, g]) => [k, Object.fromEntries(Object.entries(g).map(([s, it]) => [s, strip(it)]))])),
     bag: S.bag.map(strip), corpse: S.corpse ? { zone: S.corpse.zone || 'vale', x: S.corpse.x, z: S.corpse.z, cls: S.corpse.cls, gear: S.corpse.gear } : null,
     partyData: S.party.filter(p => !p.isHero).map(fakeData),
@@ -493,7 +736,10 @@ export function save() { if (!S.running) return; try { localStorage.setItem(SAVE
 export function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
 export function loadSave(data) {
   const sv = data || JSON.parse(localStorage.getItem(SAVE_KEY));
-  Object.assign(S, { seed: sv.seed, heroName: sv.heroName, heroCls: sv.heroCls, classes: sv.classes, gold: sv.gold, pots: sv.pots || { hpot: 0, mpot: 0 }, quests: sv.quests || {}, bar: sv.bar, bag: sv.bag || [], gear: sv.gear, pole: !!sv.pole });
+  Object.assign(S, { seed: sv.seed, heroName: sv.heroName, heroCls: sv.heroCls, classes: sv.classes, gold: sv.gold, pots: sv.pots || { hpot: 0, mpot: 0 }, quests: sv.quests || {}, bar: sv.bar, bag: sv.bag || [], gear: sv.gear, pole: !!sv.pole,
+    flags: sv.flags || {}, lore: sv.lore || {}, vetXp: sv.vetXp || 0, friendsMade: !!sv.friendsMade, friends: sv.friends || [], perks: sv.perks || [], bank: sv.bank || [], used: sv.used || {}, scenesSeen: sv.scenesSeen || { intro: true } });
+  // older saves: the old Ossuary quests are now part of the main story, so a hero who finished them skips ahead
+  if (!sv.flags && S.quests.q9?.state === 'turned') for (const id of ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12', 'm13']) S.quests[id] = S.quests[id] || { state: 'turned', n: 0 };
   for (const k of CLASS_KEYS) { if (!S.classes[k]) S.classes[k] = { lvl: 1, xp: 0 }; if (!S.gear[k]) S.gear[k] = starterGear(k); if (!S.bar[k]) S.bar[k] = defaultBar(k); }
   // Build 3 added spells: slot any new ones you've learned into empty bar keys
   for (const k of CLASS_KEYS) { const bar = S.bar[k], all = defaultBar(k); for (const key of all) if (key && !bar.includes(key)) { const i = bar.indexOf(null); if (i >= 0) bar[i] = key; } }
@@ -508,7 +754,9 @@ export function loadSave(data) {
   // older saves kept only names: find those friends among the fake players
   if (!sv.partyData) for (const n of sv.party || []) { const f = S.fakes.find(x => x.name === n); if (f) { f.x = S.hero.x + rnd(-2, 2); f.z = S.hero.z + rnd(-2, 2); f.y = hgt(f.x, f.z); f.fake.group = null; f.inParty = true; f.fake.state = 'party'; S.party.push(f); } }
   S.time = sv.time || 0;
+  S.campOrder = null; if (S.cmd === 'pull' || S.cmd === 'clear') S.cmd = 'follow';
   chat('sys', null, `Welcome back, ${S.heroName}.`);
+  if (!S.friendsMade) makeFriends();
 }
 // save codes: compressed JSON, so progress can move between builds and devices
 export async function makeCode() {

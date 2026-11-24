@@ -5,6 +5,7 @@ import { WH, rnd } from './core.js';
 import * as M from './models.js';
 import * as CM from './classmodels.js';
 import * as CO from './coastmodels.js';
+import * as VM from './valemodels.js';
 
 export const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
@@ -165,6 +166,18 @@ Object.assign(defs, {
   admiral: [CO.admiralGeo(), [.4, .35, 1.6, .15], .03, .035], merfolk: [CO.merfolkGeo(), [0, .45, 1.7, .2], .03, .03],
   crab: [CO.crabGeo(), [.9, 0, 1.2, 0], .03, .03], crabbig: [CO.crabGeo(true), [.9, 0, 1.2, 0], .03, .035], shark: [CO.sharkGeo(), [0, 0, 0, .3], 0, .03],
   leviathan: [CO.leviathanGeo(), [0, 0, 0, .2], 0, .05],
+});
+// Build 4: the Vale's new creatures, people and story props
+const STILL = [0, 0, 0, 0];
+Object.assign(defs, {
+  boar: [VM.boarGeo(), [.8, 0, 0, .4], .06, .035], boarbig: [VM.boarGeo(true), [.8, 0, 0, .4], .06, .04], spider: [VM.spiderGeo(), [.9, 0, 0, 0], .03, .03],
+  ghost: [VM.ghostGeo(), [0, .5, 1.4, 0], 0, .025], ghostnpc: [VM.ghostGeo('#e8e0c0'), [0, .3, 1.0, 0], 0, .025],
+  harpy: [VM.harpyGeo(), [.5, 1.2, 1.2, .3], 0, .03], harpynamed: [VM.harpyGeo(true), [.5, 1.2, 1.2, .3], 0, .035],
+  cultist0: [VM.cultistGeo(0), [.4, .35, 1.4, .1], .03, .03], cultist1: [VM.cultistGeo(1), [.4, .35, 1.4, .1], .03, .03], cultist2: [VM.cultistGeo(2), [.4, .35, 1.4, .1], .03, .035],
+  villager0: [VM.villagerGeo(0), HUM, .05, .03], villager1: [VM.villagerGeo(1), [.4, .35, 1.4, .1], .03, .03], villager2: [VM.villagerGeo(2), HUM, .05, .03], villager3: [VM.villagerGeo(3), [.4, .35, 1.4, .1], .03, .03],
+  wick: [VM.wickGeo(), HUM, .05, .03], hermit: [VM.hermitGeo(), [.4, .35, 1.2, .1], .03, .03], gravelord: [VM.gravelordGeo(), [.3, .3, 1.0, .1], .02, .035],
+  opengrave: [VM.openGraveGeo(), STILL, 0, .03], headstone: [VM.headstoneGeo(true), STILL, 0, .03], lorebook: [VM.loreGeo(), STILL, 0, .03],
+  bell: [VM.bellGeo(), STILL, 0, .03], wardstone: [VM.wardstoneGeo(), STILL, 0, .03], shrine: [VM.shrineGeo(), STILL, 0, .03],
 });
 export const kinds = {};
 for (const k in defs) kinds[k] = makeKind(...defs[k]);
