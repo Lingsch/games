@@ -151,6 +151,7 @@ export const depthAt = (x, z) => world.water === null ? 0 : Math.max(0, world.wa
 
 let zoneGens = {};
 export function registerZone(name, fn) { zoneGens[name] = fn; }
+export const zoneGen = name => zoneGens[name];
 // Build 4: the Vale's story places hook in here (js/valeplus.js)
 export const valeHooks = { terrain: null, build: null };
 // build a zone: 'vale' (the starting zone), 'coast', or 'fleet' (the instance)
@@ -179,8 +180,8 @@ function generateVale(seed) {
     if (reg === 3) h -= 2 + Math.abs(N.fbm(x * .02 + 70, z * .02 + 70, 3) - .5) * 8;
     h = lerp(town.base, h, smooth((Math.hypot(x - town.x, z - town.z) - town.R - 4) / 26));
     h = lerp(ruin.base, h, smooth((Math.hypot(x - ruin.x, z - ruin.z) - ruin.R - 2) / 24));
-    const edge = Math.max(Math.abs(x), Math.abs(z)) - (WH - 26), eastRoad = x > WH - 100 && Math.abs(z - Math.sin(x * .02) * 12) < 14;
-    if (edge > 0 && !eastRoad) h += edge * edge * .08;
+    const edge = Math.max(Math.abs(x), Math.abs(z)) - (WH - 26), eastRoad = x > WH - 100 && Math.abs(z - Math.sin(x * .02) * 12) < 14, northRoad = z < -WH + 60 && Math.abs(x) < 12;
+    if (edge > 0 && !eastRoad && !northRoad) h += edge * edge * .08;
     H[zi * HN + xi] = h;
   }
   town.base = hgt(0, 0); ruin.base = hgt(ruin.x, ruin.z);

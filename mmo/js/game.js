@@ -400,12 +400,12 @@ function townsfolk(zone) {
     storyFolk();
     return;
   }
-  const VEND = { port: 'Wexley the Chandler', fort: 'Quartermaster Bell', vill: 'Netmender Briggs', crook: 'Mother Ketch', light: 'Keeper Dunmore' };
+  const VEND = { port: 'Wexley the Chandler', fort: 'Quartermaster Bell', vill: 'Netmender Briggs', crook: 'Mother Ketch', light: 'Keeper Dunmore', ember: 'Quartermaster Rhoswen', refuge: 'Sister Ama' };
   for (const t of world.towns) {
     for (const [type, key, dx, dz] of t.npcs) {
       const x = t.x + dx, z = t.z + dz;
       if (type === 'giver') S.npcs[key] = npc({ name: GIVERS[key].name, title: GIVERS[key].title, kind: GIVERS[key].model, x, z, giver: key });
-      if (type === 'vendor') npc({ name: VEND[key], title: key === 'vill' ? 'Supplies and fishing poles' : 'Supplies', kind: key === 'light' ? 'villager2' : key === 'crook' ? 'villager1' : 'pirate1', x, z, vendor: key });
+      if (type === 'vendor') npc({ name: VEND[key], title: key === 'vill' ? 'Supplies and fishing poles' : 'Supplies', kind: key === 'light' ? 'villager2' : key === 'crook' || key === 'refuge' ? 'villager1' : key === 'ember' ? 'guard' : 'pirate1', x, z, vendor: key });
       if (type === 'bind') npc({ name: 'Bind Stone', title: 'Bind here', kind: 'corpse', x, z, bindstone: true, scale: 1.6 });
       if (type === 'armory') S.npcs.armorer = npc({ name: 'Mistress Hale', title: 'Armory · class trials', kind: 'guard', x, z, armory: true, giver: 'armorer' });
     }
@@ -436,6 +436,8 @@ function arrivalFor(zone, from) {
   if (INSTANCES[zone] && zone !== 'fleet') return { x: 0, z: 64 };
   if (zone === 'coast') return { x: -(ZONE_SIZE.coast || 300) + 26, z: 0 };
   if (zone === 'fleet') return { x: 0, z: 55 };
+  if (zone === 'wastes') return { x: 0, z: ZONE_SIZE.wastes - 30 };
+  if (zone === 'vale' && from === 'wastes') return { x: 0, z: -ZONE_SIZE.vale + 30 };
   const zx = ZONE_SIZE.vale - 22; return { x: zx, z: Math.sin(zx * .02) * 12 };
 }
 // a finished quest can whisk you (and your group) straight back to whoever gets the hand-in
@@ -506,7 +508,7 @@ function makeFakes(saved, zone = 'vale') {
 // ---------- party ----------
 export function invite(f) {
   if (!f.fake || f.inParty || f.dead) return;
-  if (S.party.length >= 6) { chat('sys', null, 'Your group is full (6).'); return; }
+  if (S.party.length >= partyCap()) { chat('sys', null, `Your group is full (${partyCap()}).`); return; }
   const me = S.hero, fr = f.fake.friend;
   const busy = f.fake.group && f.fake.group.length > 1 && f.fake.group[0] !== f;
   let yes = fr || (Math.abs(f.lvl - me.lvl) <= 4 && f.fake.mood > -3 && !busy && Math.random() < .85);
@@ -605,7 +607,9 @@ export function askSuspect(q, key) {
   if (st.n >= q.obj.n) { st.state = 'done'; chat('sys', null, `${q.name}: done! Return to ${GIVERS[turnToOf(q)].name}.`); Banter.onQuest('done', q); }
   save();
 }
-export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
+// a raid holds 12; everything else holds 6
+export const partyCap = () => S.ext?.raid12 ? 12 : 6;
+export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.forCls && S.heroCls !== q.forCls) return 'locked'; if (q.when && !q.when()) return 'locked'; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
 export function acceptQuest(q) {
   S.quests[q.id] = { state: q.obj.talk ? 'done' : 'active', n: 0 };
   if (S.declined) delete S.declined[q.id];
@@ -701,7 +705,7 @@ AI.aiHooks.gathered = e => { Craft.friendGather(e); save(); };
 Cb.setHooks({
   bossLoot: (e, party) => Loot5.bossLoot(e, party),
   xpMod(p, amt) {
-    let a = amt * (1 + xpBoost() + (X.xpBonus ? X.xpBonus() : 0));
+    let a = amt * (1 + xpBoost() + (X.xpBonus ? X.xpBonus() : 0)) * X.xpMul.reduce((k, f) => k * f(), 1);
     // veteran xp, earned while another class sat at the cap, doubles what this class earns until it runs out
     if (!(lockedAt10() && p.lvl >= 10) && p.lvl < MAX_LVL && S.vetXp > 0) { const x = Math.min(a, S.vetXp); S.vetXp -= x; a += x; }
     return a;
@@ -768,13 +772,16 @@ export function release() {
   // the corpse keeps your gear; you wake at the bind stone without it
   const loss = Math.round(xpNeed(h.lvl) * .1); h.xp = Math.max(0, h.xp - loss);
   S.corpse = { zone: S.zone === 'fleet' ? 'coast' : S.zone, x: S.zone === 'fleet' ? world.names && 0 : h.x, z: h.z, cls: S.heroCls, gear: { ...S.gear[S.heroCls] } };
-  if (S.zone === 'fleet') { S.corpse.x = 160 + 3; S.corpse.z = 200 + 3; } // a body lost in the fleet washes up by the buoy
+  const raidRun = X.release && X.release();   // Build 7: a corpse run inside the raid
+  if (raidRun) { }
+  else if (S.zone === 'fleet') { S.corpse.x = 160 + 3; S.corpse.z = 200 + 3; } // a body lost in the fleet washes up by the buoy
   else if (INSTANCES[S.zone]?.out) { S.corpse.zone = INSTANCES[S.zone].parent; S.corpse.x = INSTANCES[S.zone].out.x + 2; S.corpse.z = INSTANCES[S.zone].out.z + 2; } // a body lost below is carried out to the door
   else S.corpse.ent = Cb.makeEnt({ team: 'npc', name: `${h.name}'s corpse`, kind: 'corpse', x: h.x, z: h.z, corpse: true, maxHp: 1, hp: 1 });
   S.gear[S.heroCls] = {};
   h.dead = false; h.buffs = []; applyGear(h, {}); h.hp = Math.round(h.maxHp * .5); h.res = startRes(h) * .5; h.ult = 0;
   S.dead = false; S.target = null; S.dangers = [];
   for (const p of S.party) if (p !== h) { if (p.dead) Cb.revive(p, .5); p.casting = null; p.pull = null; }
+  if (raidRun) return;
   if ((S.bind.zone || 'vale') !== S.zone) travel(S.bind.zone || 'vale', { x: S.bind.x, z: S.bind.z }, true);
   else { h.x = S.bind.x; h.z = S.bind.z; h.y = hgt(h.x, h.z); for (const p of S.party) if (p !== h) { p.x = h.x + rnd(-3, 3); p.z = h.z + rnd(-3, 3); p.y = hgt(p.x, p.z); } }
   chat('sys', null, `You wake at the bind stone with ${loss} less xp and without your gear. Run back to your corpse to get it (it's marked on the map).`);

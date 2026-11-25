@@ -42,6 +42,7 @@ function stopMove(e, dt) { e.moving = Math.max(0, e.moving - dt * 6); }
 // ---------- dangers (boss telegraphs and pools) ----------
 export function inDanger(x, z) {
   for (const g of S.dangers) {
+    if (g.soak || g.mine) continue;   // soak circles are for standing in (Build 7 raid)
     if (g.kind === 'circle' && Math.hypot(x - g.x, z - g.z) < g.r + .6) return g;
     if (g.kind === 'cone') { const dd = Math.hypot(x - g.x, z - g.z); if (dd < g.r + .6 && Math.abs(wrapA(Math.atan2(x - g.x, z - g.z) - g.yaw)) < g.w + .15) return g; }
   }
@@ -86,7 +87,7 @@ export function mobAI(m, dt) {
         const ar = M.aggro * (e.sit ? 1.2 : 1) + (m.lvl - e.lvl) * .8;
         if (Math.abs(e.x - m.x) > ar || Math.abs(e.z - m.z) > ar) continue;
         if (M.aquatic && depthAt(e.x, e.z) < 1.2) continue;
-        if (dist(e, m) < ar && !blocked(m.x, m.z, e.x, e.z)) { addThreat(m, e, 1); if (m.boss) chat('say', m.name, 'You disturb the sewing. Stay. Be stitched.'); break; }
+        if (dist(e, m) < ar && !blocked(m.x, m.z, e.x, e.z)) { addThreat(m, e, 1); if (m.boss && m.named === 'boss') chat('say', m.name, 'You disturb the sewing. Stay. Be stitched.'); break; }
       }
     }
     return;
@@ -514,7 +515,7 @@ function healerTurn(e, group, inFight) {
   if (!live.length) return false;
   const mana = e.res / e.resMax;
   const low = live.slice().sort((a, b) => hpPct(a) - hpPct(b))[0];
-  const tank = group.find(p => isTank(p) && !p.dead) || live.find(p => p.pet);
+  const tank = (e.healFocus && !e.healFocus.dead && group.includes(e.healFocus) ? e.healFocus : null) || group.find(p => isTank(p) && !p.dead) || live.find(p => p.pet);
   const nLow = th => live.filter(p => hpPct(p) < th).length;
   const busy = p => group.some(o => o !== e && isHealer(o) && !o.dead && o.casting && o.casting.tgt === p);
   if (S.ents.some(m => m.mob && !m.dead && m.target === e) && tryUse(e, 'fade', e)) return true;
@@ -567,6 +568,8 @@ export function companionAI(e, dt) {
   const hero = S.hero, group = S.party;
   if (e.dead || e.onBoat) return;
   if (Cb.ccd(e)) { stopMove(e, dt); return; }
+  // raid positioning: stack, spread, soak or a marker (Build 7); a cast in the way is dropped
+  if (e.forceTo) { const f = e.forceTo; if (S.time > f.until || f.g && f.g.t <= 0) e.forceTo = null; else if (Math.hypot(e.x - f.x, e.z - f.z) > (f.r || 1.2)) { e.sit = false; e.casting = null; goTo(e, f.x, f.z, dt, (f.r || 1.2) * .7, 1.15); return; } }
   if (e.casting) { stopMove(e, dt); if (e.casting.tgt && e.casting.tgt !== e) face(e, e.casting.tgt, dt); return; }
   if (escapeDanger(e, dt)) return;
   const role = CLASSES[e.cls].role;
@@ -638,11 +641,13 @@ export function companionAI(e, dt) {
       const loose = foes.filter(f => f.target && f.target !== e && group.includes(f.target) && !cc(f) && engageable(f, group, e)).sort((a, b) => dist(a, e) - dist(b, e))[0];
       if (loose && (!t || t.target === e)) t = loose;
       if (!t) t = htgt || foes.filter(f => engageable(f, group, e)).sort((a, b) => dist(a, e) - dist(b, e))[0];
+      if (e.assignTgt && !e.assignTgt.dead && !e.assignTgt.remove && foes.includes(e.assignTgt)) t = e.assignTgt;   // the raid leader's tank assignment
       if (!t) { stopMove(e, dt); return; }
     } else {
       // adds chewing on a healer come first, then whatever you or the tank are hitting
       const onHealer = foes.find(f => f.target && isHealer(f.target) && group.includes(f.target) && !f.boss && !cc(f));
       t = (S.cmd === 'assist' && hero.target && foes.includes(hero.target)) ? hero.target : onHealer ? onHealer : (tank && tank.target && foes.includes(tank.target)) ? tank.target : (hero.target && foes.includes(hero.target)) ? hero.target : foes[0];
+      if (S.raidFocus && !S.raidFocus.dead && foes.includes(S.raidFocus)) t = S.raidFocus;   // the raid leader's kill order
       // nothing has reached us yet (a spot pull still on its way): hold position, buffs only
       if (!engageable(t, group, e)) { const ok = foes.filter(f => engageable(f, group, e) && !cc(f)); if (ok.length) t = ok.includes(tank?.target) ? tank.target : ok[0]; else { if (e.cls === 'bard') upkeepBuffs(e, group, true); stopMove(e, dt); e.autoOn = false; e.target = null; return; } }
       // songs and crowd control don't wait for threat
@@ -699,7 +704,7 @@ export function companionAI(e, dt) {
   }
   if (upkeepBuffs(e, group)) return;
   // follow in formation, rest when the group rests
-  const slot = group.indexOf(e), a = formYaw() + Math.PI + (slot - 3) * .5, r = 3 + (slot % 2) * 1.6;
+  const slot = group.indexOf(e), ring = slot >= 6 ? 1 : 0, a = formYaw() + Math.PI + ((slot % 6) - 3) * .5 + ring * .25, r = 3 + (slot % 2) * 1.6 + ring * 3.4;
   const fx = hero.x + Math.sin(a) * r, fz = hero.z + Math.cos(a) * r;
   if (S.cmd === 'hold' && e.holdAt) { if (moveToward(e, e.holdAt.x, e.holdAt.z, dt, .6)) rest(e); return; }
   // a companion that falls far behind or stays stuck on a wall catches up

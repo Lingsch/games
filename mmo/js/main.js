@@ -16,9 +16,16 @@ import './prof6.js';
 import * as Rep from './rep6.js';
 import * as Social from './social6.js';
 import * as Vale6 from './vale6.js';
+// Build 7: the blighted wastes, the raid, soulbound weapons, heroics and deeds
+import './wastes7.js';
+import './wastesq.js';
+import * as Raid from './raid7.js';
+import './soul7.js';
+import './heroic7.js';
+import './ach7.js';
 
 UI.init();
-window.__G = { S, Game, Cb, UI, Sea, world, Rep, Social, X, Vale6 }; // a handle for testing from the console
+window.__G = { S, Game, Cb, UI, Sea, world, Rep, Social, X, Vale6, Raid }; // a handle for testing from the console
 generateWorld(7);                 // a backdrop for the title screen
 UI.showTitle();
 document.getElementById('load').remove();

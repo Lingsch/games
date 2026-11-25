@@ -340,7 +340,7 @@ function makeRain() {
   rain.frustumCulled = false; scene.add(rain); rain.userData.seed = Array.from({ length: N }, () => [Math.random() * 60 - 30, Math.random() * 30, Math.random() * 60 - 30]);
 }
 X.tick.push(dt => {
-  if (S.zone !== 'coast') { world.storm = false; return; }
+  if (S.zone !== 'coast') { if (S.zone !== 'wastes') world.storm = false; return; }
   stormT -= dt;
   if (stormT <= 0) {
     world.storm = !world.storm; stormT = world.storm ? 160 + Math.random() * 60 : 480 + Math.random() * 360;

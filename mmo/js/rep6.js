@@ -36,7 +36,7 @@ X.turnin.push(q => {
   else if (/^c\d+$/.test(q.id)) addRep('law', 100);
   if (q.mount) Loot5.collect(q.mount);
 });
-const KILL_REP = { wrecker: ['crook', 6], wreckerlamp: ['crook', 6], wreckerbrute: ['crook', 6], navymarine: ['light', 5], navyofficer: ['light', 5], tidesworn: ['light', 5], tidechanter: ['light', 5], brineling: ['light', 4], tidewight: ['light', 6], stormdrowned: ['light', 5],
+export const KILL_REP = { wrecker: ['crook', 6], wreckerlamp: ['crook', 6], wreckerbrute: ['crook', 6], navymarine: ['light', 5], navyofficer: ['light', 5], tidesworn: ['light', 5], tidechanter: ['light', 5], brineling: ['light', 4], tidewight: ['light', 6], stormdrowned: ['light', 5],
   bandit: ['vale', 3], bandit2: ['vale', 3], xbow: ['vale', 3], cultist: ['vale', 3], chanter: ['vale', 3], skeleton: ['vale', 2], ghoul: ['vale', 2], pirate: ['law', 3], smuggler: ['law', 2], raider: ['vale', 6], raiderbow: ['vale', 6], risen: ['vale', 3] };
 X.kill.push(m => {
   const k = KILL_REP[m.mob]; if (k && !m.named) addRep(k[0], k[1], true);
@@ -110,8 +110,8 @@ X.tick.push(dt => {
 X.zone.push(zone => { if (S.hero) { S.hero.rideY = 0; S.hero.mountEnt = null; } if (zone === 'vale' && world.names?.town) S.ext.valeTown = world.names.town; });
 
 // ---------- quartermasters ----------
-const ring = (name, L, rar, slot = 'ring') => () => { const b = Craft.gearBudget(L, slot) * (rar > 2 ? 1 : .85); return makeItem({ name, slot, type: slot, lvl: L, rarity: rar, stats: { pow: Math.round(b * .5), sta: Math.round(b * .35), crit: +(1 + L * .08).toFixed(1) }, value: 30 }); };
-const REWARDS = {
+export const ring = (name, L, rar, slot = 'ring') => () => { const b = Craft.gearBudget(L, slot) * (rar > 2 ? 1 : .85); return makeItem({ name, slot, type: slot, lvl: L, rarity: rar, stats: { pow: Math.round(b * .5), sta: Math.round(b * .35), crit: +(1 + L * .08).toFixed(1) }, value: 30 }); };
+export const REWARDS = {
   light: [[1, 60, "Keeper's Lamp-Ring", ring("Keeper's Lamp-Ring", 12, 2)], [2, 200, 'Greywatch Courser (mount)', 'mount_greywatch'], [3, 150, "Head Keeper's Locket", ring("Head Keeper's Locket", 15, 3, 'neck')], [4, 0, 'Title: of the Light', 'title_light']],
   crook: [[1, 50, "Smuggler's Knot", ring("Smuggler's Knot", 12, 2)], [2, 0, 'Recipe: Storm Eel Pie', 'r:eelpie'], [3, 200, "Smuggler's Black (mount)", 'mount_crookblack'], [4, 0, 'Title: the Honest Rogue', 'title_rogue']],
   vale: [[1, 40, 'Watch Signet', ring('Watch Signet', 9, 2)], [2, 150, 'Vale Palfrey (mount)', 'mount_wyrgate'], [3, 120, "Watch-Captain's Medal", ring("Watch-Captain's Medal", 12, 3, 'neck')], [4, 0, 'Title: Hero of the Vale', 'title_wyrgate']],

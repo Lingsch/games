@@ -57,7 +57,7 @@ export function joinGuild(name) {
   if (G()?.name === name) return 'You are already in that guild.';
   const officer = S.fakes.find(f => f.fake?.guild === name);
   if (Math.random() > info.yes + (S.ext.guildAsked?.[name] || 0) * .15) { S.ext.guildAsked = { ...(S.ext.guildAsked || {}), [name]: (S.ext.guildAsked?.[name] || 0) + 1 }; return `${officer ? officer.name : 'The officers'} of ${name} will think about it. Ask again later.`; }
-  S.ext.guild = { name, own: false, xp: irnd(200, 2600), joinedT: S.time }; S.ext.guild.lvl = guildLvl();
+  S.ext.guild = { name, own: false, xp: irnd(200, 2600), joinedT: S.time, loot: { 'Ashen Covenant': 'dkp', 'Mana Break': 'dkp', 'Order of the Fourfold': 'council' }[name] || 'needgreed' }; S.ext.guild.lvl = guildLvl();
   chat('guild', officer ? officer.name : null, pick(['welcome!!', `welcome to ${name}!`, 'o/ welcome', 'another one! welcome', 'grats on joining, ask if you need anything']));
   return null;
 }
@@ -130,26 +130,27 @@ const HELLO = {
   joker: ['hi! i promise not to pull the boss. this time.', 'who wants to see me fall off something', 'i brought snacks'], newbie: ['hi!! first time here, be nice', 'which way is the dungeon', 'what does a tank do exactly'],
   veteran: ['done this a hundred times, stick together', 'kill the healers first', 'evening. lets keep it clean'], grumpy: ['fine. lets get this over with', 'if anyone stands in fire im leaving', 'hi. i guess.'],
 };
-export function queue(key) {
+export function queue(key, guildRun = false) {
   const d = LFG_D[key]; if (!d) return 'Unknown dungeon.';
-  if (S.party.length >= 6) return 'Your group is already full.';
+  if (d.raid) { const why = d.raid(); if (why) return why; S.ext.raid12 = true; } else if (S.party.length > 6) return 'Your group is too big for a dungeon.';
+  if (S.party.length >= Game.partyCap()) return 'Your group is already full.';
   const need = needed(), waits = need.tank * 9 + need.healer * 7 + need.dps * 3;
-  S.ext.lfg = { key, t: S.time + clamp(6 + waits * rnd(.6, 1.2), 6, 50) };
+  S.ext.lfg = { key, guild: guildRun, t: S.time + clamp((guildRun ? 4 : 6) + waits * rnd(.6, 1.2) * (guildRun ? .5 : 1), 4, 50) };
   chat('sys', null, `You join the queue for ${d.name}.`);
   return null;
 }
 export const cancelQueue = () => { if (S.ext.lfg) chat('sys', null, 'You leave the queue.'); S.ext.lfg = null; };
 function needed() {
   const have = { tank: 0, healer: 0, dps: 0 }; for (const p of S.party) have[roleOf6(p.cls)]++;
-  const n = { tank: Math.max(0, 1 - have.tank), healer: Math.max(0, 2 - have.healer), dps: 0 };
-  n.dps = Math.max(0, 6 - S.party.length - n.tank - n.healer);
+  const N = Game.partyCap(), n = { tank: Math.max(0, (N > 6 ? 2 : 1) - have.tank), healer: Math.max(0, (N > 6 ? 3 : 2) - have.healer), dps: 0 };
+  n.dps = Math.max(0, N - S.party.length - n.tank - n.healer);
   return n;
 }
-function fillGroup(key) {
+function fillGroup(key, guildRun) {
   const d = LFG_D[key], h = S.hero, need = needed(), L = clamp(Math.round((Math.max(h.lvl, d.lvl[0]) + Math.min(h.lvl + 1, d.lvl[1])) / 2), 1, 20), used = new Set([...S.party.map(p => p.name), ...S.fakes.map(f => f.name)]);
   const joined = [];
   for (const role of ['tank', 'healer', 'dps']) for (let i = 0; i < need[role]; i++) {
-    if (S.party.length >= 6) break;
+    if (S.party.length >= Game.partyCap()) break;
     // guildmates and friends first, then anyone in the zone at the right level, then someone from another zone
     const cand = S.fakes.filter(f => !f.inParty && !f.dead && roleOf6(f.cls) === role && Math.abs(f.lvl - L) <= 3).sort((a, b) => ((b.fake.guild === G()?.name) - (a.fake.guild === G()?.name)) || (b.fake.friend - a.fake.friend) || Math.abs(a.lvl - L) - Math.abs(b.lvl - L));
     let f = cand[0];
@@ -157,7 +158,7 @@ function fillGroup(key) {
     else {
       const name = pick(FAKE_NAMES.filter(n => !used.has(n))) || 'Wanderer' + irnd(10, 99); used.add(name);
       const pool = CLASS_KEYS.filter(k => roleOf6(k) === role), cls = pick(pool);
-      f = Game.addMate({ name, cls, lvl: clamp(L + irnd(-1, 1), 1, 20), pal: 1 + irnd(0, 1), persona: pick(PERSONAS), guild: Math.random() < .5 ? pick(GUILDS) : null, mood: 0 }, h);
+      f = Game.addMate({ name, cls, lvl: clamp(L + irnd(-1, 1), 1, 20), pal: 1 + irnd(0, 1), persona: pick(PERSONAS), guild: guildRun && G() ? G().name : Math.random() < .5 ? pick(GUILDS) : null, mood: 0 }, h);
     }
     joined.push(f);
   }
@@ -175,7 +176,7 @@ export function goTo(key) {
   if (at) place(at);
 }
 function place(p) { const y = hgt(p.x, p.z); for (const m of S.party) { m.x = p.x + rnd(-2, 2); m.z = p.z + rnd(-2, 2); m.y = y; } chat('sys', null, 'You arrive with your group.'); }
-X.tick.push(() => { const q = S.ext.lfg; if (q && S.time >= q.t) { S.ext.lfg = null; fillGroup(q.key); } });
+X.tick.push(() => { const q = S.ext.lfg; if (q && S.time >= q.t) { S.ext.lfg = null; fillGroup(q.key, q.guild); } });
 
 // =====================================================================
 // the auction house
@@ -200,7 +201,7 @@ X.tick.push(dt => {
     const fair = l.mat ? matPrice(l.mat) * l.n : fairGear(l.item), ratio = l.price / Math.max(1, fair);
     const chance = ratio <= .8 ? .6 : ratio <= 1.05 ? .3 : ratio <= 1.4 ? .12 : ratio <= 2 ? .04 : .005;
     if (Math.random() < chance) {
-      l.sold = true; const got = Math.floor(l.price * .95); S.gold += got;
+      l.sold = true; const got = Math.floor(l.price * .95); S.gold += got; S.ext.cnt = S.ext.cnt || {}; S.ext.cnt.sold = (S.ext.cnt.sold || 0) + 1;
       if (l.mat) a.price[l.mat] = clamp((a.price[l.mat] ?? 1) * .96, .4, 3);
       chat('sys', null, `Auction house: ${pick(S.fakes.length ? S.fakes : [{ name: 'A buyer' }]).name} bought your ${l.mat ? l.n + ' ' + Craft.MATS[l.mat].name : l.item.name} for ${l.price} gold. You receive ${got} after the house's cut.`);
     }
@@ -278,10 +279,13 @@ X.book.push(['guild', 'Guild', body => {
   const lv = guildLvl(), next = GLV[lv] ?? null;
   body.appendChild(el(`<p style="margin:0 0 4px"><b>&lt;${esc(g.name)}&gt;</b> · guild level ${lv}${next ? ` · ${g.xp || 0}/${next}` : ''}${g.own ? ' · founder' : ''}</p>`));
   body.appendChild(el(`<p class="dim" style="margin:0 0 6px;font-size:13px">${PERKS.map(([l, t]) => `${lv >= l ? '✓' : '·'} L${l}: ${t}`).join('<br>')}</p>`));
+  { const LM = { needgreed: 'Need / Greed', master: 'Master looter', dkp: 'DKP', council: 'Loot council' }, cur = g.loot || 'needgreed';
+    const r = el(`<div class="who"><div><b>Raid loot</b> <small>${g.own ? 'your rule' : 'the officers\' rule'}</small></div><div>${Object.entries(LM).map(([k, t]) => `<button data-l="${k}" class="${cur === k ? 'on' : ''}" ${g.own ? '' : 'disabled'}>${t}</button>`).join(' ')}</div></div>`);
+    r.onclick = ev => { const k = ev.target.dataset?.l; if (k && g.own) { g.loot = k; chat('guild', S.hero.name, `Raid loot is ${LM[k]} from now on.`); refreshSheet(); } }; body.appendChild(r); }
   const mates = guildmates().filter(f => !f.inParty);
   body.appendChild(el(`<h3 style="font:700 13px Cinzel;margin:8px 0 4px;color:var(--dim)">Online here (${mates.length})</h3>`));
   for (const f of mates.sort((a, b) => Math.abs(a.lvl - S.hero.lvl) - Math.abs(b.lvl - S.hero.lvl))) {
-    const c = el(`<div class="who"><div><b style="color:${CLASSES[f.cls].color}">${esc(f.name)}</b> <small>L${f.lvl} ${CLASSES[f.cls].name}</small></div><button ${S.party.length >= 6 ? 'disabled' : ''}>Invite</button></div>`);
+    const c = el(`<div class="who"><div><b style="color:${CLASSES[f.cls].color}">${esc(f.name)}</b> <small>L${f.lvl} ${CLASSES[f.cls].name}</small></div><button ${S.party.length >= Game.partyCap() ? 'disabled' : ''}>Invite</button></div>`);
     // guildmates always come when they can
     c.querySelector('button').onclick = () => { f.fake.friend = f.fake.friend || 'guild'; Game.invite(f); if (f.fake.friend === 'guild') f.fake.friend = false; if (f.inParty) { f.x = S.hero.x + rnd(-2, 2); f.z = S.hero.z + rnd(-2, 2); f.y = hgt(f.x, f.z); } refreshSheet(); };
     body.appendChild(c);
@@ -293,16 +297,17 @@ X.book.push(['guild', 'Guild', body => {
     body.appendChild(el(`<h3 style="font:700 13px Cinzel;margin:8px 0 4px;color:var(--dim)">Recruit</h3>`));
     for (const f of pool) { const c = el(`<div class="who"><div><b>${esc(f.name)}</b> <small>L${f.lvl} ${CLASSES[f.cls].name}${f.fake.guild ? ' · &lt;' + esc(f.fake.guild) + '&gt;' : ''}</small></div><button>Recruit</button></div>`); c.querySelector('button').onclick = () => { const m = recruit(f); if (m) toast(m); refreshSheet(); }; body.appendChild(c); }
   }
+  { const r = el(`<div class="card" style="text-align:left;padding:8px"><b>Raid night</b><p style="margin:2px 0;font-size:13px">Call the guild to Between Worlds. Guildmates come first, and the guild fills the rest of the twelve.</p><div class="acts"><button>Call the raid</button></div></div>`); r.querySelector('button').onclick = () => { const m = queue('between', true); if (m) toast(m); else chat('guild', S.hero.name, 'Raid night! Between Worlds, who\'s in?'); refreshSheet(); }; body.appendChild(r); }
   const b = el('<div class="acts" style="margin-top:10px"><button style="color:#ff8a6a">Leave guild</button></div>'); b.querySelector('button').onclick = () => { leaveGuild(); refreshSheet(); }; body.appendChild(b);
 }]);
 X.book.push(['lfg', 'LFG', body => {
   const { el, esc, toast, refreshSheet } = X.ui;
   const q = S.ext.lfg, ready = S.ext.lfgReady, need = needed();
-  body.appendChild(el(`<p style="margin:0 0 6px">Your group: ${S.party.length}/6 · still needed: ${need.tank ? need.tank + ' tank ' : ''}${need.healer ? need.healer + ' healer ' : ''}${need.dps ? need.dps + ' damage' : ''}${!need.tank && !need.healer && !need.dps ? 'nobody' : ''}</p>`));
+  body.appendChild(el(`<p style="margin:0 0 6px">Your group: ${S.party.length}/${Game.partyCap()} · still needed: ${need.tank ? need.tank + ' tank ' : ''}${need.healer ? need.healer + ' healer ' : ''}${need.dps ? need.dps + ' damage' : ''}${!need.tank && !need.healer && !need.dps ? 'nobody' : ''}</p>`));
   if (q) { const c = el(`<div class="card" style="padding:8px">Looking for a group for <b>${esc(LFG_D[q.key].name)}</b>… <div class="acts"><button>Leave queue</button></div></div>`); c.querySelector('button').onclick = () => { cancelQueue(); refreshSheet(); }; body.appendChild(c); }
   if (ready) { const c = el(`<div class="card" style="padding:8px">Your group for <b>${esc(LFG_D[ready].name)}</b> is ready.<div class="acts"><button class="pri">Take us there</button><button>We'll walk</button></div></div>`); c.onclick = ev => { const b = ev.target.closest('button'); if (!b) return; if (b.classList.contains('pri')) { X.ui.closeSheet(); goTo(ready); } else { S.ext.lfgReady = null; refreshSheet(); } }; body.appendChild(c); }
   for (const [k, d] of Object.entries(LFG_D)) {
-    const c = el(`<div class="who"><div><b>${esc(d.name)}</b> <small>levels ${d.lvl[0]}-${d.lvl[1]}</small></div><button ${q || S.party.length >= 6 ? 'disabled' : ''}>Queue</button></div>`);
+    const c = el(`<div class="who"><div><b>${esc(d.name)}</b> <small>levels ${d.lvl[0]}-${d.lvl[1]}</small></div><button ${q || S.party.length >= (d.raid ? 12 : 6) ? 'disabled' : ''}>Queue</button></div>`);
     c.querySelector('button').onclick = () => { const m = queue(k); if (m) toast(m); refreshSheet(); }; body.appendChild(c);
   }
 }]);

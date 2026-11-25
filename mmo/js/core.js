@@ -68,3 +68,4 @@ export const X = { tick: [], zone: [], kill: [], turnin: [], accept: [], book: [
 export const dayPhase = () => ((S.time / 1440) + .3) % 1;
 export const isNight = () => { const p = dayPhase(); return p > .66 && p < .95; };
 X.light = [];
+X.xpMul = [];   // multipliers on experience (Build 7: the wastes level slowly)

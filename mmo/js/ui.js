@@ -718,7 +718,7 @@ function tabSocial(body) {
   if (!others.length) body.appendChild(el('<p class="dim">Nobody nearby. Try the town.</p>'));
   for (const f of others) {
     const busy = f.fake.group ? ' · in a group' : f.fake.state === 'hunt' ? ' · hunting' : '';
-    const c = el(`<div class="who"><div><b style="color:${CLASSES[f.cls].color}">${roleIcon(f.cls)} ${esc(f.name)}</b> <small>L${f.lvl} ${CLASSES[f.cls].name}${f.fake.friend ? ' · ★' : ''}${busy} · ${Math.round(dist(f, S.hero))} m</small></div><button data-a="inv" ${S.party.length >= 6 ? 'disabled' : ''}>Invite</button></div>`);
+    const c = el(`<div class="who"><div><b style="color:${CLASSES[f.cls].color}">${roleIcon(f.cls)} ${esc(f.name)}</b> <small>L${f.lvl} ${CLASSES[f.cls].name}${f.fake.friend ? ' · ★' : ''}${busy} · ${Math.round(dist(f, S.hero))} m</small></div><button data-a="inv" ${S.party.length >= Game.partyCap() ? 'disabled' : ''}>Invite</button></div>`);
     c.onclick = ev => { if (ev.target.dataset.a === 'inv') { Game.invite(f); refreshSheet(); } };
     body.appendChild(c);
   }
@@ -944,7 +944,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 6 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 7 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

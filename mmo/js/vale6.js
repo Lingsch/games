@@ -67,7 +67,7 @@ X.tick.push(dt => {
     if (broken || S.time > r.until) {
       r.on = false; raidT = 840 + Math.random() * 480;
       for (const s of raidSp) { if (s.alive && !s.alive.dead) { s.alive.remove = true; s.alive.dead = true; } s.alive = null; s.spawned = false; s.timer = 0; }
-      if (broken) { chat('sys', null, 'The raid is broken. The farmers come out of hiding, cheering, and press a purse of coin into your hands.'); S.gold += 25 + irnd(0, 15); const it = randomGear(Math.max(5, S.hero.lvl), S.heroCls, .5); if (Game.addToBag(it)) chat('loot', null, `You receive ${it.name}.`); Game.save(); }
+      if (broken) { S.ext.cnt = S.ext.cnt || {}; S.ext.cnt.raids = (S.ext.cnt.raids || 0) + 1; chat('sys', null, 'The raid is broken. The farmers come out of hiding, cheering, and press a purse of coin into your hands.'); S.gold += 25 + irnd(0, 15); const it = randomGear(Math.max(5, S.hero.lvl), S.heroCls, .5); if (Game.addToBag(it)) chat('loot', null, `You receive ${it.name}.`); Game.save(); }
       else chat('sys', null, 'The raiders load their carts and slip away down the Kingsroad.');
     }
     return;
