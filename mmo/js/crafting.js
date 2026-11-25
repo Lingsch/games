@@ -101,14 +101,20 @@ export const rareFrom = d => R.filter(r => r.rare === d);
 
 // ---------- state ----------
 export function initState() { S.prof = S.prof || {}; S.mats = S.mats || {}; S.recipes = S.recipes || []; S.cons = S.cons || {}; }
-export const skill = p => S.prof?.[p] ?? null;      // null: not learned
-export const knows = r => skill(r.prof) !== null && (!r.rare || S.recipes.includes(r.id));
+export const skill = (p, who) => who ? (who.craft && (who.craft.gather === p || who.craft.make === p) ? (who.craft.skill?.[p] ?? 1) : null) : S.prof?.[p] ?? null;      // null: not learned
+// friends can be given one gathering job and one crafting job; they level those skills themselves
+export const GATHER_JOBS = ['mining', 'herbalism', 'skinning'], MAKE_JOBS = ['smithing', 'leatherworking', 'tailoring', 'alchemy', 'cooking', 'enchanting', 'jewelcrafting'];
+export function setJob(fr, kind, p) { fr.craft = fr.craft || { gather: null, make: null, skill: {} }; fr.craft[kind] = p || null; if (p && fr.craft.skill[p] == null) fr.craft.skill[p] = 1; }
+const friendsOn = () => (S.friends || []).filter(fr => S.party.some(p => p.name === fr.name && p.fake?.bff && !p.dead));
+export const friendWith = (kind, p) => friendsOn().find(fr => fr.craft?.[kind] === p);
+export const craftersAt = st => { const out = []; for (const p of STATIONS[st].profs) { if (skill(p) !== null) out.push({ who: null, p }); for (const fr of friendsOn()) if (fr.craft?.make === p) out.push({ who: fr, p }); } return out; };
+export const knows = (r, who) => skill(r.prof, who) !== null && (!r.rare || S.recipes.includes(r.id));
 export function learn(p) { initState(); if (S.prof[p] != null) return false; S.prof[p] = 1; chat('sys', null, `You learn ${PROFS[p].name}.`); return true; }
 export function addMat(k, n = 1, quiet) { initState(); S.mats[k] = (S.mats[k] || 0) + n; if (!quiet) chat('loot', null, `You gather ${n} ${MATS[k].name}.`); }
-function skillUp(p, req) {
-  const s = S.prof[p]; if (s == null || s >= 100) return;
+function skillUp(p, req, who) {
+  const s = skill(p, who); if (s == null || s >= 100) return;
   const ch = s < req + 15 ? 1 : s < req + 30 ? .5 : s < req + 45 ? .2 : 0;
-  if (Math.random() < ch) { S.prof[p] = s + 1; floatText(S.hero, `${PROFS[p].name} ${s + 1}`, '#8fe8ff'); }
+  if (Math.random() < ch) { if (who) who.craft.skill[p] = s + 1; else S.prof[p] = s + 1; const ent = who ? S.party.find(x => x.name === who.name) : S.hero; if (ent) floatText(ent, `${PROFS[p].name} ${s + 1}`, '#8fe8ff'); }
 }
 export const learnRecipe = id => { initState(); if (S.recipes.includes(id)) return false; S.recipes.push(id); chat('sys', null, `You learn a rare recipe: ${RECIPES[id].name}.`); return true; };
 
@@ -130,10 +136,10 @@ function makeGear(r) {
 }
 export function haveMats(r, n = 1) { return Object.entries(r.mats).every(([k, v]) => (S.mats[k] || 0) >= v * n); }
 // returns a message for the player
-export function craft(id, G) {
+export function craft(id, G, who = null) {
   initState();
-  const r = RECIPES[id]; if (!r || !knows(r)) return "You don't know that recipe.";
-  if (S.prof[r.prof] < r.req) return `You need ${PROFS[r.prof].name} ${r.req}.`;
+  const r = RECIPES[id]; if (!r || !knows(r, who)) return "You don't know that recipe.";
+  if (skill(r.prof, who) < r.req) return `${who ? who.name + ' needs' : 'You need'} ${PROFS[r.prof].name} ${r.req}.`;
   if (!haveMats(r)) return "You don't have the materials.";
   const o = r.out;
   if (o.ench) { const it = S.gear[S.heroCls][o.slot]; if (!it) return `You have no ${o.slot} equipped to enchant.`; }
@@ -142,8 +148,8 @@ export function craft(id, G) {
   if (o.pot) { S.pots[o.pot] = (S.pots[o.pot] || 0) + o.n; chat('loot', null, `You make ${r.name}.`); }
   else if (o.cons) { S.cons[o.cons] = (S.cons[o.cons] || 0) + o.n; chat('loot', null, `You make ${o.n} ${CONS[o.cons].name}.`); }
   else if (o.ench) { const it = S.gear[S.heroCls][o.slot]; if (it.ench) it.stats[it.ench.stat] = Math.max(0, (it.stats[it.ench.stat] || 0) - it.ench.n); it.ench = { stat: o.ench, n: o.n, name: r.name.replace(/^Enchant \w+: /, '') }; it.stats[o.ench] = +((it.stats[o.ench] || 0) + o.n).toFixed(1); G.applyGear(S.hero, S.gear[S.heroCls]); chat('loot', null, `${it.name} glows: ${it.ench.name}.`); }
-  else { const it = makeGear(r); G.addToBag(it); chat('loot', null, `You make ${it.name}.`); }
-  skillUp(r.prof, r.req);
+  else { const it = makeGear(r); G.addToBag(it); chat('loot', null, `${who ? who.name + ' makes' : 'You make'} ${it.name}.`); }
+  skillUp(r.prof, r.req, who);
   G.save();
   return null;
 }
@@ -167,7 +173,8 @@ export function mobMats(m) {
   const D = MOBS[m.mob] || {}, L = m.lvl, tier = L < 6 ? 0 : L < 11 ? 1 : 2, got = [];
   if (D.beast) {
     if (Math.random() < .45) got.push([m.mob === 'crab' || m.mob === 'crabbig' ? 'crabmeat' : 'meat', 1]);
-    if (skill('skinning') !== null) { const h = ['lighthide', 'thickhide', 'scalehide'][tier], req = [1, 40, 75][tier]; if (S.prof.skinning >= req) { got.push([h, irnd(1, 2)]); skillUp('skinning', req); } }
+    const sk = skill('skinning') !== null ? null : friendWith('gather', 'skinning'), sv = skill('skinning', sk);
+    if (sv !== null) { const h = ['lighthide', 'thickhide', 'scalehide'][tier], req = [1, 40, 75][tier]; if (sv >= req) { got.push([h, irnd(1, 2)]); skillUp('skinning', req, sk); } }
   }
   if (m.mob === 'crab' || m.mob === 'crabbig') { if (Math.random() < .5) got.push(['crabmeat', 1]); }
   if (D.human && Math.random() < .35) got.push([['linen', 'wool', 'seasilk'][tier], irnd(1, 2)]);
@@ -272,6 +279,26 @@ export function gather(e) {
   skillUp(prof, n.req);
   p.depleted = S.time + 150; e.remove = true; e.dead = true;
   return true;
+}
+// friends with a gathering job pick from nodes near you when nothing's going on
+export function friendGatherTick(G) {
+  const h = S.hero; if (!h || h.dead) return;
+  for (const fr of friendsOn()) {
+    const job = fr.craft?.gather; if (job !== 'mining' && job !== 'herbalism') continue;
+    const e = S.party.find(p => p.name === fr.name); if (!e || e.gatherTask || e.combatT && S.time - e.combatT < 4) continue;
+    const type = job === 'mining' ? 'ore' : 'herb', sk = skill(job, fr);
+    const n = S.ents.find(x => x.prop?.node && !x.remove && x.prop.node.type === type && x.prop.node.req <= sk && Math.hypot(x.x - h.x, x.z - h.z) < 16 && !S.party.some(p => p.gatherTask?.ent === x));
+    if (n) e.gatherTask = { ent: n, t: 0, fr };
+  }
+}
+// called by the friend's AI once it's standing at the node
+export function friendGather(e) {
+  const g = e.gatherTask; e.gatherTask = null; if (!g || g.ent.remove) return;
+  const p = g.ent.prop, n = p.node, k = irnd(1, 3); addMat(n.mat, k, true);
+  let gem = null; if (n.type === 'ore' && Math.random() < .15) { gem = n.mat === 'copper' ? 'garnet' : n.mat === 'iron' ? 'moonstone' : 'pearl'; addMat(gem, 1, true); }
+  chat('loot', null, `${g.fr.name} gathers ${k} ${MATS[n.mat].name}${gem ? ' and a ' + MATS[gem].name : ''}.`);
+  skillUp(n.type === 'ore' ? 'mining' : 'herbalism', n.req, g.fr);
+  p.depleted = S.time + 150; g.ent.remove = true; g.ent.dead = true;
 }
 // depleted nodes grow back
 export function tick(G) {

@@ -475,7 +475,7 @@ function weaponRack(body) {
   const card = el(`<div class="card"><h3>Your weapons</h3>
     ${S.unlockPicks > 0 ? `<div class="acts" style="margin:4px 0 8px"><button class="pri" data-a="pick">⭐ Choose your new weapon (${S.unlockPicks})</button></div>` : ''}
     <div class="wrack">${own.map(k => { const c = CLASSES[k], on = k === S.heroCls, w = S.gear[k]?.weapon; return `<div class="wpn ${on ? 'on' : ''}" style="--c:${c.color}"><span class="wi">${wIcon(k)}</span><div style="flex:1;min-width:0"><b>${esc(w ? w.name : weaponOf(k))}</b><small>${roleIcon(k)} ${c.name} · level ${Game.levelOf(k)}</small></div>${on ? '<span class="dim" style="font-size:12px">Equipped</span>' : `<button data-eq="${k}">Equip</button>`}</div>`; }).join('')}</div>
-    <div class="acts" style="margin-top:6px"><button data-a="friends">👥 Friends' classes</button></div>
+    <div class="acts" style="margin-top:6px"><button data-a="friends">👥 Friends' classes and jobs</button></div>
     </div>`);
   card.onclick = ev => {
     const b = ev.target.closest('button'); if (!b) return;
@@ -511,12 +511,15 @@ export function openFriendPick(afterUnlock, afterSwitch, newCls) {
   const pend = {};
   const friends = () => (S.friends || []).filter(fr => S.party.some(p => p.name === fr.name && p.fake?.bff));
   if (!friends().length) { if (afterUnlock) openBook('char'); return; }
-  openSheet("Friends' classes", body => {
+  openSheet('Your friends', body => {
     body.appendChild(el(`<p style="margin-top:0">${afterUnlock ? 'Your friends are picking up new weapons too.' : afterSwitch ? 'Your friends could switch too.' : ''} <span class="dim">You: ${roleIcon(S.heroCls)} ${CLASSES[S.heroCls].name}.</span></p>`));
     for (const fr of friends()) {
       const cur = pend[fr.name] || fr.cls;
       const box = el(`<div class="card"><h3>${esc(fr.name)} <span class="dim" style="font:500 12px Alegreya Sans">· ${roleIcon(cur)} ${CLASSES[cur].name} (${CLASSES[cur].role})</span></h3><div class="fpick">${FAMILIES.map(f => CLASS_KEYS.filter(k => CLASSES[k].family === f).map(k => `<button data-k="${k}" class="${k === cur ? 'on' : ''}" style="--c:${CLASSES[k].color}">${roleIcon(k)} ${CLASSES[k].name}</button>`).join('')).join('')}</div></div>`);
-      box.onclick = ev => { const b = ev.target.closest('button'); if (b?.dataset.k) { pend[fr.name] = b.dataset.k; refreshSheet(); } };
+      const job = fr.craft || {}, J = Craft.PROFS;
+      box.appendChild(el(`<div><p class="setl" style="margin-top:8px">Gathers</p><div class="seg">${['', ...Craft.GATHER_JOBS].map(p => `<button data-g="${p}" class="${(job.gather || '') === p ? 'on' : ''}">${p ? J[p].icon + ' ' + J[p].name + (job.skill?.[p] ? ' ' + job.skill[p] : '') : 'Nothing'}</button>`).join('')}</div>
+        <p class="setl">Crafts</p><div class="seg">${['', ...Craft.MAKE_JOBS].map(p => `<button data-m="${p}" class="${(job.make || '') === p ? 'on' : ''}">${p ? J[p].icon + ' ' + J[p].name + (job.skill?.[p] ? ' ' + job.skill[p] : '') : 'Nothing'}</button>`).join('')}</div></div>`));
+      box.onclick = ev => { const b = ev.target.closest('button'); if (!b) return; if (b.dataset.k) { pend[fr.name] = b.dataset.k; refreshSheet(); } if (b.dataset.g !== undefined) { Craft.setJob(fr, 'gather', b.dataset.g); Game.save(); refreshSheet(); } if (b.dataset.m !== undefined) { Craft.setJob(fr, 'make', b.dataset.m); Game.save(); refreshSheet(); } };
       body.appendChild(box);
     }
     const roles = [CLASSES[S.heroCls].role, ...friends().map(fr => CLASSES[pend[fr.name] || fr.cls].role)];
@@ -637,6 +640,8 @@ function objText(q) {
 function tabTrade(body) {
   const P = Craft.PROFS;
   body.appendChild(el(`<div class="card"><h3>Professions</h3><div class="profs">${Object.entries(P).map(([k, p]) => { const v = Craft.skill(k); return `<div class="prof ${v === null ? 'off' : ''}"><span>${p.icon}</span><b>${p.name}</b><small>${v === null ? 'not learned' : v + ' / 100'}</small>${v === null ? '' : `<i style="width:${v}%"></i>`}</div>`; }).join('')}</div></div>`));
+  const jobs = (S.friends || []).filter(fr => fr.craft && (fr.craft.gather || fr.craft.make));
+  if (jobs.length) body.appendChild(el(`<div class="card"><h3>Friends' jobs</h3>${jobs.map(fr => `<p style="margin:2px 0">${esc(fr.name)}: ${[fr.craft.gather, fr.craft.make].filter(Boolean).map(p => `${P[p].icon} ${P[p].name} ${Craft.skill(p, fr)}`).join(' · ')}</p>`).join('')}</div>`));
   const mats = Object.entries(S.mats || {}).filter(([, n]) => n > 0);
   body.appendChild(el(`<div class="card"><h3>Materials</h3>${mats.length ? `<div class="mats">${mats.map(([k, n]) => `<span>${Craft.MATS[k].icon} ${esc(Craft.MATS[k].name)} <b>${n}</b></span>`).join('')}</div>` : '<p class="dim" style="margin:0">None yet.</p>'}</div>`));
   const cons = Object.entries(S.cons || {}).filter(([, n]) => n > 0);
@@ -652,19 +657,23 @@ function tabTrade(body) {
     body.appendChild(c);
   }
 }
+let craftPick = 0;
 export function openCraft(st) {
-  const S0 = Craft.STATIONS[st];
+  const S0 = Craft.STATIONS[st]; craftPick = 0;
   openSheet(S0.name, body => {
-    for (const p of S0.profs) {
-      const v = Craft.skill(p), P = Craft.PROFS[p];
-      if (v === null) { body.appendChild(el(`<div class="card"><h3>${P.icon} ${P.name}</h3><p class="dim" style="margin:0">You haven't learned this. The trainers in the yard can teach you.</p></div>`)); continue; }
-      body.appendChild(el(`<h3 style="font:700 14px Cinzel;margin:8px 0 4px">${P.icon} ${P.name} <span class="dim" style="font:500 12px Alegreya Sans">· ${v} / 100</span></h3>`));
-      const list = Object.values(Craft.RECIPES).filter(r => r.prof === p && Craft.knows(r)).sort((a, b) => a.req - b.req);
+    const all = Craft.craftersAt(st);
+    if (!all.length) { body.appendChild(el(`<div class="card"><p style="margin:0">Nobody in your group knows ${S0.profs.map(p => Craft.PROFS[p].name).join(' or ')}. A trainer in the yard can teach you, or give a friend the job.</p></div>`)); return; }
+    if (craftPick >= all.length) craftPick = 0;
+    if (all.length > 1) { const tabs = el(`<div class="seg">${all.map((c, i) => `<button data-i="${i}" class="${i === craftPick ? 'on' : ''}">${Craft.PROFS[c.p].icon} ${c.who ? esc(c.who.name) : 'You'} · ${Craft.skill(c.p, c.who)}</button>`).join('')}</div>`); tabs.onclick = ev => { const i = ev.target.closest('button')?.dataset.i; if (i !== undefined) { craftPick = +i; refreshSheet(); } }; body.appendChild(tabs); }
+    for (const { who, p } of [all[craftPick]]) {
+      const v = Craft.skill(p, who), P = Craft.PROFS[p];
+      body.appendChild(el(`<h3 style="font:700 14px Cinzel;margin:8px 0 4px">${P.icon} ${P.name}${who ? ' · ' + esc(who.name) : ''} <span class="dim" style="font:500 12px Alegreya Sans">· ${v} / 100</span></h3>`));
+      const list = Object.values(Craft.RECIPES).filter(r => r.prof === p && Craft.knows(r, who)).sort((a, b) => a.req - b.req);
       for (const r of list) {
         const can = v >= r.req, has = Craft.haveMats(r), col = v < r.req ? '#888' : v < r.req + 15 ? '#ff9a3a' : v < r.req + 30 ? '#ffd34d' : v < r.req + 45 ? '#7fd35a' : '#9a9a9a';
         const mats = Object.entries(r.mats).map(([k, n]) => { const have = (S.mats || {})[k] || 0; return `<span style="color:${have >= n ? 'var(--ink)' : '#ff8a6a'}">${Craft.MATS[k].icon} ${have}/${n} ${esc(Craft.MATS[k].name)}</span>`; }).join(' ');
         const c = el(`<div class="card craft"><div><b style="color:${col}">${esc(r.name)}</b>${r.rare ? ' <small style="color:#b86bff">rare</small>' : ''}<small class="dim"> · skill ${r.req}</small><div class="mats">${mats}</div></div><button ${can && has ? '' : 'disabled'}>Craft</button></div>`);
-        c.querySelector('button').onclick = () => { const m = Craft.craft(r.id, Game); if (m) toast(m); refreshSheet(); };
+        c.querySelector('button').onclick = () => { const m = Craft.craft(r.id, Game, who); if (m) toast(m); refreshSheet(); };
         body.appendChild(c);
       }
     }
@@ -929,7 +938,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 5 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 5.1 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
@@ -945,22 +954,24 @@ export function showTitle(view = 'home') {
   }
   if (view === 'set') { T.onclick = null; T.innerHTML = head; const box = document.createElement('div'); T.appendChild(box); renderSettings(box, false, () => showTitle('home')); return; }
   // a new character starts with one weapon, and the weapon makes the class
-  let pick = null;
+  let pick = null, fcls = [];
   const draw = () => {
     T.innerHTML = `${head}<button data-a="back" style="margin:8px 0">← Back</button>
       <div class="card" style="text-align:left"><h3>Name your hero</h3><input type="text" id="heroName" maxlength="14" placeholder="Hero name" value="${esc(T.dataset.name || pickName())}"></div>
       <div class="card" style="text-align:left"><h3>Choose your weapon</h3>
       ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Cinzel;color:var(--acc)">${FAMILY_ICON[f]} ${f}s</p><div class="wpick">${CLASS_KEYS.filter(k => CLASSES[k].family === f).map(k => { const c = CLASSES[k]; return `<div class="card ${pick === k ? 'on' : ''}" data-k="${k}" style="border-color:${c.color}"><span class="wi">${wIcon(k)}</span><div><b style="color:${c.color}">${weaponOf(k)}</b><small>${c.name} · ${c.role}</small><p>${esc(c.blurb)}</p></div></div>`; }).join('')}</div>`).join('')}</div>
+      ${pick ? `<div class="card" style="text-align:left"><h3>Your friends</h3>${fcls.map((k, i) => `<p class="setl" style="margin-top:6px">Friend ${i + 1}</p><select data-f="${i}" class="fsel">${FAMILIES.map(f => `<optgroup label="${f}s">${CLASS_KEYS.filter(c => CLASSES[c].family === f).map(c => `<option value="${c}" ${c === k ? 'selected' : ''}>${CLASSES[c].name} · ${c === 'illusionist' || c === 'bard' ? 'support' : CLASSES[c].role}</option>`).join('')}</optgroup>`).join('')}</select>`).join('')}</div>` : ''}
       ${info ? `<p style="color:#ff8a6a;font-size:13px">Starting a new character replaces ${esc(info.name)} (level ${info.lvl}). Copy their save code in Settings first if you want to keep them.</p>` : ''}
       <div style="position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,rgba(13,17,20,.95) 30%)"><button class="pri" data-a="go" style="width:100%;opacity:1" ${pick ? '' : 'disabled'}>${pick ? `Enter the world as a ${CLASSES[pick].name}` : 'Tap a weapon to choose it'}</button></div>`;
   };
   T.dataset.name = '';
   draw();
+  T.onchange = ev => { const sel = ev.target.closest('select[data-f]'); if (sel) fcls[+sel.dataset.f] = sel.value; };
   T.onclick = ev => {
     const card = ev.target.closest('.wpick .card'), a = ev.target.closest('button')?.dataset.a;
-    if (card) { T.dataset.name = $('heroName').value; const y = $('title').scrollTop; pick = card.dataset.k; draw(); $('title').scrollTop = y; return; }
+    if (card) { T.dataset.name = $('heroName').value; const y = $('title').scrollTop; if (pick !== card.dataset.k) fcls = Game.defaultFriendCls(card.dataset.k); pick = card.dataset.k; draw(); $('title').scrollTop = y; return; }
     if (a === 'back') showTitle('home');
-    if (a === 'go' && pick) { const n = ($('heroName').value || 'Hero').trim().slice(0, 14) || 'Hero'; Game.newGame(pick, n); afterStart(); }
+    if (a === 'go' && pick) { const n = ($('heroName').value || 'Hero').trim().slice(0, 14) || 'Hero'; Game.newGame(pick, n, undefined, fcls.slice()); afterStart(); }
   };
 }
 function pickName() { return ['Aldric', 'Wren', 'Corvane', 'Isolde', 'Taran', 'Merrow', 'Halcyon', 'Brisa'][(Math.random() * 8) | 0]; }

@@ -562,6 +562,7 @@ function healerTurn(e, group, inFight) {
 export const PULL_AB = { bulwark: 'taunt', wardancer: 'challenge', bladewarden: 'callout', monk: 'provoke', bard: 'chord' };
 
 // ---------- your companions ----------
+export const aiHooks = {};
 export function companionAI(e, dt) {
   const hero = S.hero, group = S.party;
   if (e.dead || e.onBoat) return;
@@ -612,24 +613,38 @@ export function companionAI(e, dt) {
   }
   if (inFight) {
     e.sit = false;
+    // something is hitting me: go and stand by the tank so it can be taken off me (never run away from it)
+    const tankP = group.find(p => isTank(p) && !p.dead && p !== e);
+    const onMe = role !== 'tank' && tankP && foes.some(f => f.target === e && !cc(f) && dist(f, e) < 8);
+    if (onMe && dist(e, tankP) > 3.5) {
+      if (role === 'healer' && hpPct(e) > .35 && healerTurn(e, group, true)) { stopMove(e, dt); return; }
+      goTo(e, tankP.x, tankP.z, dt, 2.5); return;
+    }
     if (role === 'healer') {
+      if (onMe) { if (healerTurn(e, group, true)) { stopMove(e, dt); return; } if (upkeepBuffs(e, group, true)) return; stopMove(e, dt); return; }
       if (healerTurn(e, group, true)) { stopMove(e, dt); return; }
       if (upkeepBuffs(e, group, true)) return;
       const tank = group.find(p => isTank(p) && !p.dead) || hero, boss = foes.find(f => f.boss) || foes[0];
       const idle = e.cls === 'druid' ? e.res > e.resMax * .4 && !group.some(p => !p.dead && hpPct(p) < .75) : e.res > e.resMax * .6 && !group.some(p => !p.dead && hpPct(p) < .9);
-      if (standBehind(e, boss, tank, 18, dt) && idle) { e.target = boss; fight(e, boss, group); }
+      if (standBehind(e, boss, tank, 18, dt) && idle && engageable(boss, group, e)) { e.target = boss; fight(e, boss, group); }
       return;
     }
     let t;
     const tank = group.find(p => isTank(p) && !p.dead && p !== e);
     if (role === 'tank') {
       t = (e.target && !e.target.dead && foes.includes(e.target)) ? e.target : null;
-      const htgt = hero.target && foes.includes(hero.target) ? hero.target : null;
-      if (!t) t = htgt || foes.slice().sort((a, b) => dist(a, e) - dist(b, e))[0];
+      const htgt = hero.target && foes.includes(hero.target) && engageable(hero.target, group, e) ? hero.target : null;
+      if (t && !engageable(t, group, e)) t = null;
+      const loose = foes.filter(f => f.target && f.target !== e && group.includes(f.target) && !cc(f) && engageable(f, group, e)).sort((a, b) => dist(a, e) - dist(b, e))[0];
+      if (loose && (!t || t.target === e)) t = loose;
+      if (!t) t = htgt || foes.filter(f => engageable(f, group, e)).sort((a, b) => dist(a, e) - dist(b, e))[0];
+      if (!t) { stopMove(e, dt); return; }
     } else {
       // adds chewing on a healer come first, then whatever you or the tank are hitting
       const onHealer = foes.find(f => f.target && isHealer(f.target) && group.includes(f.target) && !f.boss && !cc(f));
       t = (S.cmd === 'assist' && hero.target && foes.includes(hero.target)) ? hero.target : onHealer ? onHealer : (tank && tank.target && foes.includes(tank.target)) ? tank.target : (hero.target && foes.includes(hero.target)) ? hero.target : foes[0];
+      // nothing has reached us yet (a spot pull still on its way): hold position, buffs only
+      if (!engageable(t, group, e)) { const ok = foes.filter(f => engageable(f, group, e) && !cc(f)); if (ok.length) t = ok.includes(tank?.target) ? tank.target : ok[0]; else { if (e.cls === 'bard') upkeepBuffs(e, group, true); stopMove(e, dt); e.autoOn = false; e.target = null; return; } }
       // songs and crowd control don't wait for threat
       if (e.cls === 'bard' && upkeepBuffs(e, group, true)) return;
       if ((e.cls === 'illusionist' || e.cls === 'bard') && mezAdd(e, t, group, e.cls === 'illusionist' ? 'mez' : 'lullaby')) return;
@@ -675,6 +690,13 @@ export function companionAI(e, dt) {
   // out of combat
   e.autoOn = false;
   if (healerTurnOoc(e, group)) return;
+  // a friend sent to gather from a node
+  if (e.gatherTask) {
+    const g = e.gatherTask, n = g.ent;
+    if (n.remove || dist(n, hero) > 30 || hero.moving > .5 && dist(e, hero) > 18) e.gatherTask = null;
+    else if (dist(e, n) > 1.8) { e.sit = false; goTo(e, n.x, n.z, dt, 1.4); return; }
+    else { stopMove(e, dt); face(e, n, dt); e.anim.atk = .6; g.t += dt; if (g.t > 1.6) aiHooks.gathered?.(e); return; }
+  }
   if (upkeepBuffs(e, group)) return;
   // follow in formation, rest when the group rests
   const slot = group.indexOf(e), a = formYaw() + Math.PI + (slot - 3) * .5, r = 3 + (slot % 2) * 1.6;
@@ -703,7 +725,19 @@ function rest(e) {
   if (low && !e.sit && S.hero.moving < .1) { e.sit = true; if (e.resType === 'mana' && e.res < e.resMax * .35 && (!e.oomT || S.time - e.oomT > 40)) { e.oomT = S.time; chat('party', e.name, pick(CHAT.oom)); } }
   if (e.sit && (S.hero.moving > .3) && !(e.resType === 'mana' && e.res < e.resMax * .2)) e.sit = false;
 }
-function groupCenter(group, not) { let x = 0, z = 0, n = 0; for (const p of group) if (p !== not && !p.dead) { x += p.x; z += p.z; n++; } return n ? { x: x / n, z: z / n } : { x: not.x, z: not.z }; }
+// companions only start on an enemy once it has come to the group (or is chewing on one of us).
+// This keeps them from opening on a mob still standing in its camp while you spot-pull it.
+function engageable(t, group, e) {
+  if (!t || t.boss || t.boss2) return true;
+  const ord = S.campOrder; if (ord && (ord.mode === 'clear' || ord.mode === 'hunt')) return true;
+  const c = groupCenter(group.filter(p => !p.pull), null) ;
+  if (Math.hypot(t.x - c.x, t.z - c.z) < 15) return true;
+  if (t.target && group.includes(t.target) && dist(t, t.target) < 6 && Math.hypot(t.target.x - c.x, t.target.z - c.z) < 15) return true;
+  // a ranged enemy shooting at us from where it stands: after a moment, go and get it
+  if (t.target && group.includes(t.target) && S.time - (t.seenT || (t.seenT = S.time)) > 3) return true;
+  return false;
+}
+function groupCenter(group, not) { let x = 0, z = 0, n = 0; for (const p of group) if (p !== not && !p.dead) { x += p.x; z += p.z; n++; } return n ? { x: x / n, z: z / n } : { x: (not || S.hero).x, z: (not || S.hero).z }; }
 // healers and ranged stand at range on the far side from the tank (out of the cleave)
 // returns true when settled (close enough to its spot to fight)
 function standBehind(e, foe, tank, rng, dt) {

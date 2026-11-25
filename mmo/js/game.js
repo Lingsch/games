@@ -51,7 +51,8 @@ function starterGear(cls) {
 }
 
 // ---------- starting and loading ----------
-export function newGame(cls, heroName, seed = (Math.random() * 1e9) | 0) {
+export function newGame(cls, heroName, seed = (Math.random() * 1e9) | 0, friendCls = null) {
+  S.pendingFriendCls = friendCls;
   S.seed = seed; S.time = 0; S.gold = 5; S.bag = []; S.pots = { hpot: 3, mpot: 3 }; S.quests = {}; S.friends = [];
   S.classes = {}; S.gear = {}; S.bar = {};
   for (const k of CLASS_KEYS) { S.classes[k] = { lvl: 1, xp: 0 }; S.gear[k] = starterGear(k); S.bar[k] = defaultBar(k); }
@@ -108,9 +109,12 @@ function densify(zone) {
   world.spawns.push(...add);
 }
 // ---------- your two friends: always your level, always the roles you're missing ----------
-const NEED = { tank: ['healer', 'dps'], healer: ['tank', 'dps'], dps: ['tank', 'healer'] };
-const FRIEND_CLS = { tank: ['bulwark', 'bladewarden', 'wardancer'], healer: ['cleric', 'lifebinder', 'aegis'], dps: ['longwatch', 'elementalist', 'knifeshade', 'warlock', 'blightblade'] };
-const FRIEND_HI = { tank: 'Shields up. I\'ll take the hits.', healer: "I've got heals. Don't stand in fire.", dps: "I'll make things fall over." };
+// the four jobs in a starting group: you fill one, your three friends fill the rest
+export const SLOT_OF = k => ['illusionist', 'bard'].includes(k) ? 'support' : CLASSES[k].role;
+export const NEED_FOR = k => ['tank', 'healer', 'dps', 'support'].filter(r => r !== SLOT_OF(k));
+export const FRIEND_CLS = { tank: ['bulwark', 'bladewarden', 'wardancer'], healer: ['cleric', 'lifebinder', 'aegis'], dps: ['longwatch', 'elementalist', 'knifeshade', 'warlock', 'blightblade'], support: ['illusionist', 'bard'] };
+const FRIEND_HI = { tank: 'Shields up. I\'ll take the hits.', healer: "I've got heals. Don't stand in fire.", dps: "I'll make things fall over.", support: "I'll keep the buffs up and put the extras to sleep." };
+export const defaultFriendCls = k => NEED_FOR(k).map(r => pick(FRIEND_CLS[r]));
 export function makeFriends() {
   if (S.friendsMade) return;
   S.friendsMade = true;
@@ -118,14 +122,24 @@ export function makeFriends() {
   const names = ['Tamsin', 'Brannoc', 'Mirelle', 'Odo', 'Finch', 'Rowena', 'Garrick', 'Ysolde'].filter(n => !used.has(n)).sort(() => Math.random() - .5);
   const room = 6 - S.party.length;
   if (room <= 0) return;
-  const need = NEED[CLASSES[S.heroCls].role];
-  S.friends = need.slice(0, room).map((role, i) => ({ name: names[i] || 'Friend ' + (i + 1), pal: 1 + i, persona: 'friendly' }));
-  S.friends.forEach((fr, i) => {
-    const cls = pick(FRIEND_CLS[need[i]]); S.friends[i].cls = cls;
-    const f = addMate({ name: fr.name, cls, lvl: S.hero.lvl, pal: fr.pal, persona: fr.persona, guild: null, friend: true, bff: true }, S.hero);
-    chat('party', f.name, FRIEND_HI[need[i]]);
-  });
-  chat('sys', null, `${S.friends.map(f => f.name).join(' and ')} join you.`);
+  const picks = (S.pendingFriendCls && S.pendingFriendCls.length ? S.pendingFriendCls : defaultFriendCls(S.heroCls)).slice(0, room); S.pendingFriendCls = null;
+  S.friends = picks.map((cls, i) => ({ name: names[i] || 'Friend ' + (i + 1), pal: 1 + i, persona: 'friendly', cls }));
+  for (const fr of S.friends) {
+    const f = addMate({ name: fr.name, cls: fr.cls, lvl: S.hero.lvl, pal: fr.pal, persona: fr.persona, guild: null, friend: true, bff: true }, S.hero);
+    chat('party', f.name, FRIEND_HI[SLOT_OF(fr.cls)]);
+  }
+  chat('sys', null, `${S.friends.map(f => f.name).slice(0, -1).join(', ')} and ${S.friends[S.friends.length - 1].name} join you.`);
+}
+// older characters started with two friends: a third (for crowd control and buffs) catches up with them
+export function topUpFriends() {
+  if (!S.friendsMade || (S.friends || []).length >= 3 || S.party.length >= 6) return;
+  const used = new Set([...S.fakes.map(f => f.name), S.heroName, ...S.friends.map(f => f.name)]);
+  const name = ['Wren', 'Pip', 'Lark', 'Sable', 'Quill', 'Juniper'].find(n => !used.has(n)) || 'Friend 3';
+  const have = new Set([SLOT_OF(S.heroCls), ...S.friends.map(f => SLOT_OF(f.cls))]);
+  const role = ['support', 'tank', 'healer', 'dps'].find(r => !have.has(r)) || 'support', cls = pick(FRIEND_CLS[role]);
+  const fr = { name, pal: 3, persona: 'friendly', cls }; S.friends.push(fr);
+  const f = addMate({ name, cls, lvl: S.hero.lvl, pal: fr.pal, persona: fr.persona, guild: null, friend: true, bff: true }, S.hero);
+  chat('party', f.name, `Sorry I'm late! ${FRIEND_HI[SLOT_OF(cls)]}`);
 }
 // keep friends at your level, playing the classes you chose for them
 export function syncFriends() {
@@ -520,7 +534,7 @@ export function partyCommand(cmd) {
 
 // ---------- class switching ----------
 // ---------- vanity pets: they follow you around and do nothing useful at all ----------
-let petEnt = null;
+let petEnt = null, craftT = 0;
 export function setPet(k) { S.pet = S.pet === k ? null : k; if (petEnt) { petEnt.remove = true; petEnt.dead = true; petEnt = null; } save(); }
 function petTick(dt) {
   const h = S.hero; if (!h) return;
@@ -678,6 +692,7 @@ export function assignLoot(mob, it, who) {
 }
 
 // ---------- death and the corpse run ----------
+AI.aiHooks.gathered = e => { Craft.friendGather(e); save(); };
 Cb.setHooks({
   bossLoot: (e, party) => Loot5.bossLoot(e, party),
   xpMod(p, amt) {
@@ -819,7 +834,7 @@ export function tick(dt) {
   separate();
   Sea.tick(dt);
   Banter.tick();
-  if (S.frame % 30 === 0) Craft.tick({ spawnProp });
+  craftT += dt; if (craftT > .5) { craftT = 0; Craft.tick({ spawnProp }); Craft.friendGatherTick(); }
   petTick(dt);
   if (world.levT && S.time >= world.levT) {
     world.levT = 0;
@@ -954,7 +969,7 @@ export function loadSave(data) {
   S.time = sv.time || 0;
   S.campOrder = null; S.cmd = S.huntOn ? 'hunt' : 'follow';
   chat('sys', null, `Welcome back, ${S.heroName}.`);
-  if (!S.friendsMade) makeFriends();
+  if (!S.friendsMade) makeFriends(); else topUpFriends();
 }
 // save codes: compressed JSON, so progress can move between builds and devices
 export async function makeCode(fromStore) {
