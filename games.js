@@ -25,5 +25,15 @@ window.GAMES = [
     blurb: "The same world, a hundred years after the summoner wars. Uncover the Gravelord's plot in the Vale with your two friends, then sail the Saltreach Coast to the Sunken Fleet.",
     facts: ["16 classes", "Levels 1–20", "2 zones"],
     accent: "#63b7c9"
+  },
+  {
+    title: "Smokestack",
+    folder: "smokestack",
+    version: "v0.12.1",
+    updated: "November 2026",
+    kind: "Factory builder",
+    blurb: "A Factorio fan game. Mine by hand, then automate: belts and inserters, oil, trains, robots, nuclear power, the circuit network, and a rocket at the end. Same game as the 3DS build.",
+    facts: ["210 items", "196 technologies", "Phase 9: circuits"],
+    accent: "#ffbe46"
   }
 ];

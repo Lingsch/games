@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Smokestack</title>
+<meta name="apple-mobile-web-app-title" content="Smokestack">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
+<meta name="theme-color" content="#10141f">
+<style>
+/* Smokestack in the browser: the game's two 3DS screens, stacked, with touch controls laid out like the handheld.
+   Same pixels as the 3DS build: the C game runs as WebAssembly and draws both screens; this page only shows them. */
+:root{color-scheme:dark;--bg:#10141f;--ink:#e9e4d6;--dim:#9a96a0;--acc:#ffbe46;--btn:#2a3142;--btn2:#394257;--line:#4a5470}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:15px/1.35 system-ui,-apple-system,sans-serif;overflow:hidden;
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+#app{position:fixed;inset:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+#stage{position:relative;width:100%;height:100%}
+canvas{position:absolute;display:block;image-rendering:pixelated;image-rendering:crisp-edges;background:#000;box-shadow:0 0 0 1px #000,0 6px 24px #0008}
+.c{position:absolute;display:flex;align-items:center;justify-content:center;background:var(--btn);border:1px solid var(--line);color:var(--ink);
+  font-weight:700;letter-spacing:.04em;box-shadow:inset 0 -3px 0 #0006}
+.c.on{background:var(--acc);color:#1a1408;box-shadow:inset 0 2px 0 #0004}
+.round{border-radius:50%}
+.pill{border-radius:999px;font-size:12px}
+.shoulder{border-radius:12px;font-size:14px}
+#dpad,#stick{position:absolute}
+#dpad .arm{position:absolute;background:var(--btn);border:1px solid var(--line);box-shadow:inset 0 -3px 0 #0006}
+#dpad .arm.on{background:var(--acc)}
+#dpad .hub{position:absolute;background:var(--btn)}
+#stick{border-radius:50%;background:radial-gradient(circle,#1b2030 55%,#252c3d);border:1px solid var(--line)}
+#knob{position:absolute;border-radius:50%;background:radial-gradient(circle at 40% 35%,#5a6580,#353d52);border:1px solid #6b7795;box-shadow:0 3px 8px #0008}
+#legend{position:absolute;left:0;right:0;text-align:center;color:var(--dim);font-size:13px}
+#legend b{color:var(--ink)}
+#back{position:absolute;color:var(--dim);font-size:13px;text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:#0006}
+#veil{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;background:var(--bg);z-index:5;text-align:center;padding:24px}
+#veil img{width:96px;height:96px;border-radius:22px;box-shadow:0 10px 30px #000a}
+#veil h1{margin:0;font-size:28px;letter-spacing:.12em;color:var(--acc)}
+#bar{width:min(320px,80vw);height:8px;border-radius:4px;background:#2a3142;overflow:hidden}
+#bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .15s}
+#msg{color:var(--dim);max-width:30em}
+#veil button{font:inherit;font-weight:700;background:var(--acc);color:#1a1408;border:0;border-radius:12px;padding:12px 22px}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div id="app"><div id="stage">
+  <canvas id="top" width="400" height="240"></canvas>
+  <canvas id="bot" width="320" height="240"></canvas>
+  <div id="legend" class="hide"></div>
+  <a id="back" href="../">‹ Games</a>
+</div></div>
+<div id="veil"><img src="icon-192.png" alt=""><h1>SMOKESTACK</h1><div id="bar"><i></i></div><div id="msg">Loading the factory…</div></div>
+<script>
+"use strict";
+const VERSION = "0.12.1";
+const $ = id => document.getElementById(id);
+const veil = $("veil"), msg = $("msg"), bar = document.querySelector("#bar i");
+function fail(text) { veil.classList.remove("hide"); document.querySelector("#bar").classList.add("hide"); msg.textContent = text; }
+
+/* ---------- saves: the game's files, kept in IndexedDB (one store, name -> bytes) */
+const DB = { db: null,
+  open() { return new Promise((ok, no) => { const r = indexedDB.open("smokestack", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("files"); r.onsuccess = () => { this.db = r.result; ok(); }; r.onerror = () => no(r.error); }); },
+  all() { return new Promise(ok => { const out = new Map(); if (!this.db) return ok(out);
+    const st = this.db.transaction("files").objectStore("files"), req = st.openCursor();
+    req.onsuccess = () => { const c = req.result; if (c) { out.set(c.key, new Uint8Array(c.value)); c.continue(); } else ok(out); }; req.onerror = () => ok(out); }); },
+  put(k, v) { if (this.db) try { this.db.transaction("files", "readwrite").objectStore("files").put(v, k); } catch (e) { console.warn(e); } },
+  del(k) { if (this.db) try { this.db.transaction("files", "readwrite").objectStore("files").delete(k); } catch (e) { console.warn(e); } }
+};
+
+/* ---------- the game (WebAssembly) */
+let ex = null, mem = null, running = false;
+const td = new TextDecoder(), te = new TextEncoder();
+const cstr = p => { const b = new Uint8Array(mem.buffer); let e = p; while (b[e]) e++; return td.decode(b.subarray(p, e)); };
+const env = {
+  js_print: (p, n) => console.log(td.decode(new Uint8Array(mem.buffer, p, n))),
+  js_file_saved: (np, dp, n) => DB.put(cstr(np), new Uint8Array(mem.buffer, dp, n).slice().buffer),
+  js_file_removed: np => DB.del(cstr(np)),
+  js_now: () => Date.now() / 1000, js_now_ms: () => performance.now(),
+  js_exit: () => { running = false; fail("Thanks for playing. Reload the page to play again."); throw new Error("quit"); },
+  js_sin: Math.sin, js_cos: Math.cos, js_tan: Math.tan, js_atan2: Math.atan2, js_atan: Math.atan, js_asin: Math.asin, js_acos: Math.acos,
+  js_exp: Math.exp, js_log: Math.log, js_log10: Math.log10, js_log2: Math.log2, js_pow: Math.pow
+};
+async function fetchAssets() {     /* assets.bin.gz with a progress bar, then gunzip */
+  const r = await fetch("assets.bin.gz?v=" + VERSION); if (!r.ok) throw new Error("couldn't load the art (" + r.status + ")");
+  const total = +r.headers.get("content-length") || 8.7e6, rd = r.body.getReader(), parts = []; let got = 0;
+  for (;;) { const { done, value } = await rd.read(); if (done) break; parts.push(value); got += value.length; bar.style.width = Math.min(100, got * 100 / total) + "%"; }
+  const blob = new Blob(parts), head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
+  if (head[0] !== 0x1f || head[1] !== 0x8b) return new Uint8Array(await blob.arrayBuffer());     /* the server already unpacked it */
+  if (typeof DecompressionStream === "undefined") throw new Error("This browser is too old for Smokestack (Safari 16.4 or newer is needed).");
+  return new Uint8Array(await new Response(blob.stream().pipeThrough(new DecompressionStream("gzip"))).arrayBuffer());
+}
+async function boot() {
+  try { await DB.open(); } catch (e) { console.warn("no storage", e); }
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  const [wasm, assets, files] = await Promise.all([
+    fetch("smokestack.wasm?v=" + VERSION).then(r => { if (!r.ok) throw new Error("couldn't load the game (" + r.status + ")"); return r.arrayBuffer(); }),
+    fetchAssets(), DB.all()]);
+  msg.textContent = "Starting…";
+  const { instance } = await WebAssembly.instantiate(wasm, { env });
+  ex = instance.exports; mem = ex.memory;
+  const put = bytes => { const p = ex.web_alloc(bytes.length); new Uint8Array(mem.buffer, p, bytes.length).set(bytes); return p; };
+  for (const [name, data] of files) ex.web_put_file(put(te.encode(name + "\0")), put(data), data.length);
+  ex.web_init(put(assets));
+  veil.classList.add("hide"); running = true; layout(); requestAnimationFrame(loop);
+}
+
+/* ---------- drawing: 60 game frames a second, whatever the screen's refresh rate */
+const ctxT = $("top").getContext("2d"), ctxB = $("bot").getContext("2d");
+let last = 0, acc = 0;
+function loop(t) {
+  if (!running) return;
+  requestAnimationFrame(loop);
+  if (!last) last = t; acc += Math.min(100, t - last); last = t;
+  let steps = 0;
+  try { while (acc >= 1000 / 60 && steps < 2) { ex.web_frame(); acc -= 1000 / 60; steps++; } }
+  catch (e) { if (running) { running = false; fail("The game stopped: " + e.message); } return; }
+  if (acc > 1000 / 30) acc = 0;
+  if (steps) {
+    ctxT.putImageData(new ImageData(new Uint8ClampedArray(mem.buffer, ex.web_top(), 400 * 240 * 4), 400, 240), 0, 0);
+    ctxB.putImageData(new ImageData(new Uint8ClampedArray(mem.buffer, ex.web_bot(), 320 * 240 * 4), 320, 240), 0, 0);
+  }
+}
+const saveNow = () => { if (running && ex) try { ex.web_save_now(); } catch (e) {} };
+document.addEventListener("visibilitychange", () => { if (document.hidden) saveNow(); else last = 0; });
+addEventListener("pagehide", saveNow);
+
+/* ---------- controls: the 3DS's buttons (libctru key numbers), circle pad, D-pad; the bottom screen is the touch screen */
+const KEY = { A: 0, B: 1, SELECT: 2, START: 3, DRIGHT: 4, DLEFT: 5, DUP: 6, DDOWN: 7, R: 8, L: 9, X: 10, Y: 11, ZL: 14, ZR: 15 };
+const touchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+const stage = $("stage"), held = {};       /* key -> count of things holding it (a finger and a keyboard key) */
+const press = (k, down) => { held[k] = Math.max(0, (held[k] || 0) + (down ? 1 : -1)); if (ex) ex.web_key(KEY[k], held[k] > 0 ? 1 : 0); };
+const btns = {};
+function mkBtn(name, label, cls) { const d = document.createElement("div"); d.className = "c " + cls; d.textContent = label; d.dataset.key = name; stage.appendChild(d); btns[name] = d; return d; }
+let dpad = null, stick = null, knob = null;
+if (touchDevice) {
+  ["L", "ZL", "ZR", "R"].forEach(k => mkBtn(k, k, "shoulder"));
+  ["SELECT", "START"].forEach(k => mkBtn(k, k, "pill"));
+  ["X", "Y", "A", "B"].forEach(k => mkBtn(k, k, "round"));
+  dpad = document.createElement("div"); dpad.id = "dpad"; stage.appendChild(dpad);
+  for (const k of ["DUP", "DDOWN", "DLEFT", "DRIGHT"]) { const a = document.createElement("div"); a.className = "arm"; a.dataset.arm = k; dpad.appendChild(a); }
+  const hub = document.createElement("div"); hub.className = "hub"; dpad.appendChild(hub);
+  stick = document.createElement("div"); stick.id = "stick"; knob = document.createElement("div"); knob.id = "knob"; stick.appendChild(knob); stage.appendChild(stick);
+}
+const place = (el, x, y, w, h) => { Object.assign(el.style, { left: x + "px", top: y + "px", width: w + "px", height: (h ?? w) + "px" }); };
+
+function layout() {
+  const W = stage.clientWidth, H = stage.clientHeight, T = $("top"), B = $("bot"), lg = $("legend"), back = $("back");
+  if (!W || !H) return;
+  const portrait = H >= W;
+  let st, sb, tx, ty, bx, by;
+  if (!touchDevice) {                       /* desktop: screens stacked, as big as fits; keys and mouse */
+    const s = Math.min(W / 400, (H - 40) / 480); st = sb = s;
+    tx = (W - 400 * s) / 2; ty = Math.max(4, (H - 40 - 480 * s) / 2); bx = (W - 320 * s) / 2; by = ty + 240 * s;
+    lg.classList.remove("hide"); lg.style.top = (by + 240 * s + 8) + "px";
+    lg.innerHTML = "Mouse: <b>touch screen</b> · WASD: <b>circle pad</b> · Arrows: <b>D-pad</b> · K <b>A</b> · J <b>B</b> · I <b>X</b> · U <b>Y</b> · Q <b>L</b> · E <b>R</b> · 1 <b>ZL</b> · 3 <b>ZR</b> · Enter <b>START</b> · Shift <b>SELECT</b>";
+  } else if (portrait) {                    /* phone upright: screens on top, the handheld's controls under them */
+    const CH = Math.max(190, Math.min(250, H * 0.3)), avail = H - CH - 6;
+    st = Math.min(W / 400, avail * 0.46 / 240); sb = Math.min(W / 320, (avail - 240 * st) / 240);
+    tx = (W - 400 * st) / 2; ty = 0; bx = (W - 320 * sb) / 2; by = 240 * st + 4;
+    const y0 = by + 240 * sb + 8, rest = H - y0, u = Math.min(W / 3.2, rest - 46, 140);
+    const sw = Math.min(64, W / 6.4); place(btns.L, 6, y0, sw, 34); place(btns.ZL, 12 + sw, y0, sw, 34); place(btns.ZR, W - 12 - 2 * sw, y0, sw, 34); place(btns.R, W - 6 - sw, y0, sw, 34);
+    place(btns.SELECT, W / 2 - 54, y0 + 4, 52, 26); place(btns.START, W / 2 + 2, y0 + 4, 52, 26);
+    const yc = y0 + 42 + (rest - 42 - u) / 2;
+    placeStick(8, yc, u); placeDpad(W / 2 - u * 0.42, yc + u * 0.08, u * 0.84); placeABXY(W - 8 - u, yc, u);
+  } else {                                  /* sideways: screens in the middle, controls at the sides */
+    const CW = Math.min(210, W * 0.25), s = Math.min((W - 2 * CW) / 400, H / 480);
+    st = sb = s; tx = (W - 400 * s) / 2; ty = (H - 480 * s) / 2; bx = (W - 320 * s) / 2; by = ty + 240 * s;
+    const u = Math.min(CW - 16, (H - 60) / 2.3), lx = (CW - u) / 2, rx = W - CW + (CW - u) / 2;
+    place(btns.L, 6, 4, CW / 2 - 9, 34); place(btns.ZL, CW / 2 + 3, 4, CW / 2 - 9, 34);
+    place(btns.ZR, W - CW + 6, 4, CW / 2 - 9, 34); place(btns.R, W - CW / 2 + 3, 4, CW / 2 - 9, 34);
+    placeStick(lx, 46, u); placeDpad(lx + u * 0.08, 52 + u, u * 0.84); placeABXY(rx, 46, u);
+    place(btns.SELECT, lx, H - 34, Math.min(u, 90), 28); place(btns.START, rx + u - Math.min(u, 90), H - 34, Math.min(u, 90), 28);
+  }
+  Object.assign(T.style, { left: tx + "px", top: ty + "px", width: 400 * st + "px", height: 240 * st + "px" });
+  Object.assign(B.style, { left: bx + "px", top: by + "px", width: 320 * sb + "px", height: 240 * sb + "px" });
+  /* the way back to the shelf: under the controls on a phone, top left on a computer */
+  const bw = back.offsetWidth || 70;
+  Object.assign(back.style, !touchDevice ? { left: "8px", top: "8px" } : portrait ? { left: (W - bw) / 2 + "px", top: (H - 24) + "px" } : { left: "8px", top: (H - 66) + "px" });
+}
+function placeStick(x, y, u) { if (!stick) return; place(stick, x, y, u); const k = u * 0.46; place(knob, (u - k) / 2, (u - k) / 2, k); stick._u = u; stick._k = k; }
+function placeDpad(x, y, u) {
+  if (!dpad) return; place(dpad, x, y, u); const t = u / 3;
+  for (const a of dpad.children) { const k = a.dataset.arm;
+    if (k === "DUP") place(a, t, 0, t, t + 2); else if (k === "DDOWN") place(a, t, 2 * t - 2, t, t + 2);
+    else if (k === "DLEFT") place(a, 0, t, t + 2, t); else if (k === "DRIGHT") place(a, 2 * t - 2, t, t + 2, t); else place(a, t, t, t, t);
+    a.style.borderRadius = k ? "6px" : "0"; }
+}
+function placeABXY(x, y, u) { const b = u * 0.34, c = u / 2 - b / 2;
+  place(btns.X, x + c, y, b); place(btns.B, x + c, y + u - b, b); place(btns.Y, x, y + c, b); place(btns.A, x + u - b, y + c, b);
+  for (const k of "ABXY") btns[k].style.fontSize = Math.round(b * 0.38) + "px"; }
+addEventListener("resize", layout); addEventListener("orientationchange", () => setTimeout(layout, 200));
+
+/* pointers: each finger belongs to what it went down on */
+const owner = new Map();      /* pointerId -> {kind, key|...} */
+function canvasXY(e) { const r = $("bot").getBoundingClientRect(); return [Math.floor((e.clientX - r.left) * 320 / r.width), Math.floor((e.clientY - r.top) * 240 / r.height)]; }
+function dpadDirs(e) { const r = dpad.getBoundingClientRect(), dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2), d = r.width * 0.14, s = new Set();
+  if (Math.hypot(dx, dy) < d * 0.6) return s;
+  const ang = Math.atan2(dy, dx), oct = Math.round(ang / (Math.PI / 4));        /* eight directions */
+  const m = { 0: ["DRIGHT"], 1: ["DRIGHT", "DDOWN"], 2: ["DDOWN"], 3: ["DDOWN", "DLEFT"], 4: ["DLEFT"], "-4": ["DLEFT"], "-3": ["DLEFT", "DUP"], "-2": ["DUP"], "-1": ["DUP", "DRIGHT"] };
+  (m[oct] || []).forEach(k => s.add(k)); return s; }
+function setDpad(o, dirs) { for (const k of ["DUP", "DDOWN", "DLEFT", "DRIGHT"]) { const was = o.dirs.has(k), now = dirs.has(k); if (was !== now) press(k, now); }
+  o.dirs = dirs; for (const a of dpad.children) if (a.dataset.arm) a.classList.toggle("on", dirs.has(a.dataset.arm)); }
+function setStick(e) { const r = stick.getBoundingClientRect(), R = r.width / 2, dx = e.clientX - (r.left + R), dy = e.clientY - (r.top + R), d = Math.hypot(dx, dy), m = Math.min(1, d / (R * 0.8)) / (d || 1);
+  const x = dx * m, y = dy * m; ex && ex.web_pad(Math.round(x * 128), Math.round(-y * 128));
+  knob.style.transform = `translate(${x * R * 0.55}px,${y * R * 0.55}px)`; }
+stage.addEventListener("pointerdown", e => {
+  e.preventDefault();
+  const t = e.target;
+  if (t.id === "back") { location.href = "../"; return; }
+  if (t.id === "bot") { if ([...owner.values()].some(o => o.kind === "touch")) return; const [x, y] = canvasXY(e); owner.set(e.pointerId, { kind: "touch" }); ex && ex.web_touch(1, x, y); }
+  else if (t.dataset.key) { owner.set(e.pointerId, { kind: "btn", key: t.dataset.key }); press(t.dataset.key, true); t.classList.add("on"); }
+  else if (dpad && dpad.contains(t)) { const o = { kind: "dpad", dirs: new Set() }; owner.set(e.pointerId, o); setDpad(o, dpadDirs(e)); }
+  else if (stick && stick.contains(t)) { owner.set(e.pointerId, { kind: "stick" }); setStick(e); }
+  else return;
+  try { t.setPointerCapture(e.pointerId); } catch (_) {}
+}, { passive: false });
+stage.addEventListener("pointermove", e => { const o = owner.get(e.pointerId); if (!o) return; e.preventDefault();
+  if (o.kind === "touch") { const [x, y] = canvasXY(e); ex && ex.web_touch(1, x, y); }
+  else if (o.kind === "dpad") setDpad(o, dpadDirs(e)); else if (o.kind === "stick") setStick(e); }, { passive: false });
+const up = e => { const o = owner.get(e.pointerId); if (!o) return; owner.delete(e.pointerId);
+  if (o.kind === "touch") ex && ex.web_touch(0, 0, 0);
+  else if (o.kind === "btn") { press(o.key, false); btns[o.key] && btns[o.key].classList.remove("on"); }
+  else if (o.kind === "dpad") setDpad(o, new Set());
+  else if (o.kind === "stick") { ex && ex.web_pad(0, 0); knob.style.transform = ""; } };
+stage.addEventListener("pointerup", up); stage.addEventListener("pointercancel", up);
+document.addEventListener("contextmenu", e => e.preventDefault());
+document.addEventListener("gesturestart", e => e.preventDefault());
+document.addEventListener("dblclick", e => e.preventDefault());
+
+/* keyboard (desktop Safari, or an iPad keyboard) */
+const KB = { KeyK: "A", KeyJ: "B", KeyI: "X", KeyU: "Y", KeyQ: "L", KeyE: "R", Digit1: "ZL", Digit3: "ZR", Enter: "START", ShiftLeft: "SELECT", ShiftRight: "SELECT",
+  ArrowUp: "DUP", ArrowDown: "DDOWN", ArrowLeft: "DLEFT", ArrowRight: "DRIGHT" };
+const wasd = { KeyW: 0, KeyA: 0, KeyS: 0, KeyD: 0 };
+const sendWasd = () => ex && ex.web_pad((wasd.KeyD - wasd.KeyA) * 128, (wasd.KeyW - wasd.KeyS) * 128);
+addEventListener("keydown", e => { if (e.metaKey || e.ctrlKey) return;
+  if (e.code in wasd) { wasd[e.code] = 1; sendWasd(); e.preventDefault(); return; }
+  const k = KB[e.code]; if (!k) return; e.preventDefault(); if (!e.repeat) press(k, true); });
+addEventListener("keyup", e => { if (e.code in wasd) { wasd[e.code] = 0; sendWasd(); return; } const k = KB[e.code]; if (k) press(k, false); });
+addEventListener("blur", () => { for (const k in held) if (held[k]) { held[k] = 0; ex && ex.web_key(KEY[k], 0); } for (const k in wasd) wasd[k] = 0; sendWasd(); });
+
+if (typeof WebAssembly === "undefined") fail("This browser can't run Smokestack (no WebAssembly).");
+else { layout(); boot().catch(e => fail("Couldn't start: " + e.message)); }
+</script>
+</body></html>
