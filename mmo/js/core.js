@@ -1,6 +1,7 @@
 // Shared helpers and the single mutable game state.
 export const TAU = Math.PI * 2;
-export const WH = 300;            // half the zone's width, in world units
+export let WH = 300;              // half the zone's width, in world units (each zone sets its own)
+export function setWH(v) { WH = v; }
 export const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const rnd = (a, b) => a + Math.random() * (b - a);

@@ -2,14 +2,17 @@
 // while the shape stays the same: a walled town in the middle, fields around it,
 // a bandit road, the orc wood to the south and the blighted waste with the War Ruin to the north.
 import * as THREE from './three.js';
-import { WH, TAU, clamp, lerp, smooth, mulberry32, makeNoise } from './core.js';
+import { WH, setWH, TAU, clamp, lerp, smooth, mulberry32, makeNoise } from './core.js';
 import { worldGroup, toon, detailTex, grassTex, uTime, addInstanced, addChunked, propMat, propOutline } from './render.js';
 import * as M from './models.js';
 import { build, P, T, Cone, Cyl, Box, Dod, Sph, Oct } from './models.js';
 const O = [0, 0, 0];
 
-export const HN = 2 * WH + 1;
-export const H = new Float32Array(HN * HN);
+export let HN = 2 * WH + 1;
+export let H = new Float32Array(HN * HN);
+// each zone has its own size: the Vale is bigger since Build 5
+export const ZONE_SIZE = { vale: 420 };
+function sizeWorld(zone) { const w = ZONE_SIZE[zone] || 300; if (w !== WH || H.length !== (2 * w + 1) ** 2) { setWH(w); HN = 2 * WH + 1; H = new Float32Array(HN * HN); } }
 export const world = { seed: 0, zone: 'vale', water: null, town: null, ruin: null, spawns: [], walls: [], areas: [], minimap: null, names: {}, places: [], zoneLines: [], towns: [] };
 
 export function hgt(x, z) {
@@ -30,9 +33,24 @@ const BOSS = ['Grathul the Stitched', 'Morg the Sewn', 'Hollowgut', 'The Bone Wa
 // soft walls (houses, pillars) stop bodies but don't block routes or line of sight
 export function addWall(x1, z1, x2, z2, th = .9, soft = false) { world.walls.push({ x1, z1, x2, z2, th, soft, dx: x2 - x1, dz: z2 - z1, l2: (x2 - x1) ** 2 + (z2 - z1) ** 2 }); }
 // pushes a body of radius r out of every wall; returns true if it touched one
+// walls bucketed into a coarse grid, so bodies only test the walls near them
+let wgrid = null, wgridN = -1, wgridRef = null;
+const WG = 16;
+function wallsNear(x, z) {
+  const W = world.walls;
+  if (!wgrid || wgridN !== W.length || wgridRef !== W) {
+    wgrid = new Map(); wgridN = W.length; wgridRef = W;
+    for (const w of W) {
+      const pad = w.th + 1.5, x0 = Math.floor((Math.min(w.x1, w.x2) - pad) / WG), x1 = Math.floor((Math.max(w.x1, w.x2) + pad) / WG), z0 = Math.floor((Math.min(w.z1, w.z2) - pad) / WG), z1 = Math.floor((Math.max(w.z1, w.z2) + pad) / WG);
+      for (let i = x0; i <= x1; i++) for (let j = z0; j <= z1; j++) { const k = i * 4096 + j; let b = wgrid.get(k); if (!b) wgrid.set(k, b = []); b.push(w); }
+    }
+  }
+  return wgrid.get(Math.floor(x / WG) * 4096 + Math.floor(z / WG)) || EMPTY;
+}
+const EMPTY = [];
 export function collide(e, r = .5) {
   let hit = false;
-  for (const w of world.walls) {
+  for (const w of wallsNear(e.x, e.z)) {
     const t = clamp(((e.x - w.x1) * w.dx + (e.z - w.z1) * w.dz) / w.l2, 0, 1);
     const px = w.x1 + w.dx * t, pz = w.z1 + w.dz * t, dx = e.x - px, dz = e.z - pz, d = Math.hypot(dx, dz), m = r + w.th;
     if (d < m && d > 1e-4) { e.x = px + dx / d * m; e.z = pz + dz / d * m; hit = true; }
@@ -136,7 +154,8 @@ export function registerZone(name, fn) { zoneGens[name] = fn; }
 export const valeHooks = { terrain: null, build: null };
 // build a zone: 'vale' (the starting zone), 'coast', or 'fleet' (the instance)
 export function generateWorld(seed, zone = 'vale') {
-  disposeWorld();
+  disposeWorld(); sizeWorld(zone);
+  world.mapLabels = []; world.huntAreas = null; world.buoy = null; world.underwater = false; world.cave = null; world.mapBounds = null;
   world.seed = seed; world.zone = zone; world.water = null; world.regionFn = null; world.regionNames = null; world.places = []; world.zoneLines = []; world.towns = []; world.camps = []; world.ferries = []; world.docks = []; world.props = []; world.storyNpcs = []; world.spots = {}; world.extraPlaces = []; world.clearSpots = [];
   if (zone !== 'vale') return zoneGens[zone](seed);
   return generateVale(seed);
@@ -158,7 +177,7 @@ function generateVale(seed) {
     if (reg === 3) h -= 2 + Math.abs(N.fbm(x * .02 + 70, z * .02 + 70, 3) - .5) * 8;
     h = lerp(town.base, h, smooth((Math.hypot(x - town.x, z - town.z) - town.R - 4) / 26));
     h = lerp(ruin.base, h, smooth((Math.hypot(x - ruin.x, z - ruin.z) - ruin.R - 2) / 24));
-    const edge = Math.max(Math.abs(x), Math.abs(z)) - (WH - 26), eastRoad = x > 200 && Math.abs(z - Math.sin(x * .02) * 12) < 14;
+    const edge = Math.max(Math.abs(x), Math.abs(z)) - (WH - 26), eastRoad = x > WH - 100 && Math.abs(z - Math.sin(x * .02) * 12) < 14;
     if (edge > 0 && !eastRoad) h += edge * edge * .08;
     H[zi * HN + xi] = h;
   }
@@ -167,14 +186,14 @@ function generateVale(seed) {
   if (valeHooks.terrain) valeHooks.terrain({ rng, town, ruin });
   // ground colour by region, blended near borders
   const REG_COL = [new THREE.Color('#9ea455'), new THREE.Color('#a89d5e'), new THREE.Color('#58763a'), new THREE.Color('#6d6878')];
-  const SZ = 2 * WH + 40, gGeo = new THREE.PlaneGeometry(SZ, SZ, 300, 300).rotateX(-Math.PI / 2);
+  const SZ = 2 * WH + 40, SEG = Math.round(SZ / 2.15), gGeo = new THREE.PlaneGeometry(SZ, SZ, SEG, SEG).rotateX(-Math.PI / 2);
   { const p = gGeo.attributes.position, col = new Float32Array(p.count * 3), rock = new THREE.Color('#7b8094'), road = new THREE.Color('#9c8458'), cobble = new THREE.Color('#8f897c');
     for (let i = 0; i < p.count; i++) {
       const x = p.getX(i), z = p.getZ(i); p.setY(i, hgt(x, z));
       const c = REG_COL[regionAt(x, z)].clone();
       for (const [dx, dz] of [[6, 0], [-6, 0], [0, 6], [0, -6]]) c.lerp(REG_COL[regionAt(x + dx * 2, z + dz * 2)], .12);
       if (Math.abs(x) < 3.2 + N.n2(z * .1, 3) * 1.5 && Math.abs(z) < 210) c.lerp(road, .75);       // north-south road
-      if (Math.abs(z - Math.sin(x * .02) * 12) < 3 && Math.abs(x) > 20 && Math.abs(x) < 250) c.lerp(road, .7); // east-west road
+      if (Math.abs(z - Math.sin(x * .02) * 12) < 3 && Math.abs(x) > 20 && Math.abs(x) < WH - 50) c.lerp(road, .7); // east-west road
       if (Math.hypot(x, z) < town.R - 1) c.lerp(cobble, .6);
       if (Math.hypot(x - ruin.x, z - ruin.z) < ruin.R) c.lerp(new THREE.Color('#5a5560'), .6);
       const out = Math.max(Math.abs(x), Math.abs(z)) - (WH - 18); c.lerp(rock, smooth(out / 12));
@@ -316,14 +335,15 @@ function generateVale(seed) {
   const clear = (x, z) => Math.hypot(x - town.x, z - town.z) < town.R + 6 || Math.hypot(x - ruin.x, z - ruin.z) < ruin.R + 4 || Math.abs(x) < 5 && Math.abs(z) < 210 ||
     world.camps.some(c => Math.hypot(x - c.x, z - c.z) < 12) || sp.some(s => Math.hypot(s.x - x, s.z - z) < 2.5) || world.clearSpots.some(c => Math.hypot(x - c.x, z - c.z) < c.r);
   const dens = [[['oak', .05], ['rock', .03]], [['oak', .04], ['rock', .05], ['dead', .01]], [['pine', .42], ['oak', .12], ['rock', .04]], [['dead', .12], ['grock', .07]]];
-  for (let n = 0; n < 45000; n++) {
+  const areaK = ((WH - 10) / 290) ** 2;
+  for (let n = 0; n < 45000 * areaK; n++) {
     const x = (rng() * 2 - 1) * (WH - 10), z = (rng() * 2 - 1) * (WH - 10);
     if (clear(x, z)) continue;
     const reg = regionAt(x, z), r = rng(); let acc = 0;
     for (const [k, p] of dens[reg]) { acc += p; if (r < acc) { lists[k].push([x, hgt(x, z) - .2, z, rng() * 6.3, (rng() - .5) * .1, (rng() - .5) * .1, .8 + rng() * .9]); break; } }
   }
   const tuftCol = [[.62, .68, .32], [.7, .64, .38], [.36, .52, .24], [.48, .45, .5]];
-  for (let n = 0; n < 60000; n++) {
+  for (let n = 0; n < 60000 * Math.min(1.5, areaK); n++) {
     const x = (rng() * 2 - 1) * (WH - 6), z = (rng() * 2 - 1) * (WH - 6), reg = regionAt(x, z);
     if ((reg === 3 && rng() < .7) || clear(x, z)) continue;
     tufts.push([x, hgt(x, z) - .05, z, rng() * 6.3, 0, 0, .7 + rng() * .8]); tcol.push(tuftCol[reg]);

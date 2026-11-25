@@ -32,6 +32,8 @@ function dayNight(time) {
 function ruinGloom(h) {
   R.scene.fog.far = world.underwater ? 110 : 250; R.scene.fog.near = world.underwater ? 20 : 45;
   if (world.underwater) { R.scene.fog.color.set('#163c5a'); R.sun.intensity *= .45; R.hemi.intensity *= .8; R.sun.color.lerp(C('#6ab8e8'), .6); return; }
+  if (world.cave) { R.scene.fog.far = 75; R.scene.fog.near = 10; R.scene.fog.color.set(world.cave.fog); R.sun.intensity = 2.2 * world.cave.light; R.hemi.intensity = 1.1 * world.cave.light; R.sun.color.set('#ffd8a8');
+    R.skyMat.uniforms.top.value.set(world.cave.fog); R.skyMat.uniforms.mid.value.set(world.cave.fog); R.skyMat.uniforms.hor.value.set(world.cave.fog); return; }
   if (!world.ruin || world.zone !== 'vale') return;
   const d = Math.hypot(h.x - world.ruin.x, h.z - world.ruin.z); const k = clamp(1 - (d - world.ruin.R) / 30, 0, 1); if (k > 0) { R.scene.fog.color.lerp(C('#3a3646'), k * .7); R.sun.intensity *= 1 - k * .45; } }
 

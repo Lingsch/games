@@ -30,7 +30,7 @@ export function updateWater(t) { waterMat.uniforms.uTime.value = t; }
 function addWater() { const g = new THREE.PlaneGeometry(2 * WH + 400, 2 * WH + 400, 80, 80).rotateX(-Math.PI / 2); waterMesh = new THREE.Mesh(g, waterMat); waterMesh.position.y = 0; worldGroup.add(waterMesh); }
 
 // ---------- shared ground building ----------
-function groundMesh(colorAt) {
+export function groundMesh(colorAt) {
   const SZ = 2 * WH + 40, gGeo = new THREE.PlaneGeometry(SZ, SZ, 300, 300).rotateX(-Math.PI / 2), p = gGeo.attributes.position, col = new Float32Array(p.count * 3);
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, hgt(x, z)); const c = colorAt(x, z); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   gGeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); gGeo.computeVertexNormals();

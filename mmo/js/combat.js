@@ -525,7 +525,7 @@ function mobDied(e, src) {
   // loot: only bodies your party tagged get looted by you; fake groups loot their own
   e.loot = [];
   e.lootGold = Math.round(e.lvl * rnd(.8, 2.2) * (e.elite ? 2 : 1) * (e.named ? 5 : 1) * (e.boss ? 4 : 1));
-  const spec = e.named ? specialLoot(e.named, (e.tagged === 'party' ? S.party : credit).filter(p => p && p.cls)) : null;
+  const spec = (e.tagged === 'party' && hooks.bossLoot && hooks.bossLoot(e, S.party)) || (e.named ? specialLoot(e.named, (e.tagged === 'party' ? S.party : credit).filter(p => p && p.cls)) : null);
   if (spec) e.loot.push(...spec);
   else if (e.named && NAMED_LOOT[e.named]) {
     const pool = [...NAMED_LOOT[e.named]].sort(() => Math.random() - .5);

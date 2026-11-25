@@ -4,12 +4,16 @@ import { CLASSES, CLASS_KEYS, MOBS, QUESTS, GIVERS, FAKE_NAMES, PERSONAS, GUILDS
 import * as Sea from './sea.js';
 import { LORE, SCENES, PERKS } from './story.js';
 import './valeplus.js';
+import { INSTANCES, DBOSSES } from './dungeons.js';
+import * as Craft from './crafting.js';
+import * as Loot5 from './loot5.js';
+import * as Mystery from './mystery.js';
 import './dialogue.js';
 import * as Banter from './banter.js';
 import { FAMILIES } from './data.js';
 import * as Cb from './combat.js';
 import * as AI from './ai.js';
-import { generateWorld, world, hgt, REGION_NAMES, regionAt, collide, depthAt } from './world.js';
+import { generateWorld, world, hgt, REGION_NAMES, regionAt, collide, depthAt, ZONE_SIZE } from './world.js';
 import './zones.js';
 import { defineHuntZones, zoneAt } from './hunt.js';
 import * as R from './render.js';
@@ -20,6 +24,8 @@ for (const q of QUESTS) q.xp = Math.round((q.xp || 0) * Cb.XP_RATE);
 
 // ---------- gear ----------
 export function canWear(cls, it) {
+  if (it.slot === 'ring' || it.slot === 'neck') return true;
+  if (it.slot === 'recipe' || it.slot === 'collect') return false;
   if (it.slot === 'weapon') return WTYPE[cls][0] === it.type;
   if (it.slot === 'off') return WTYPE[cls][1] === it.type;
   return WEAR[CLASSES[cls].armor].includes(it.armorType);
@@ -51,7 +57,7 @@ export function newGame(cls, heroName, seed = (Math.random() * 1e9) | 0) {
   for (const k of CLASS_KEYS) { S.classes[k] = { lvl: 1, xp: 0 }; S.gear[k] = starterGear(k); S.bar[k] = defaultBar(k); }
   S.heroCls = cls; S.heroName = heroName; S.owned = [cls]; S.unlockPicks = 0;
   S.pops = {}; S.bind = null; S.zone = 'vale'; S.pole = false;
-  S.flags = {}; S.lore = {}; S.perks = []; S.bank = []; S.used = {}; S.scenesSeen = {}; S.vetXp = 0; S.huntOn = false; S.campOrder = null; S.cmd = 'follow';
+  S.flags = {}; S.lore = {}; S.perks = []; S.bank = []; S.used = {}; S.scenesSeen = {}; S.vetXp = 0; S.huntOn = false; S.prof = {}; S.mats = {}; S.recipes = []; S.cons = {}; S.collection = []; S.title = null; S.pet = null; S.campOrder = null; S.cmd = 'follow';
   startWorld({ zone: 'vale' });
   S.pendingScene = 'intro';
   makeFriends();
@@ -65,7 +71,7 @@ function startWorld(opts = {}) {
   S.ents.length = 0; S.party = []; S.dangers = []; S.meter = {}; S.target = null; S.dead = false; Cb.projectiles.length = 0;
   if (!opts.keepLog) S.log.length = 0;
   S.zone = zone; world.fleetT = 0; world.underwater = false;
-  generateWorld(S.seed, zone); densify(zone); defineHuntZones();
+  generateWorld(S.seed, zone); Craft.decorate(zone, S.seed); densify(zone); defineHuntZones();
   const tw = world.town, a = opts.arrive || { x: tw.x + 1, z: tw.z + 4 };
   const hero = Cb.makeHuman(S.heroCls, S.classes[S.heroCls].lvl, { name: S.heroName, isHero: true, inParty: true, x: a.x, z: a.z, pal: 0 });
   hero.xp = S.classes[S.heroCls].xp; hero.kind = CLASSES[S.heroCls].models[0];
@@ -77,7 +83,7 @@ function startWorld(opts = {}) {
   for (const sp of world.spawns) if (!(sp.gate && S.flags[sp.gate + 'Yielded'])) spawn(sp);
   if (zone === 'coast') for (const q of QUESTS) if (q.rival && S.quests[q.id]?.state === 'active') spawnRival(q.rival);
   // fake players live in each zone
-  makeFakes(zone === 'fleet' ? [] : S.pops?.[zone] || null, zone);
+  makeFakes(INSTANCES[zone] ? [] : S.pops?.[zone] || null, zone);
   if (S.corpse && (S.corpse.zone || 'vale') === zone) S.corpse.ent = Cb.makeEnt({ team: 'npc', name: `${S.heroName}'s corpse`, kind: 'corpse', x: S.corpse.x, z: S.corpse.z, corpse: true, maxHp: 1, hp: 1 });
   // the group comes with you
   for (const d of opts.carry || []) addMate(d, hero);
@@ -195,7 +201,7 @@ export function setHunt(on) {
   save();
 }
 const huntable = (zn, h) => S.ents.filter(m => m.mob && !m.dead && !m.remove && m.spawn?.hz === zn.id && !m.boss && !m.boss2 && !m.charmed && !m.evading
-  && m.lvl <= h.lvl + 2 && Cb.isEnemy(h, m) && (world.underwater || depthAt(m.x, m.z) < 1.3) && Math.hypot(m.x - zn.x, m.z - zn.z) < zn.r + 15
+  && m.lvl <= h.lvl + (m.named ? 3 : 2) && Cb.isEnemy(h, m) && (world.underwater || depthAt(m.x, m.z) < 1.3) && Math.hypot(m.x - zn.x, m.z - zn.z) < zn.r + 15
   && !(m.threat && [...m.threat.keys()].some(k => !k.dead && !S.party.includes(k) && !(k.pet && S.party.includes(k.owner)))));
 export const huntInfo = () => { const o = S.campOrder; return S.huntOn ? { zone: o?.mode === 'hunt' ? o.zone : zoneAt(S.hero.x, S.hero.z), rest: o?.rest, wait: o?.wait && !o?.next, next: o?.next } : null; };
 function huntTick(first) {
@@ -253,9 +259,9 @@ export function autoFollowPoint() {
   return { x: t.x + Math.sin(a) * keep, z: t.z + Math.cos(a) * keep };
 }
 // the Vale's story people and the things you can inspect; rebuilt when a choice changes who is where
-const flagIs = ([k, v]) => S.flags[k] === v;
+export const flagMatch = c => flagIs(c);
+const flagIs = ([k, v]) => v === '*' ? S.flags[k] != null : typeof v === 'string' && v[0] === '!' ? S.flags[k] != null && S.flags[k] !== v.slice(1) : S.flags[k] === v;
 export function storyFolk() {
-  if (S.zone !== 'vale') return;
   for (const e of S.ents) if (e.storyNpc || e.prop) { e.remove = true; e.dead = true; }
   for (const n of world.storyNpcs) {
     if (n.when && !flagIs(n.when)) continue;
@@ -267,22 +273,33 @@ export function storyFolk() {
     if (g && n.key !== 'villager') S.npcs[n.key] = e;
   }
   for (const p of world.props) {
+    if (p.depleted) continue;
+    if (p.when && !flagIs(p.when)) continue;
+    if (p.unless && flagIs(p.unless)) continue;
     if (p.lore && S.lore[p.lore] && !(p.tag !== 'lore' && needFor(p))) continue;
     const e = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, prop: p, name: p.lore ? LORE[p.lore].title : p.name, kind: p.kind, x: p.x, z: p.z, scale: p.scale });
     e.yaw = p.yaw; e.y = hgt(e.x, e.z);
   }
 }
-const OBJ_VERB = { grave: 'Examine the grave', headstone: 'Set the headstone upright', bell: 'Ring the bell', wardstone: 'Touch the ward stone', journal: "Read Corwin's journal" };
+export function spawnProp(p) {
+  const e = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, prop: p, name: p.lore ? LORE[p.lore].title : p.name, kind: p.kind, x: p.x, z: p.z, scale: p.scale });
+  e.yaw = p.yaw; e.y = hgt(e.x, e.z); return e;
+}
+const OBJ_VERB = { clue1: 'Examine', clue2: 'Examine', grave: 'Examine the grave', headstone: 'Set the headstone upright', bell: 'Ring the bell', wardstone: 'Touch the ward stone', journal: "Read Corwin's journal" };
 function needFor(p) { return QUESTS.find(q => q.obj.inspect === p.tag && S.quests[q.id]?.state === 'active' && !(S.used[q.id] || []).includes(p.id)); }
 // what the action button says for a prop, or null if there's nothing to do with it
 export function inspectLabel(e) {
   const p = e.prop; if (!p) return null;
-  if (needFor(p)) return OBJ_VERB[p.tag] || 'Inspect';
+  if (p.node) return Craft.nodeLabel(p);
+  if (p.station) return `Craft: ${Craft.STATIONS[p.station].name}`;
+  if (needFor(p)) return (OBJ_VERB[p.tag] || 'Inspect') + (p.tag.startsWith('clue') ? ': ' + p.name : '');
   if (p.lore && !S.lore[p.lore]) return 'Read: ' + LORE[p.lore].title;
   return null;
 }
 export function inspect(e) {
   const p = e.prop, h = S.hero; if (!p || dist(h, e) > 6) return null;
+  if (p.node) { Craft.gather(e); save(); return null; }
+  if (p.station) return { station: p.station };
   const q = needFor(p);
   let read = null;
   if (q) {
@@ -360,7 +377,7 @@ function townsfolk(zone) {
   if (zone === 'vale') {
     const tw = world.town, N = tw.npcs;
     for (const [k, g] of Object.entries(GIVERS)) { const p = { warden: N.quest1, tanner: N.quest2, sister: N.quest3 }[k]; if (p) S.npcs[k] = npc({ name: g.name, title: g.title, kind: g.model, x: tw.x + p.x, z: tw.z + p.z, giver: k }); }
-    S.npcs.vendor = npc({ name: 'Odda Coin-Purse', title: 'Supplies', kind: 'bandit', x: tw.x + N.vendor.x, z: tw.z + N.vendor.z, vendor: 'vale' });
+    S.npcs.vendor = npc({ name: S.flags?.case1 === 'odda' ? 'Tobb Coin-Purse' : 'Odda Coin-Purse', title: S.flags?.case1 === 'odda' ? 'Supplies (minding his aunt\'s stall)' : 'Supplies', kind: 'bandit', x: tw.x + N.vendor.x, z: tw.z + N.vendor.z, vendor: 'vale' });
     S.npcs.armorer = S.npcs.armory = npc({ name: 'Master Corvin', title: 'Armory · class trials', kind: 'guard', x: tw.x + N.armory.x, z: tw.z + N.armory.z, armory: true, giver: 'armorer' });
     S.npcs.bind = npc({ name: 'Bind Stone', title: 'Bind here', kind: 'corpse', x: tw.x + N.bind.x, z: tw.z + N.bind.z, bindstone: true, scale: 1.6 });
     if (!S.bind) S.bind = { zone: 'vale', x: S.npcs.bind.x, z: S.npcs.bind.z + 1.5 };
@@ -389,7 +406,7 @@ function guard(t, x, z, name) { return Cb.makeEnt({ team: 'ally', name, kind: 'g
 export function travel(zone, arrive, force) {
   if (!force && S.party.some(p => !p.dead && Cb.inCombat(p) && dist(p, S.hero) < 40 && S.ents.some(m => m.mob && !m.dead && m.threat.has(p)))) { chat('sys', null, "You can't leave while your group is fighting."); return false; }
   const from = S.zone;
-  if (from !== 'fleet') { S.pops = S.pops || {}; S.pops[from] = S.fakes.filter(f => !f.inParty).map(fakeData); }
+  if (!INSTANCES[from]) { S.pops = S.pops || {}; S.pops[from] = S.fakes.filter(f => !f.inParty).map(fakeData); }
   const carry = S.party.filter(p => !p.isHero).map(p => ({ ...fakeData(p), hp: p.dead ? .5 : p.hp / p.maxHp, res: p.resMax ? p.res / p.resMax : 1 }));
   S.classes[S.heroCls] = { lvl: S.hero.lvl, xp: S.hero.xp };
   startWorld({ zone, arrive: arrive || arrivalFor(zone, from), carry, carryHero: true, keepLog: true });
@@ -399,9 +416,11 @@ export function travel(zone, arrive, force) {
 }
 function arrivalFor(zone, from) {
   if (zone === 'coast' && from === 'fleet') return { x: world.buoy.x + 3, z: world.buoy.z + 3 };
+  if (INSTANCES[from]?.out && zone === INSTANCES[from].parent) return { ...INSTANCES[from].out };
+  if (INSTANCES[zone] && zone !== 'fleet') return { x: 0, z: 64 };
   if (zone === 'coast') return { x: -280, z: 0 };
   if (zone === 'fleet') return { x: 0, z: 55 };
-  const zx = 278; return { x: zx, z: Math.sin(zx * .02) * 12 };
+  const zx = ZONE_SIZE.vale - 22; return { x: zx, z: Math.sin(zx * .02) * 12 };
 }
 // a finished quest can whisk you (and your group) straight back to whoever gets the hand-in
 export function returnToGiver(q) {
@@ -500,6 +519,19 @@ export function partyCommand(cmd) {
 }
 
 // ---------- class switching ----------
+// ---------- vanity pets: they follow you around and do nothing useful at all ----------
+let petEnt = null;
+export function setPet(k) { S.pet = S.pet === k ? null : k; if (petEnt) { petEnt.remove = true; petEnt.dead = true; petEnt = null; } save(); }
+function petTick(dt) {
+  const h = S.hero; if (!h) return;
+  if (!S.pet || !Loot5.COLLECT[S.pet]) { if (petEnt) { petEnt.remove = true; petEnt.dead = true; petEnt = null; } return; }
+  if (!petEnt || petEnt.remove || !S.ents.includes(petEnt)) { const c = Loot5.COLLECT[S.pet]; petEnt = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, name: c.name, title: `${S.heroName}'s pet`, kind: c.kind, x: h.x + 1.5, z: h.z + 1.5, scale: c.scale, vanity: true }); petEnt.y = hgt(petEnt.x, petEnt.z); }
+  const d = dist(petEnt, h);
+  if (d > 30) { petEnt.x = h.x + 1; petEnt.z = h.z + 1; }
+  if (d > 2.4) { const a = Math.atan2(h.x - petEnt.x, h.z - petEnt.z), sp = Math.min(d - 2, h.spd * 1.15 * dt); petEnt.x += Math.sin(a) * sp; petEnt.z += Math.cos(a) * sp; petEnt.yaw = a; petEnt.y = hgt(petEnt.x, petEnt.z); petEnt.moving = 1; } else petEnt.moving = Math.max(0, (petEnt.moving || 0) - dt * 4);
+}
+export function setTitle(k) { S.title = S.title === k ? null : k; save(); }
+export const heroTitle = () => S.title && Loot5.COLLECT[S.title] ? Loot5.COLLECT[S.title].name : '';
 // ---------- weapons: you play a class by equipping its weapon; the armory trials unlock new ones ----------
 export const owns = k => (S.owned || []).includes(k);
 export function weaponChoices() {
@@ -548,7 +580,16 @@ export const nextOffer = k => offerQueue(k)[0] || null;
 export const turnInsFor = k => QUESTS.filter(q => turnToOf(q) === k && S.quests[q.id]?.state === 'done' && (!q.cls || q.cls === S.heroCls));
 export const activeFrom = k => QUESTS.filter(q => q.giver === k && S.quests[q.id]?.state === 'active');
 export function declineQuest(q) { S.declined = S.declined || {}; S.declined[q.id] = (S.declined[q.id] || 0) + 1; }
-export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
+// questioning suspects: each one you've asked counts toward the quest
+export const asksFor = key => QUESTS.filter(q => q.obj.ask && q.obj.ask.includes(key) && S.quests[q.id]?.state === 'active' && !(S.quests[q.id].asked || []).includes(key));
+export function askSuspect(q, key) {
+  const st = S.quests[q.id]; if (!st || st.state !== 'active') return;
+  st.asked = st.asked || []; if (st.asked.includes(key)) return;
+  st.asked.push(key); st.n = st.asked.length; floatText(S.hero, `${q.name} ${st.n}/${q.obj.n}`, '#ffd34d');
+  if (st.n >= q.obj.n) { st.state = 'done'; chat('sys', null, `${q.name}: done! Return to ${GIVERS[turnToOf(q)].name}.`); Banter.onQuest('done', q); }
+  save();
+}
+export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
 export function acceptQuest(q) {
   S.quests[q.id] = { state: q.obj.talk ? 'done' : 'active', n: 0 };
   if (S.declined) delete S.declined[q.id];
@@ -573,6 +614,11 @@ export function turnIn(q, choice = null) {
   if (['m8', 'h5', 'm13'].includes(q.id)) storyFolk();
   Banter.onQuest('turnin', q);
   if (q.id === 'm16') S.flags.wickCoast = true;
+  if (ch?.collect) Loot5.collect(ch.collect);
+  { const v = Mystery.verdict(q, S.flags);
+    if (v === false && q.id === 'c2d') { S.flags.mystery = 'failed'; chat('sys', null, 'Three nights later, Wick digs another grave in Little Hollin. Whoever is in the cells, the killing goes on.'); }
+    if (v === true && q.id === 'c2d') { S.gold += 25; if (S.flags.case1 === 'linus') Loot5.collect('title_eye'); }
+    if (v !== null) storyFolk(); }
   if (q.unlock) { S.unlockPicks = (S.unlockPicks || 0) + 1;  }
   save();
   return ch ? ch.reply : null;
@@ -586,6 +632,7 @@ function questProgress(mob, near) {
     if (o.kill && o.kill.includes(mob.mob) && nearOk && (!o.dungeon || mob.dungeon) && (!o.reef || mob.spawn?.area === 5) && !mob.named && !mob.add) hit = true;
     if (o.kill && o.kill.includes(mob.mob) && mob.add && mob.mob === 'ghost' && nearOk) hit = true;
     if (o.anyMin && mob.lvl >= o.anyMin && !mob.add) hit = true;
+    if (o.bosses && o.bosses.includes(mob.named) && !(st.got || []).includes(mob.named)) { (st.got = st.got || []).push(mob.named); hit = true; }
     if (o.named && mob.named === o.named) hit = true;
     if (o.collect && o.collect.includes(mob.mob)) { if (Math.random() < o.chance) { hit = true; chat('loot', null, `You loot ${o.item}.`); } }
     if (hit) { st.n = Math.min(o.n, st.n + 1); floatText(S.hero, `${q.name} ${st.n}/${o.n}`, '#ffd34d'); if (st.n >= o.n) { st.state = 'done'; Banter.onQuest('done', q); chat('sys', null, `${q.name}: done! Return to ${GIVERS[turnToOf(q)].name}.`); } }
@@ -613,6 +660,8 @@ export function drinkPot(k) {
 // a looted item goes to someone in the party. Companions remember whether you were fair.
 export function assignLoot(mob, it, who) {
   mob.loot = mob.loot.filter(x => x !== it);
+  if (it.recipe) { if (!Craft.learnRecipe(it.recipe)) chat('sys', null, 'You already know that recipe.'); save(); return; }
+  if (it.collect) { Loot5.collect(it.collect); save(); return; }
   if (who === S.hero) {
     if (!addToBag(it)) { mob.loot.push(it); return; }
     chat('loot', null, `You receive ${it.name}.`);
@@ -630,6 +679,7 @@ export function assignLoot(mob, it, who) {
 
 // ---------- death and the corpse run ----------
 Cb.setHooks({
+  bossLoot: (e, party) => Loot5.bossLoot(e, party),
   xpMod(p, amt) {
     let a = amt * (1 + xpBoost());
     // veteran xp, earned while another class sat at the cap, doubles what this class earns until it runs out
@@ -663,6 +713,7 @@ Cb.setHooks({
   },
   onMobDeath(mob, credit, near) {
     if (mob.tagged === 'party') questProgress(mob, near);
+    if (mob.tagged === 'party' && near.includes(S.hero)) Craft.mobMats(mob);
     if (mob.mob === 'abom' && mob.tagged === 'party' && !S.scenesSeen.gravelord) {
       const g = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, name: 'The Gravelord', title: 'An echo', kind: 'gravelord', x: world.spots.crypt.x, z: world.spots.crypt.z - 3, storyNpc: true, scale: 1.3 }); g.y = hgt(g.x, g.z) + .5;
       S.pendingScene = 'gravelord'; S.sceneEnd = () => { g.remove = true; g.dead = true; R.burst(g.x, g.y + 1.5, g.z, 60, [.5, 1, .6], 3, 1.2, .8); };
@@ -698,6 +749,7 @@ export function release() {
   const loss = Math.round(xpNeed(h.lvl) * .1); h.xp = Math.max(0, h.xp - loss);
   S.corpse = { zone: S.zone === 'fleet' ? 'coast' : S.zone, x: S.zone === 'fleet' ? world.names && 0 : h.x, z: h.z, cls: S.heroCls, gear: { ...S.gear[S.heroCls] } };
   if (S.zone === 'fleet') { S.corpse.x = 160 + 3; S.corpse.z = 200 + 3; } // a body lost in the fleet washes up by the buoy
+  else if (INSTANCES[S.zone]?.out) { S.corpse.zone = INSTANCES[S.zone].parent; S.corpse.x = INSTANCES[S.zone].out.x + 2; S.corpse.z = INSTANCES[S.zone].out.z + 2; } // a body lost below is carried out to the door
   else S.corpse.ent = Cb.makeEnt({ team: 'npc', name: `${h.name}'s corpse`, kind: 'corpse', x: h.x, z: h.z, corpse: true, maxHp: 1, hp: 1 });
   S.gear[S.heroCls] = {};
   h.dead = false; h.buffs = []; applyGear(h, {}); h.hp = Math.round(h.maxHp * .5); h.res = startRes(h) * .5; h.ult = 0;
@@ -767,6 +819,8 @@ export function tick(dt) {
   separate();
   Sea.tick(dt);
   Banter.tick();
+  if (S.frame % 30 === 0) Craft.tick({ spawnProp });
+  petTick(dt);
   if (world.levT && S.time >= world.levT) {
     world.levT = 0;
     const L = Cb.makeMob('leviathan', 20, { x: 0, z: -60, home: { x: 0, z: -60 }, named: 'leviathan', boss: true, dungeon: true });
@@ -864,11 +918,11 @@ export function snapshot() {
   const h = S.hero;
   if (h) S.classes[S.heroCls] = { lvl: h.lvl, xp: h.xp };
   const strip = it => it ? { ...it } : null;
-  const pops = { ...(S.pops || {}) }; if (S.zone !== 'fleet') pops[S.zone] = S.fakes.filter(f => !f.inParty).map(fakeData);
+  const pops = { ...(S.pops || {}) }; if (!INSTANCES[S.zone]) pops[S.zone] = S.fakes.filter(f => !f.inParty).map(fakeData);
   return {
     v: 2, seed: S.seed, heroName: S.heroName, heroCls: S.heroCls, classes: S.classes, gold: S.gold, pots: S.pots, quests: S.quests, bar: S.bar, time: S.time,
     zone: S.zone, hx: h ? h.x : 0, hz: h ? h.z : 0, bind: S.bind, pole: !!S.pole, pops,
-    flags: S.flags, lore: S.lore, perks: S.perks, vetXp: S.vetXp || 0, friendsMade: !!S.friendsMade, friends: S.friends || [], bank: S.bank.map(strip), used: S.used, scenesSeen: S.scenesSeen, huntOn: !!S.huntOn, owned: S.owned, unlockPicks: S.unlockPicks || 0,
+    flags: S.flags, lore: S.lore, perks: S.perks, vetXp: S.vetXp || 0, friendsMade: !!S.friendsMade, friends: S.friends || [], bank: S.bank.map(strip), used: S.used, scenesSeen: S.scenesSeen, huntOn: !!S.huntOn, owned: S.owned, unlockPicks: S.unlockPicks || 0, prof: S.prof || {}, mats: S.mats || {}, recipes: S.recipes || [], cons: S.cons || {}, collection: S.collection || [], title: S.title || null, pet: S.pet || null,
     gear: Object.fromEntries(Object.entries(S.gear).map(([k, g]) => [k, Object.fromEntries(Object.entries(g).map(([s, it]) => [s, strip(it)]))])),
     bag: S.bag.map(strip), corpse: S.corpse ? { zone: S.corpse.zone || 'vale', x: S.corpse.x, z: S.corpse.z, cls: S.corpse.cls, gear: S.corpse.gear } : null,
     partyData: S.party.filter(p => !p.isHero).map(fakeData),
@@ -881,7 +935,7 @@ export function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } cat
 export function loadSave(data) {
   const sv = data || JSON.parse(localStorage.getItem(SAVE_KEY));
   Object.assign(S, { seed: sv.seed, heroName: sv.heroName, heroCls: sv.heroCls, classes: sv.classes, gold: sv.gold, pots: sv.pots || { hpot: 0, mpot: 0 }, quests: sv.quests || {}, bar: sv.bar, bag: sv.bag || [], gear: sv.gear, pole: !!sv.pole,
-    flags: sv.flags || {}, lore: sv.lore || {}, vetXp: sv.vetXp || 0, friendsMade: !!sv.friendsMade, friends: sv.friends || [], perks: sv.perks || [], bank: sv.bank || [], used: sv.used || {}, scenesSeen: sv.scenesSeen || { intro: true }, huntOn: !!sv.huntOn, unlockPicks: sv.unlockPicks || 0, owned: sv.owned || CLASS_KEYS.filter(k => k === sv.heroCls || (sv.classes?.[k]?.lvl || 1) > 1) });
+    flags: sv.flags || {}, lore: sv.lore || {}, vetXp: sv.vetXp || 0, friendsMade: !!sv.friendsMade, friends: sv.friends || [], perks: sv.perks || [], bank: sv.bank || [], used: sv.used || {}, scenesSeen: sv.scenesSeen || { intro: true }, huntOn: !!sv.huntOn, unlockPicks: sv.unlockPicks || 0, prof: sv.prof || {}, mats: sv.mats || {}, recipes: sv.recipes || [], cons: sv.cons || {}, collection: sv.collection || [], title: sv.title || null, pet: sv.pet || null, owned: sv.owned || CLASS_KEYS.filter(k => k === sv.heroCls || (sv.classes?.[k]?.lvl || 1) > 1) });
   // older saves: the old Ossuary quests are now part of the main story, so a hero who finished them skips ahead
   if (!sv.flags && S.quests.q9?.state === 'turned') for (const id of ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12', 'm13']) S.quests[id] = S.quests[id] || { state: 'turned', n: 0 };
   for (const k of CLASS_KEYS) { if (!S.classes[k]) S.classes[k] = { lvl: 1, xp: 0 }; if (!S.gear[k]) S.gear[k] = starterGear(k); if (!S.bar[k]) S.bar[k] = defaultBar(k); }
@@ -891,9 +945,9 @@ export function loadSave(data) {
   S.bind = sv.bind && sv.bind.x !== undefined ? { zone: sv.bind.zone || 'vale', ...sv.bind } : null;
   S.corpse = sv.corpse ? { ...sv.corpse, zone: sv.corpse.zone || 'vale' } : null;
   S.hero = null; S.party = [];
-  const zone = sv.zone === 'fleet' ? 'coast' : (sv.zone || 'vale');
+  const inst = INSTANCES[sv.zone], zone = inst ? inst.parent : (sv.zone || 'vale');
   const party = sv.partyData || [];
-  startWorld({ zone, arrive: sv.zone === 'fleet' ? null : (sv.hx !== undefined ? { x: sv.hx, z: sv.hz } : null), carry: party });
+  startWorld({ zone, arrive: inst ? (inst.out ? { ...inst.out } : null) : (sv.hx !== undefined ? { x: sv.hx, z: sv.hz } : null), carry: party });
   if (sv.zone === 'fleet') { S.hero.x = world.buoy.x + 3; S.hero.z = world.buoy.z + 3; }
   // older saves kept only names: find those friends among the fake players
   if (!sv.partyData) for (const n of sv.party || []) { const f = S.fakes.find(x => x.name === n); if (f) { f.x = S.hero.x + rnd(-2, 2); f.z = S.hero.z + rnd(-2, 2); f.y = hgt(f.x, f.z); f.fake.group = null; f.inParty = true; f.fake.state = 'party'; S.party.push(f); } }

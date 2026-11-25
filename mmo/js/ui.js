@@ -3,7 +3,7 @@ import * as THREE from './three.js';
 import { S, WH, TAU, clamp, dist, fct, chat } from './core.js';
 import { cam } from './render.js';
 import { world, hgt, regionAt, REGION_NAMES } from './world.js';
-import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, WTYPE, BASE_NAMES } from './data.js';
+import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, WTYPE, BASE_NAMES, SETS } from './data.js';
 import * as Sea from './sea.js';
 import { LORE, PERKS } from './story.js';
 import { TALK, VILLAGER_LINES, MOB_LORE } from './dialogue.js';
@@ -11,6 +11,9 @@ import { QUICK } from './banter.js';
 import * as Cb from './combat.js';
 import * as Game from './game.js';
 import * as MapUI from './mapui.js';
+import * as Craft from './crafting.js';
+import * as Loot5 from './loot5.js';
+import { TESTIMONY } from './mystery.js';
 import { SET, OPTS, setOpt, apply as applySettings } from './settings.js';
 
 const $ = id => document.getElementById(id);
@@ -226,23 +229,26 @@ function updateAct() {
   else if (S.corpse && S.corpse.ent && dist(h, S.corpse) < 6) { label = 'Recover your gear'; actFn = () => Game.lootCorpse(); }
   else {
     const t = S.target;
-    if (t && t.prop && dist(h, t) < 6 && Game.inspectLabel(t)) { label = Game.inspectLabel(t); actFn = () => { const lore = Game.inspect(t); if (lore) openLore(lore); }; }
-    else if (t && (t.team === 'npc' || t.guard) && !t.corpse && !t.prop && dist(h, t) < 7) { label = 'Talk to ' + t.name.split(' ')[0]; actFn = () => interact(t); }
+    if (t && t.prop && dist(h, t) < 6 && Game.inspectLabel(t)) { label = Game.inspectLabel(t); actFn = () => { propUse(Game.inspect(t)); }; }
+    else if (t && (t.team === 'npc' || t.guard) && !t.corpse && !t.prop && !t.vanity && dist(h, t) < 7) { label = 'Talk to ' + t.name.split(' ')[0]; actFn = () => interact(t); }
     else if (t && t.mob && t.dead && t.loot?.length && t.lootFor === 'party' && dist(h, t) < 7) { label = 'Loot'; actFn = () => openLoot(t); }
     else {
       const body = S.ents.find(e => e.mob && e.dead && e.lootFor === 'party' && (e.loot?.length) && dist(e, h) < 5);
       const pr = !body && S.ents.find(e => e.prop && !e.remove && dist(e, h) < 4.5 && Game.inspectLabel(e));
-      if (pr) { label = Game.inspectLabel(pr); actFn = () => { const lore = Game.inspect(pr); if (lore) openLore(lore); }; }
+      if (pr) { label = Game.inspectLabel(pr); actFn = () => { propUse(Game.inspect(pr)); }; }
       else if (body) { label = 'Loot ' + body.name; actFn = () => openLoot(body); }
-      else { const n = S.ents.find(e => e.team === 'npc' && !e.corpse && !e.prop && !e.remove && dist(e, h) < 4.5); if (n) { label = (n.bindstone ? 'Bind here' : 'Talk to ' + n.name.split(' ')[0]); actFn = () => interact(n); } }
+      else { const n = S.ents.find(e => e.team === 'npc' && !e.corpse && !e.prop && !e.vanity && !e.remove && dist(e, h) < 4.5); if (n) { label = (n.bindstone ? 'Bind here' : 'Talk to ' + n.name.split(' ')[0]); actFn = () => interact(n); } }
     }
     if (!label) { const a = Sea.action(); if (a) { label = a.label; actFn = a.fn; } }
   }
   b.classList.toggle('hide', !label); if (label && b.textContent !== label) b.textContent = label;
 }
+// what using a prop opens: a lore page, or a crafting station
+function propUse(r) { if (!r) return; if (r.station) openCraft(r.station); else openLore(r); }
 function interact(n) {
+  if (n.vanity) return;
   if (dist(S.hero, n) > 8) { toast('Too far away'); return; }
-  if (n.prop) { const lore = Game.inspect(n); if (lore) openLore(lore); return; }
+  if (n.prop) { propUse(Game.inspect(n)); return; }
   if (n.bindstone) { S.bind = { zone: S.zone, x: n.x, z: n.z + 1.5 }; const pl = placeAt(n.x, n.z); chat('sys', null, 'You are bound here.'); toast('Bound to ' + (pl ? pl.name : world.names.town)); Game.save(); return; }
   if (n.corpse) return;
   if (n.team === 'npc' || n.guard) openTalk(n);
@@ -259,7 +265,7 @@ function buffRow(u, max) {
 }
 function updateFrames() {
   const h = S.hero;
-  $('meName').textContent = h.name; $('meLvl').textContent = `${h.lvl} ${CLASSES[h.cls].name}`;
+  { const tt = Game.heroTitle(); const nm = tt ? (tt.startsWith('of ') || tt.startsWith('the ') ? `${h.name} ${tt}` : `${h.name} ${tt}`) : h.name; if ($('meName').textContent !== nm) $('meName').textContent = nm; } $('meLvl').textContent = `${h.lvl} ${CLASSES[h.cls].name}`;
   $('meHp').style.width = pct(h.hp, h.maxHp) + '%'; $('meHpT').textContent = `${Math.ceil(h.hp)} / ${h.maxHp}`;
   $('meRes').style.width = pct(h.res, h.resMax) + '%'; $('meRes').style.background = RES_COL[h.resType]; $('meResT').textContent = frameRes(h);
   const bs = buffRow(h, 12) + (S.corpse ? '<span>🪦</span>' : '');
@@ -350,7 +356,7 @@ function updateFrames() {
   const qn = QUESTS.filter(q => S.quests[q.id]?.state === 'done').length;
   if (qn) $('bookBtn').dataset.n = qn; else delete $('bookBtn').dataset.n;
 }
-const BUFF_ICON = { shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
+const BUFF_ICON = { fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
   focusmind: '🎯', wolfspirit: '🐺', markwild: '🐾', poisonblades: '🗡️', restsong: '🎼', hastesong: '🥁', haste: '⏩', ward: '🛡️', shelter: '🔯', renew: '🌱', rejuv: '🍃', wild: '🌳', regrowth: '🍀',
   bear: '🐻', cat: '🐆', chain: '🤺', untouch: '🌪️', crescendo: '🎺', empower: '💪', unbound: '🌋', treeoflife: '🌲', guard: '🛡️', evade: '💨', shadowstep: '🌑', fists: '👐', crescendo2: '🎶' };
 for (const c in CLASSES) for (const [k, a] of Object.entries(CLASSES[c].abilities)) if (!BUFF_ICON[k]) BUFF_ICON[k] = a.icon;
@@ -375,7 +381,7 @@ function updatePlates(dt) {
     if (e.dead && !(e.mob && e.loot?.length && e.lootFor === 'party')) continue;
     if (e.mob && !(e === S.target || (e.engaged && [...e.threat.keys()].some(k => S.party.includes(k))) || e.named || e.boss) && !e.dead) continue;
     if (e.guard && dd > 15) continue;
-    if (e.prop && (dd > 22 || !Game.inspectLabel(e))) continue;
+    if (e.prop && (dd > (e.prop.node || e.prop.station ? 10 : 22) || !Game.inspectLabel(e))) continue;
     list.push(e);
   }
   list.sort((a, b) => dist(a, h) - dist(b, h)); list.length = Math.min(list.length, 26);
@@ -448,16 +454,16 @@ function itemHtml(it, cmp) {
   const rc = RARITY[it.rarity].c, s = it.stats;
   const st = Object.entries(s).map(([k, v]) => { const dlt = cmp ? v - (cmp.stats[k] || 0) : 0; return `<span>${{ sta: 'Stamina', pow: 'Power', crit: 'Crit %', arm: 'Armor' }[k]} ${v}${cmp && dlt ? ` <i class="${dlt > 0 ? 'up' : 'down'}">${dlt > 0 ? '+' : ''}${Math.round(dlt * 10) / 10}</i>` : ''}</span>`; }).join('');
   if (cmp) for (const k in cmp.stats) if (!(k in s)) { }
-  return `<b>${esc(it.name)}</b> <span class="dim">· ${SLOT_NAMES[it.slot]}${it.armorType ? ' · ' + it.armorType : it.type ? ' · ' + it.type : ''} · L${it.lvl}</span><div class="st">${st}</div>`;
+  return `<b>${esc(it.name)}</b> <span class="dim">· ${SLOT_NAMES[it.slot]}${it.armorType ? ' · ' + it.armorType : it.type && it.type !== it.slot ? ' · ' + it.type : ''} · L${it.lvl}${it.crafted ? ' · crafted' : ''}</span><div class="st">${st}</div>${it.ench ? `<div class="dim" style="font-size:11.5px;color:#8affff">✨ ${esc(it.ench.name)}</div>` : ''}${it.set && SETS[it.set] ? `<div style="font-size:11.5px;color:#d8b24a">Set: ${esc(SETS[it.set].name)}. ${esc(SETS[it.set].desc)}</div>` : ''}`;
 }
 let bookTab = 'char';
 export function openBook(tab) {
   if (tab) bookTab = tab;
   openSheet('Book', body => {
-    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Spells'], ['quests', 'Quests'], ['bags', 'Bags'], ['lore', 'Lore'], ['social', 'Social']].map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
+    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Spells'], ['quests', 'Quests'], ['bags', 'Bags'], ['trade', 'Trade'], ['lore', 'Lore'], ['social', 'Social']].map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
     tabs.onclick = ev => { const t = ev.target.dataset.t; if (t) { bookTab = t; refreshSheet(); } };
     body.appendChild(tabs);
-    ({ char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial })[bookTab](body);
+    ({ char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial, trade: tabTrade })[bookTab](body);
   });
 }
 // ---------- weapons: equip a class's weapon to play it ----------
@@ -627,17 +633,56 @@ function objText(q) {
   if (o.collect) return `Collect ${n} ${o.item}${n > 1 && !/s$/.test(o.item) && !/silk|ectoplasm|bacon/i.test(o.item) ? 's' : ''} from ${orList([...new Set(o.collect.map(k => plural(nm(k))))])}${where}`;
   return `Defeat ${n} ${orList([...new Set(o.kill.map(k => n > 1 ? plural(nm(k)) : nm(k)))])}${where}`;
 }
+// ---------- professions, materials, food and the collection ----------
+function tabTrade(body) {
+  const P = Craft.PROFS;
+  body.appendChild(el(`<div class="card"><h3>Professions</h3><div class="profs">${Object.entries(P).map(([k, p]) => { const v = Craft.skill(k); return `<div class="prof ${v === null ? 'off' : ''}"><span>${p.icon}</span><b>${p.name}</b><small>${v === null ? 'not learned' : v + ' / 100'}</small>${v === null ? '' : `<i style="width:${v}%"></i>`}</div>`; }).join('')}</div></div>`));
+  const mats = Object.entries(S.mats || {}).filter(([, n]) => n > 0);
+  body.appendChild(el(`<div class="card"><h3>Materials</h3>${mats.length ? `<div class="mats">${mats.map(([k, n]) => `<span>${Craft.MATS[k].icon} ${esc(Craft.MATS[k].name)} <b>${n}</b></span>`).join('')}</div>` : '<p class="dim" style="margin:0">None yet.</p>'}</div>`));
+  const cons = Object.entries(S.cons || {}).filter(([, n]) => n > 0);
+  if (cons.length) {
+    const c = el(`<div class="card"><h3>Food and elixirs</h3>${cons.map(([k, n]) => `<div class="who"><div><b>${Craft.CONS[k].icon} ${esc(Craft.CONS[k].name)}</b> <small>×${n} · ${esc(Craft.CONS[k].desc)}</small></div><button data-c="${k}">Use</button></div>`).join('')}</div>`);
+    c.onclick = ev => { const k = ev.target.dataset.c; if (k) { Craft.useCons(k); Game.save(); refreshSheet(); } };
+    body.appendChild(c);
+  }
+  const col = (S.collection || []).map(k => [k, Loot5.COLLECT[k]]).filter(([, c]) => c);
+  if (col.length) {
+    const c = el(`<div class="card"><h3>Collection</h3>${col.map(([k, c]) => `<div class="who"><div><b>${c.type === 'pet' ? '🐾' : c.type === 'title' ? '🏷️' : '🏆'} ${esc(c.name)}</b>${c.desc ? `<small> · ${esc(c.desc)}</small>` : ''}</div>${c.type === 'pet' ? `<button data-p="${k}">${S.pet === k ? 'Dismiss' : 'Summon'}</button>` : c.type === 'title' ? `<button data-t="${k}">${S.title === k ? 'Remove' : 'Wear'}</button>` : ''}</div>`).join('')}</div>`);
+    c.onclick = ev => { const b = ev.target.closest('button'); if (!b) return; if (b.dataset.p) Game.setPet(b.dataset.p); if (b.dataset.t) Game.setTitle(b.dataset.t); refreshSheet(); };
+    body.appendChild(c);
+  }
+}
+export function openCraft(st) {
+  const S0 = Craft.STATIONS[st];
+  openSheet(S0.name, body => {
+    for (const p of S0.profs) {
+      const v = Craft.skill(p), P = Craft.PROFS[p];
+      if (v === null) { body.appendChild(el(`<div class="card"><h3>${P.icon} ${P.name}</h3><p class="dim" style="margin:0">You haven't learned this. The trainers in the yard can teach you.</p></div>`)); continue; }
+      body.appendChild(el(`<h3 style="font:700 14px Cinzel;margin:8px 0 4px">${P.icon} ${P.name} <span class="dim" style="font:500 12px Alegreya Sans">· ${v} / 100</span></h3>`));
+      const list = Object.values(Craft.RECIPES).filter(r => r.prof === p && Craft.knows(r)).sort((a, b) => a.req - b.req);
+      for (const r of list) {
+        const can = v >= r.req, has = Craft.haveMats(r), col = v < r.req ? '#888' : v < r.req + 15 ? '#ff9a3a' : v < r.req + 30 ? '#ffd34d' : v < r.req + 45 ? '#7fd35a' : '#9a9a9a';
+        const mats = Object.entries(r.mats).map(([k, n]) => { const have = (S.mats || {})[k] || 0; return `<span style="color:${have >= n ? 'var(--ink)' : '#ff8a6a'}">${Craft.MATS[k].icon} ${have}/${n} ${esc(Craft.MATS[k].name)}</span>`; }).join(' ');
+        const c = el(`<div class="card craft"><div><b style="color:${col}">${esc(r.name)}</b>${r.rare ? ' <small style="color:#b86bff">rare</small>' : ''}<small class="dim"> · skill ${r.req}</small><div class="mats">${mats}</div></div><button ${can && has ? '' : 'disabled'}>Craft</button></div>`);
+        c.querySelector('button').onclick = () => { const m = Craft.craft(r.id, Game); if (m) toast(m); refreshSheet(); };
+        body.appendChild(c);
+      }
+    }
+    body.appendChild(el('<p class="dim" style="font-size:12px">Orange recipes always raise your skill; yellow usually; green sometimes; grey never.</p>'));
+  });
+}
 function tabBags(body) {
   body.appendChild(el(`<p style="margin-top:0">Gold: <b style="color:var(--acc)">${S.gold}</b> · Potions: 🧪 ${S.pots.hpot} · 💧 ${S.pots.mpot} · Bags ${S.bag.length}/30</p>`));
   if (!S.bag.length) body.appendChild(el('<p class="dim">Your bags are empty.</p>'));
   const vend = S.ents.some(n => n.vendor && !n.dead && dist(S.hero, n) < 8);
   for (const it of S.bag) {
     const ok = Game.canWear(S.heroCls, it), cur = S.gear[S.heroCls][it.slot];
-    const c = el(`<div class="card it" style="--c:${RARITY[it.rarity].c}">${itemHtml(it, ok ? cur : null)}${ok ? '' : `<p style="font-size:12px;margin:2px 0">A ${CLASSES[S.heroCls].name} can't use this.</p>`}<div class="acts">${ok ? '<button data-a="eq">Equip</button>' : ''}${vend ? `<button data-a="sell">Sell ${it.value}g</button>` : ''}${S.party.length > 1 ? '<button data-a="give">Give…</button>' : ''}</div></div>`);
+    const c = el(`<div class="card it" style="--c:${RARITY[it.rarity].c}">${itemHtml(it, ok ? cur : null)}${ok ? '' : `<p style="font-size:12px;margin:2px 0">A ${CLASSES[S.heroCls].name} can't use this.</p>`}<div class="acts">${ok ? '<button data-a="eq">Equip</button>' : ''}${vend ? `<button data-a="sell">Sell ${it.value}g</button>` : ''}${S.party.length > 1 ? '<button data-a="give">Give…</button>' : ''}${Craft.skill('enchanting') !== null && it.rarity >= 1 ? '<button data-a="de">Disenchant</button>' : ''}</div></div>`);
     c.onclick = ev => {
       const a = ev.target.dataset.a;
       if (a === 'eq') { Game.equip(it); refreshSheet(); }
       if (a === 'sell') { Game.sell(it); refreshSheet(); }
+      if (a === 'de') { const m = Craft.disenchant(it, Game); if (m) toast(m); refreshSheet(); }
       if (a === 'give') { const acts = c.querySelector('.acts'); acts.innerHTML = S.party.filter(p => !p.isHero).map((p, i) => `<button data-g="${i}">${esc(p.name)}${Game.canWear(p.cls, it) ? ' ✓' : ''}</button>`).join(''); }
       if (ev.target.dataset.g !== undefined) { const p = S.party.filter(p => !p.isHero)[+ev.target.dataset.g]; S.bag = S.bag.filter(b => b !== it); Game.assignLoot({ loot: [it] }, it, p); refreshSheet(); }
     };
@@ -698,12 +743,21 @@ function renderConv(body) {
     const off = Game.nextOffer(k);
     if (off) list.push([`▸ ${off.story ? "What's going on?" : 'Is there anything I can help you with?'} <span class="qn">${off.story ? 'Main story · ' : ''}${esc(off.name)}</span>`, () => go({ view: 'offer', q: off }), 'hl']);
     for (const a of Game.activeFrom(k)) list.push([`▸ About "${esc(a.name)}"…`, () => go({ view: 'active', q: a })]);
+    for (const a of Game.asksFor(k)) list.push([`▸ I have some questions about the murder. <span class="qn">${esc(a.name)}</span>`, () => go({ view: 'ask', q: a }), 'hl']);
+    for (const p of Craft.TRAINERS[k] || []) if (Craft.skill(p) === null) list.push([`▸ Teach me ${Craft.PROFS[p].name}. <span class="qn">${Craft.PROFS[p].icon}</span>`, () => { Craft.learn(p); Game.save(); go({ view: 'reply', lines: [`There. You know the basics of ${Craft.PROFS[p].name.toLowerCase()} now. The rest is practice, and practice, and a bit more practice.`] }); }, 'hl']);
     if (nn?.vendor) list.push(['▸ Show me what you have for sale.', () => { closeSheet(); openVendor(nn); }, 'hl']);
     if (nn?.banker || k === 'banker') list.push(["▸ I'd like to use my vault.", () => { closeSheet(); openBank(); }, 'hl']);
     if (nn?.armory) { list.push(["▸ I'd like to switch weapons.", () => { closeSheet(); openBook('char'); }, 'hl']); if (S.unlockPicks > 0) list.push(['▸ Show me the weapon rack.', () => { closeSheet(); openWeaponPick(); }, 'hl']); }
     for (const t of (T.topics || [])) if (!t.after || S.quests[t.after]?.state === 'turned') list.push([`▸ ${esc(Game.fill(t.q))}`, () => go({ view: 'topic', t })]);
     list.push(['▸ Farewell.', () => closeSheet()]);
     opts(list);
+    return;
+  }
+  if (c.view === 'ask') {
+    const T2 = TESTIMONY[c.q.id]?.[k], lines = T2 ? T2(S.flags) : ["I don't know anything about that."];
+    body.appendChild(el(sayHtml([['you', 'I have some questions about the murder.'], ...lines], k)));
+    Game.askSuspect(c.q, k);
+    opts([['▸ Thank you. Let me ask you something else.', () => go({ view: 'menu', lines: [] })], ['▸ Farewell.', () => closeSheet()]]);
     return;
   }
   if (c.view === 'topic') {
@@ -737,8 +791,9 @@ function renderConv(body) {
   }
   if (c.view === 'done') {
     const def = Game.turnToOf(q);
-    body.appendChild(el(sayHtml(q.done || ['Well done, and thank you.'], def)));
-    const a = el(`<div class="acts col">${q.choices ? q.choices.map((ch, i) => `<button class="pri" data-c="${i}">${esc(Game.fill(ch.t))}</button>`).join('') : '<button class="pri" data-c="-1">Complete the quest</button>'}</div>`);
+    body.appendChild(el(sayHtml((typeof q.done === 'function' ? q.done(S.flags) : q.done) || ['Well done, and thank you.'], def)));
+    const chOk = ch => !ch.if || Game.flagMatch(ch.if);
+    const a = el(`<div class="acts col">${q.choices ? q.choices.map((ch, i) => chOk(ch) ? `<button class="pri" data-c="${i}">${esc(Game.fill(ch.t))}</button>` : '').join('') : '<button class="pri" data-c="-1">Complete the quest</button>'}</div>`);
     a.onclick = ev => {
       const cc = ev.target.dataset.c; if (cc === undefined) return;
       const reply = Game.turnIn(q, +cc >= 0 ? +cc : null);
@@ -874,7 +929,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 4.4 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 5 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

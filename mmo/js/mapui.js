@@ -86,11 +86,26 @@ function ensureBase() {
 // ---------- what goes on the map ----------
 const npcPos = k => S.npcs?.[k] && !S.npcs[k].remove ? S.npcs[k] : S.ents.find(e => e.giver === k && !e.dead && !e.remove);
 function questTargets(q) {
+  const out = questTargets0(q);
+  if (!out.length && q.where && world.spots?.[q.where]) out.push({ x: world.spots[q.where].x, z: world.spots[q.where].z });
+  return out;
+}
+function questTargets0(q) {
   const o = q.obj, out = [];
   if (o.zone && o.zone !== S.zone) return out;
   if (o.at) { const sp = world.spots?.[o.at]; if (sp && S.zone === 'vale') out.push({ x: sp.x, z: sp.z, r: Math.max(8, o.r || 9) }); return out; }
+  if (o.ask) {
+    const asked = S.quests[q.id]?.asked || [];
+    for (const k of o.ask) if (!asked.includes(k)) { const n = S.ents.find(e => !e.dead && !e.remove && (e.giver === k || (k.startsWith('vendor:') && e.vendor === k.slice(7)))); if (n) out.push({ x: n.x, z: n.z }); }
+    return out;
+  }
   if (o.talk) { const n = npcPos(Game.turnToOf(q)); if (n) out.push({ x: n.x, z: n.z }); return out; }
   if (o.inspect) { for (const p of world.props) if (p.tag === o.inspect && !(S.used[q.id] || []).includes(p.id)) out.push({ x: p.x, z: p.z }); return out; }
+  if (o.bosses) {
+    const got = S.quests[q.id]?.got || [];
+    for (const sp of world.spawns) if (o.bosses.includes(sp.named) && !got.includes(sp.named)) out.push({ x: sp.x, z: sp.z });
+    return out;
+  }
   if (o.named) {
     for (const sp of world.spawns) if (sp.named === o.named || sp.ph?.named === o.named) out.push({ x: sp.x, z: sp.z, r: sp.ph ? 14 : 0 });
     if (!out.length) for (const e of S.ents) if (e.named === o.named && !e.dead) out.push({ x: e.x, z: e.z });
@@ -152,6 +167,10 @@ export function marks() {
   }
   // items: lore pages, things to inspect for quests, and your corpse
   for (const p of world.props || []) {
+    if (p.when || p.unless) { const e = S.ents.find(x => x.prop === p && !x.remove); if (!e) continue; }
+    if (p.node) { if (!p.depleted) out.push({ layer: 'items', type: 'item', icon: p.node.type === 'ore' ? '⛏️' : '🌿', hot: false, node: true, x: p.x, z: p.z, title: p.name, sub: p.node.type === 'ore' ? 'Ore vein (Mining)' : 'Herb (Herbalism)', info: '' }); continue; }
+    if (p.station) { out.push({ layer: 'services', type: 'svc', icon: '🔨', x: p.x, z: p.z, title: p.name, sub: "Crafters' station", info: 'Craft here once a trainer has taught you.' }); continue; }
+    if (p.tag === 'scene') continue;
     const need = QUESTS.some(q => q.obj.inspect === p.tag && S.quests[q.id]?.state === 'active' && !(S.used[q.id] || []).includes(p.id));
     const unread = p.lore && !S.lore[p.lore];
     out.push({ layer: 'items', type: 'item', icon: p.lore ? '📖' : need ? '◆' : '•', hot: need || unread, x: p.x, z: p.z, title: p.lore ? LORE[p.lore]?.title || p.name : p.name,
@@ -189,7 +208,7 @@ function drawMark(g, m, px, py, s, big) {
       if (m.icon === '◆') { const r = 6 * sz; g.fillStyle = GOLD; g.beginPath(); g.moveTo(px, py - r); g.lineTo(px + r, py); g.lineTo(px, py + r); g.lineTo(px - r, py); g.closePath(); g.stroke(); g.fill(); break; }
       if (m.icon === '•') { g.fillStyle = '#bbb'; g.beginPath(); g.arc(px, py, 3 * sz, 0, TAU); g.stroke(); g.fill(); break; }
       if (m.hot) { g.fillStyle = 'rgba(255,211,77,.35)'; g.beginPath(); g.arc(px, py, 11 * sz, 0, TAU); g.fill(); }
-      g.globalAlpha = m.type === 'item' && !m.hot ? .45 : 1; g.fillText(m.icon, px, py + 1); g.globalAlpha = 1; break; }
+      g.globalAlpha = m.type === 'item' && !m.hot && !m.node ? .45 : 1; g.fillText(m.icon, px, py + 1); g.globalAlpha = 1; break; }
     case 'corpse': g.strokeStyle = '#8dffef'; g.lineWidth = 3; g.beginPath(); g.moveTo(px - 6, py - 6); g.lineTo(px + 6, py + 6); g.moveTo(px + 6, py - 6); g.lineTo(px - 6, py + 6); g.stroke(); break;
     case 'zone': {
       g.strokeStyle = m.col; g.globalAlpha = .7; g.lineWidth = 1.5; g.setLineDash([3, 4]); g.beginPath(); g.arc(px, py, m.r * s, 0, TAU); g.stroke(); g.setLineDash([]); g.globalAlpha = 1; break; }
@@ -210,7 +229,7 @@ function heroArrow(g, px, py, sz = 1) {
 let miniMarks = [], miniT = -9;
 export function drawMini(c) {
   const h = S.hero; if (!h || !ensureBase()) return;
-  if (S.time - miniT > .5 || S.time < miniT) { miniT = S.time; miniMarks = marks().filter(m => ['quests', 'givers', 'items', 'enemies'].includes(m.layer) && (m.type !== 'item' || m.hot) && m.type !== 'npc' && !(m.type === 'giver' && !m.mk) && m.type !== 'zone'); }
+  if (S.time - miniT > .5 || S.time < miniT) { miniT = S.time; miniMarks = marks().filter(m => ['quests', 'givers', 'items', 'enemies'].includes(m.layer) && (m.type !== 'item' || m.hot || m.node) && m.type !== 'npc' && !(m.type === 'giver' && !m.mk) && m.type !== 'zone'); }
   const g = c.getContext('2d'), W = c.width, span = 120, s = W / span, k = N / (2 * WH);
   g.save(); g.clearRect(0, 0, W, W); g.beginPath(); g.arc(W / 2, W / 2, W / 2, 0, TAU); g.clip();
   g.fillStyle = '#1b2228'; g.fillRect(0, 0, W, W);
@@ -263,6 +282,7 @@ export function openBig() {
   const box = $('bigmap'); box.classList.remove('hide'); open = true; picked = null; $('bmInfo').classList.add('hide');
   cv = $('bmc'); size();
   view.x = S.hero.x; view.z = S.hero.z; view.s = Math.max(view.fit, view.fit * 1.8);
+  if (world.mapBounds) { const B = world.mapBounds; view.x = (B.x0 + B.x1) / 2; view.z = (B.z0 + B.z1) / 2; view.s = view.fit; }
   $('bmTitle').textContent = world.names.zone || world.names.town || 'Map';
   $('bmTog').innerHTML = LAYERS.map(([k, ic, n]) => `<button data-l="${k}" class="${on[k] ? 'on' : ''}">${ic} ${n}</button>`).join('');
   draw();
@@ -272,6 +292,7 @@ function size() {
   const dpr = Math.min(2, devicePixelRatio || 1), w = innerWidth, h = innerHeight;
   cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px';
   view.dpr = dpr; view.w = w; view.h = h; view.fit = Math.min(w, h - 90) / (2 * WH) * .96;
+  const B = world.mapBounds; if (B) view.fit = Math.min(w / (B.x1 - B.x0), (h - 90) / (B.z1 - B.z0)) * .96;
   view.s = clamp(view.s, view.fit, view.fit * 9);
 }
 const toScr = (x, z) => [(x - view.x) * view.s + view.w / 2, (z - view.z) * view.s + view.h / 2];
@@ -359,7 +380,7 @@ export function init() {
   const box = $('bigmap'); cv = $('bmc');
   $('bmX').onclick = closeBig;
   $('bmTog').onclick = ev => { const b = ev.target.closest('button'); if (!b) return; const k = b.dataset.l; on[k] = !on[k]; b.classList.toggle('on', on[k]); try { localStorage.setItem('mmo-map-layers', JSON.stringify(on)); } catch (e) { } draw(); };
-  $('bmZoom').onclick = ev => { const z = ev.target.dataset.z; if (z === 'in') view.s *= 1.5; if (z === 'out') view.s /= 1.5; if (z === 'me') { view.x = S.hero.x; view.z = S.hero.z; } if (z === 'all') { view.s = view.fit; view.x = 0; view.z = 0; } clampView(); draw(); };
+  $('bmZoom').onclick = ev => { const z = ev.target.dataset.z; if (z === 'in') view.s *= 1.5; if (z === 'out') view.s /= 1.5; if (z === 'me') { view.x = S.hero.x; view.z = S.hero.z; } if (z === 'all') { const B = world.mapBounds; view.s = view.fit; view.x = B ? (B.x0 + B.x1) / 2 : 0; view.z = B ? (B.z0 + B.z1) / 2 : 0; } clampView(); draw(); };
   addEventListener('resize', () => { if (open) { size(); draw(); } });
   // drag to pan, pinch to zoom, tap to see what something is
   const pts = new Map(); let start = null, pinch = null, moved = 0;

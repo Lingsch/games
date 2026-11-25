@@ -408,8 +408,8 @@ export const mobDmg = L => (4 + 2.3 * L) * 1.75;
 export const mobXp = L => 18 + 13 * L + .9 * L * L;
 
 // ---------- items ----------
-export const SLOTS = ['weapon', 'off', 'head', 'chest', 'legs', 'feet'];
-export const SLOT_NAMES = { weapon: 'Weapon', off: 'Off-hand', head: 'Head', chest: 'Chest', legs: 'Legs', feet: 'Feet' };
+export const SLOTS = ['weapon', 'off', 'head', 'chest', 'legs', 'feet', 'neck', 'ring'];
+export const SLOT_NAMES = { weapon: 'Weapon', off: 'Off-hand', head: 'Head', chest: 'Chest', legs: 'Legs', feet: 'Feet', neck: 'Neck', ring: 'Ring', recipe: 'Recipe', collect: 'Collectible' };
 export const RARITY = [{ n: 'Common', c: '#d8d2c2' }, { n: 'Uncommon', c: '#5fd35a' }, { n: 'Rare', c: '#4fa0ff' }, { n: 'Epic', c: '#b86bff' }];
 // which armour each class can wear
 export const WEAR = { plate: ['plate', 'leather', 'cloth'], leather: ['leather', 'cloth'], cloth: ['cloth'] };

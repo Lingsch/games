@@ -105,7 +105,7 @@ export function mobAI(m, dt) {
     m.mcast.t += dt; stopMove(m, dt); m.anim.atk = .5;
     if (m.mcast.t >= m.mcast.total) {
       const c = m.mcast; m.mcast = null;
-      if (c.kind === 'heal' && !c.tgt.dead) { c.tgt.hp = Math.min(c.tgt.maxHp, c.tgt.hp + c.tgt.maxHp * .3); R.burst(c.tgt.x, c.tgt.y + 1, c.tgt.z, 16, [.5, 1, .4], 2, .7, .5); floatText(c.tgt, 'Healed', '#9be36b'); }
+      if (c.kind === 'heal' && !c.tgt.dead) { c.tgt.hp = Math.min(c.tgt.maxHp, c.tgt.hp + c.tgt.maxHp * (c.tgt.boss || c.tgt.boss2 ? .04 : .3)); R.burst(c.tgt.x, c.tgt.y + 1, c.tgt.z, 16, [.5, 1, .4], 2, .7, .5); floatText(c.tgt, 'Healed', '#9be36b'); }
       else if (c.kind === 'bolt' && !c.tgt.dead) { Cb.bolt(m, c.tgt, m.power * (m.boltPow || 1.3), M.school || 'shadow'); m.boltPow = 0; }
     }
     return;
@@ -133,8 +133,39 @@ export function mobAI(m, dt) {
 
 // the boss in the crypt: cleave, bile pools, raising the dead, and an enrage timer
 function bossAI(m, t, dt) {
-  const f = { abom: abomAI, queen: queenAI, bosun: bosunAI, admiral: admiralAI, leviathan: levAI }[m.mob];
+  const f = { abom: abomAI, queen: queenAI, bosun: bosunAI, admiral: admiralAI, leviathan: levAI }[m.mob] || (MOBS[m.mob]?.mechs ? mechAI : null);
   return f ? f(m, t, dt) : false;
+}
+// Build 5: dungeon bosses share a kit of telegraphed moves, picked per boss in MOBS[...].mechs
+function mechAI(m, t, dt) {
+  const D = MOBS[m.mob], has = k => D.mechs.includes(k);
+  const b = bstate(m, { cleave: rnd(6, 8), slam: rnd(9, 11), pool: rnd(7, 9), volley: 10, charge: 12, spawn: 14, heal: 16, fear: 15, web: 11, knock: 13 }); b.time += dt;
+  if (has('enrage')) { enrageAt(m, b, 240); if (m.hp < m.maxHp * .3 && !b.said.rage) { b.said.rage = 1; Cb.buff(m, 'frenzy', 999, { pow: .5 }); floatText(m, 'FRENZY', '#ff3a1a', true); chat('sys', null, `${m.name} flies into a rage!`); } }
+  if (!b.said.start) { b.said.start = 1; if (D.lines?.start) chat('say', m.name, D.lines.start); if (has('hounds')) addWave(m, 2, Math.max(1, m.lvl - 1), D.adds, [{ x: m.x + 3, z: m.z }, { x: m.x - 3, z: m.z }]); }
+  if (m.hp < m.maxHp * .5 && !b.said.half) {
+    b.said.half = 1; if (D.lines?.half) chat('say', m.name, D.lines.half);
+    if (has('call') || has('hounds')) addWave(m, 2, Math.max(1, m.lvl - 1), D.adds, [{ x: m.x + 5, z: m.z + 4 }, { x: m.x - 5, z: m.z - 4 }]);
+    if (has('shield')) { Cb.buff(m, 'boneshield', 20, { absorb: Math.round(m.maxHp * .12) }); floatText(m, 'Bone shield', '#e8e0c0', true); }
+  }
+  if (has('call') && m.hp < m.maxHp * .25 && !b.said.call2) { b.said.call2 = 1; addWave(m, 2, Math.max(1, m.lvl - 1), D.adds, [{ x: m.x + 5, z: m.z - 4 }, { x: m.x - 5, z: m.z + 4 }]); }
+  if (runWind(m, b, dt, (w, e) => {
+    if (w.kind === 'heal') return;
+    damage(m, e, m.power * (w.kind === 'cleave' ? 1.9 : w.kind === 'slam' ? 1.6 : 1.7), D.school || 'phys', { noMiss: true });
+    if (w.kind === 'slam') Cb.buff(e, 'stun', 1, { stun: 1 }, m);
+  })) return true;
+  if (b.healing) { b.healing -= dt; stopMove(m, dt); m.anim.atk = .4; if (b.healing <= 0) { b.healing = 0; Cb.heal(m, m, m.maxHp * .08); floatText(m, 'Healed', '#7fff7f'); } return true; }
+  const tick = k => has(k) && (b[k] -= dt) <= 0;
+  if (tick('cleave')) { b.cleave = rnd(8, 10); const yaw = angTo(m, t); m.yaw = yaw; windup(m, b, 'cleave', 1.3, { kind: 'cone', x: m.x, z: m.z, r: 6.5 * Math.max(1, m.scale * .6), yaw, w: .85, col: '#ff3a1a' }); return true; }
+  if (tick('slam')) { b.slam = rnd(10, 13); windup(m, b, 'slam', 1.6, { kind: 'circle', x: m.x, z: m.z, r: 6, col: '#ffb03a' }); chat('say', m.name, 'raises its arms high!'); return true; }
+  if (tick('pool')) { b.pool = rnd(8, 11); const v = nonTank(m, t); windup(m, b, 'pool', 1.7, { kind: 'circle', x: v.x, z: v.z, r: 3.6, col: D.school === 'fire' ? '#ff7a2a' : D.school === 'nature' ? '#8aff5a' : '#b05aff' }); return true; }
+  if (tick('volley')) { b.volley = rnd(11, 13); const L = partyIn(m); if (L.length) { const gs = L.slice(0, 3).map(e => ({ kind: 'circle', x: e.x, z: e.z, r: 3, col: '#ff3a1a' })); windup(m, b, 'volley', 1.7, gs[0], { extra: gs.slice(1) }); for (const g of gs.slice(1)) { g.t = 1.7; g.tele = true; S.dangers.push(g); } chat('say', m.name, 'Loose!'); } return true; }
+  if (tick('charge')) { b.charge = rnd(12, 15); const v = nonTank(m, t); if (v && v !== t && dist(m, v) < 30) { const a = angTo(m, v); m.x = v.x - Math.sin(a) * 1.6; m.z = v.z - Math.cos(a) * 1.6; m.y = hgt(m.x, m.z); damage(m, v, m.power * 1.3, 'phys', { noMiss: true }); Cb.buff(v, 'stun', 1, { stun: 1 }, m); floatText(v, 'Charged!', '#ffb03a'); } return false; }
+  if (tick('spawn')) { b.spawn = rnd(17, 21); addWave(m, 2, Math.max(1, m.lvl - 2), D.adds, [{ x: m.x + 3, z: m.z + 3 }, { x: m.x - 3, z: m.z - 3 }], .6); return false; }
+  if (tick('heal') && m.hp < m.maxHp * .85) { b.heal = rnd(15, 18); b.healing = 2; chat('say', m.name, 'begins to mend its wounds!'); floatText(m, 'Casting heal...', '#7fff7f'); return true; }
+  if (tick('fear')) { b.fear = rnd(15, 18); for (const e of partyIn(m)) if (dist(e, m) < 9) { Cb.buff(e, 'stun', 1.6, { stun: 1 }, m); floatText(e, 'Terrified', '#c8a2ff'); } chat('say', m.name, 'lets out a terrible cry!'); return false; }
+  if (tick('web')) { b.web = rnd(11, 14); const v = nonTank(m, t); if (v) { Cb.buff(v, 'webbed', 4, { root: 1 }, m); floatText(v, 'Webbed', '#e8e8e8'); } return false; }
+  if (tick('knock')) { b.knock = rnd(12, 15); if (t && dist(m, t) < 6) { const a = angTo(m, t); t.x += Math.sin(a) * 6; t.z += Math.cos(a) * 6; t.y = hgt(t.x, t.z); damage(m, t, m.power * .9, 'phys', { noMiss: true }); floatText(t, 'Knocked back', '#ffb03a'); } return false; }
+  return false;
 }
 // shared boss tools
 function bstate(m, o) { return m.bs || (m.bs = { time: 0, wind: null, enraged: false, said: {}, ...o }); }
