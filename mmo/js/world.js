@@ -374,7 +374,7 @@ function generateVale(seed) {
   // places for the map and zone names, and the zone line at the east end of the Kingsroad
   world.places = [{ name: world.names.town, x: town.x, z: town.z, R: town.R + 2, kind: 'town' }, { name: world.names.ruin, x: ruin.x, z: ruin.z, R: ruin.R, kind: 'dungeon' }, ...world.extraPlaces];
   world.towns = [{ name: world.names.town, x: town.x, z: town.z }];
-  { const zx = WH - 14, zz = Math.sin(zx * .02) * 12; world.zoneLines.push({ x: zx, z: zz, r: 9, to: 'coast', label: 'To the Saltreach Coast (levels 11-20)' }); zoneMarker(zx, zz, Math.PI / 2); }
+  { const zx = WH - 14, zz = Math.sin(zx * .02) * 12; world.zoneLines.push({ x: zx, z: zz, r: 9, to: 'coast', label: 'To the Saltreach Coast (levels 10-20)' }); zoneMarker(zx, zz, Math.PI / 2); }
   // minimap base
   const mm = document.createElement('canvas'); mm.width = mm.height = 200;
   const g = mm.getContext('2d'), img = g.createImageData(200, 200), MC = ['#9a9e5a', '#a39866', '#4f6b35', '#5e5966'].map(c => new THREE.Color(c));

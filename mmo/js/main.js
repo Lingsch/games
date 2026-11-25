@@ -1,6 +1,6 @@
 // Boot, the frame loop, the over-the-shoulder camera, hero movement and drawing every character.
 import * as THREE from './three.js';
-import { S, clamp, wrapA, rnd } from './core.js';
+import { S, clamp, wrapA, rnd, X } from './core.js';
 import * as R from './render.js';
 import * as Game from './game.js';
 import * as Cb from './combat.js';
@@ -9,9 +9,16 @@ import { hgt, collide, world, generateWorld, wallHit } from './world.js';
 import { MOBS } from './data.js';
 import { updateWater } from './zones.js';
 import * as Sea from './sea.js';
+// Build 6: the bigger coast, professions, reputation and mounts, guilds and the market, more Vale
+import './coast6.js';
+import './coastq.js';
+import './prof6.js';
+import * as Rep from './rep6.js';
+import * as Social from './social6.js';
+import * as Vale6 from './vale6.js';
 
 UI.init();
-window.__G = { S, Game, Cb, UI, Sea, world }; // a handle for testing from the console
+window.__G = { S, Game, Cb, UI, Sea, world, Rep, Social, X, Vale6 }; // a handle for testing from the console
 generateWorld(7);                 // a backdrop for the title screen
 UI.showTitle();
 document.getElementById('load').remove();
@@ -165,7 +172,7 @@ function loop() {
     moveHero(dt, inp);
     Game.tick(dt);
     camera(dt);
-    dayNight(S.time); ruinGloom(S.hero);
+    dayNight(S.time); for (const f of X.light) f(dt); ruinGloom(S.hero);
     if (world.water !== null) updateWater(now / 1000);
   } else {
     const t = now / 1000;

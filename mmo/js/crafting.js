@@ -1,6 +1,6 @@
 // Build 5: professions. Gather from nodes in the world and from what enemies leave behind; craft at stations in town.
 // One hero can learn every profession. Skills run 1-100; recipes come from the trainers or, the rare ones, from dungeon bosses.
-import { S, TAU, rnd, irnd, pick, chat, floatText, mulberry32, clamp } from './core.js';
+import { S, TAU, rnd, irnd, pick, chat, floatText, mulberry32, clamp, X, WH } from './core.js';
 import { world, hgt, regionAt, depthAt } from './world.js';
 import { CLASSES, MOBS, WTYPE, BASE_NAMES, makeItem, GIVERS } from './data.js';
 import { build, P, T, Box, Cyl, Cone, Sph, Oct, Dod } from './models.js';
@@ -98,12 +98,13 @@ rec('deepwpn', 'smithing', 'Deepforged Weapon (for your class)', 60, { iron: 10,
 rec('slagring', 'jewelcrafting', 'Slagheart Ring', 60, { iron: 4, garnet: 2, moonstone: 1 }, { slot: 'ring', jewel: true, lvl: 12, rar: 3 }, 'mines');
 export const RECIPES = Object.fromEntries(R.map(r => [r.id, r]));
 export const rareFrom = d => R.filter(r => r.rare === d);
+export function addRecipe(id, prof, name, req, mats, out, rare = null) { rec(id, prof, name, req, mats, out, rare); RECIPES[id] = R[R.length - 1]; }
 
 // ---------- state ----------
 export function initState() { S.prof = S.prof || {}; S.mats = S.mats || {}; S.recipes = S.recipes || []; S.cons = S.cons || {}; }
 export const skill = (p, who) => who ? (who.craft && (who.craft.gather === p || who.craft.make === p) ? (who.craft.skill?.[p] ?? 1) : null) : S.prof?.[p] ?? null;      // null: not learned
 // friends can be given one gathering job and one crafting job; they level those skills themselves
-export const GATHER_JOBS = ['mining', 'herbalism', 'skinning'], MAKE_JOBS = ['smithing', 'leatherworking', 'tailoring', 'alchemy', 'cooking', 'enchanting', 'jewelcrafting'];
+export const GATHER_JOBS = ['mining', 'herbalism', 'skinning', 'fishing', 'salvaging'], MAKE_JOBS = ['smithing', 'leatherworking', 'tailoring', 'alchemy', 'cooking', 'enchanting', 'jewelcrafting'];
 export function setJob(fr, kind, p) { fr.craft = fr.craft || { gather: null, make: null, skill: {} }; fr.craft[kind] = p || null; if (p && fr.craft.skill[p] == null) fr.craft.skill[p] = 1; }
 const friendsOn = () => (S.friends || []).filter(fr => S.party.some(p => p.name === fr.name && p.fake?.bff && !p.dead));
 export const friendWith = (kind, p) => friendsOn().find(fr => fr.craft?.[kind] === p);
@@ -111,7 +112,7 @@ export const craftersAt = st => { const out = []; for (const p of STATIONS[st].p
 export const knows = (r, who) => skill(r.prof, who) !== null && (!r.rare || S.recipes.includes(r.id));
 export function learn(p) { initState(); if (S.prof[p] != null) return false; S.prof[p] = 1; chat('sys', null, `You learn ${PROFS[p].name}.`); return true; }
 export function addMat(k, n = 1, quiet) { initState(); S.mats[k] = (S.mats[k] || 0) + n; if (!quiet) chat('loot', null, `You gather ${n} ${MATS[k].name}.`); }
-function skillUp(p, req, who) {
+export function skillUp(p, req, who) {
   const s = skill(p, who); if (s == null || s >= 100) return;
   const ch = s < req + 15 ? 1 : s < req + 30 ? .5 : s < req + 45 ? .2 : 0;
   if (Math.random() < ch) { if (who) who.craft.skill[p] = s + 1; else S.prof[p] = s + 1; const ent = who ? S.party.find(x => x.name === who.name) : S.hero; if (ent) floatText(ent, `${PROFS[p].name} ${s + 1}`, '#8fe8ff'); }
@@ -210,7 +211,7 @@ export const YARD = { x: -15, z: 15 };
 export function decorate(zone, seed) {
   initState();
   const list = NODES[zone]; if (!list) return;
-  const rng = mulberry32(seed + (zone === 'vale' ? 77 : 177)), W = zone === 'vale' ? 400 : 280;
+  const rng = mulberry32(seed + (zone === 'vale' ? 77 : 177)), W = WH - 20;
   const tooClose = (x, z) => (world.towns || []).some(t => Math.hypot(t.x - x, t.z - z) < (t.R || 26) + 10) || (world.town && Math.hypot(world.town.x - x, world.town.z - z) < 40) ||
     world.props.some(p => Math.hypot(p.x - x, p.z - z) < 8) || (world.clearSpots || []).some(c => Math.hypot(c.x - x, c.z - z) < c.r);
   for (const [mat, type, kind, req, regs, n] of list) {
@@ -262,31 +263,41 @@ Object.assign(TALK, {
 // the old tanner in town teaches leather too
 TALK.tanner = TALK.tanner || {};
 
-// gathering: the action button on a node
+// gathering: the action button on a node. Ore and herbs, and from Build 6 fish and wrecks.
+export const NODE_PROF = { ore: 'mining', herb: 'herbalism', fish: 'fishing', wreck: 'salvaging' };
+const NODE_VERB = { ore: 'Mine', herb: 'Pick', fish: 'Fish', wreck: 'Salvage' };
+export const nodeHooks = { roll: {} };          // type -> (node, who) => [[mat, n], ...] and a line of loot text
+const rollNode = (n, who) => {
+  if (nodeHooks.roll[n.type]) return nodeHooks.roll[n.type](n, who);
+  const k = irnd(1, 3), got = [[n.mat, k]];
+  if (n.type === 'ore' && Math.random() < .15) got.push([n.mat === 'copper' ? 'garnet' : n.mat === 'iron' ? 'moonstone' : 'pearl', 1]);
+  return got;
+};
+const lootLine = got => got.map(([k, n]) => `${n} ${MATS[k].name}`).join(' and ');
 export function nodeLabel(p) {
   const n = p.node; if (!n || p.depleted) return null;
-  const prof = n.type === 'ore' ? 'mining' : 'herbalism';
-  return `${n.type === 'ore' ? 'Mine' : 'Pick'}: ${p.name}${skill(prof) === null ? ' (needs ' + PROFS[prof].name + ')' : S.prof[prof] < n.req ? ` (needs ${n.req})` : ''}`;
+  const prof = NODE_PROF[n.type];
+  return `${NODE_VERB[n.type]}: ${p.name}${skill(prof) === null ? ' (needs ' + PROFS[prof].name + ')' : S.prof[prof] < n.req ? ` (needs ${n.req})` : ''}`;
 }
 export function gather(e) {
   initState();
-  const p = e.prop, n = p.node, prof = n.type === 'ore' ? 'mining' : 'herbalism';
-  if (skill(prof) === null) { chat('sys', null, `You need to learn ${PROFS[prof].name}. A trainer in the crafters' quarter can teach you.`); return false; }
+  const p = e.prop, n = p.node, prof = NODE_PROF[n.type];
+  if (skill(prof) === null) { chat('sys', null, `You need to learn ${PROFS[prof].name}. A trainer can teach you.`); return false; }
   if (S.prof[prof] < n.req) { chat('sys', null, `You need ${PROFS[prof].name} ${n.req} to gather this.`); return false; }
-  const k = irnd(1, 3); addMat(n.mat, k, true);
-  let gem = null; if (n.type === 'ore' && Math.random() < .15) { gem = n.mat === 'copper' ? 'garnet' : n.mat === 'iron' ? 'moonstone' : 'pearl'; addMat(gem, 1, true); }
-  chat('loot', null, `You gather ${k} ${MATS[n.mat].name}${gem ? ' and a ' + MATS[gem].name : ''}.`);
+  const got = rollNode(n, null); for (const [k, c] of got) addMat(k, c, true);
+  if (got.length) chat('loot', null, `You gather ${lootLine(got)}.`);
   skillUp(prof, n.req);
-  p.depleted = S.time + 150; e.remove = true; e.dead = true;
+  for (const f of X.gathered || []) f(n.type, got);
+  p.depleted = S.time + (n.regrow || 150); e.remove = true; e.dead = true;
   return true;
 }
 // friends with a gathering job pick from nodes near you when nothing's going on
 export function friendGatherTick(G) {
   const h = S.hero; if (!h || h.dead) return;
   for (const fr of friendsOn()) {
-    const job = fr.craft?.gather; if (job !== 'mining' && job !== 'herbalism') continue;
+    const job = fr.craft?.gather, type = Object.keys(NODE_PROF).find(t => NODE_PROF[t] === job); if (!type) continue;
     const e = S.party.find(p => p.name === fr.name); if (!e || e.gatherTask || e.combatT && S.time - e.combatT < 4) continue;
-    const type = job === 'mining' ? 'ore' : 'herb', sk = skill(job, fr);
+    const sk = skill(job, fr);
     const n = S.ents.find(x => x.prop?.node && !x.remove && x.prop.node.type === type && x.prop.node.req <= sk && Math.hypot(x.x - h.x, x.z - h.z) < 16 && !S.party.some(p => p.gatherTask?.ent === x));
     if (n) e.gatherTask = { ent: n, t: 0, fr };
   }
@@ -294,11 +305,10 @@ export function friendGatherTick(G) {
 // called by the friend's AI once it's standing at the node
 export function friendGather(e) {
   const g = e.gatherTask; e.gatherTask = null; if (!g || g.ent.remove) return;
-  const p = g.ent.prop, n = p.node, k = irnd(1, 3); addMat(n.mat, k, true);
-  let gem = null; if (n.type === 'ore' && Math.random() < .15) { gem = n.mat === 'copper' ? 'garnet' : n.mat === 'iron' ? 'moonstone' : 'pearl'; addMat(gem, 1, true); }
-  chat('loot', null, `${g.fr.name} gathers ${k} ${MATS[n.mat].name}${gem ? ' and a ' + MATS[gem].name : ''}.`);
-  skillUp(n.type === 'ore' ? 'mining' : 'herbalism', n.req, g.fr);
-  p.depleted = S.time + 150; g.ent.remove = true; g.ent.dead = true;
+  const p = g.ent.prop, n = p.node, got = rollNode(n, g.fr); for (const [k, c] of got) addMat(k, c, true);
+  if (got.length) chat('loot', null, `${g.fr.name} gathers ${lootLine(got)}.`);
+  skillUp(NODE_PROF[n.type], n.req, g.fr);
+  p.depleted = S.time + (n.regrow || 150); g.ent.remove = true; g.ent.dead = true;
 }
 // depleted nodes grow back
 export function tick(G) {

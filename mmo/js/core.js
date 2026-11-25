@@ -59,3 +59,12 @@ export function chat(ch, from, text) {
 // floating combat text, drawn by the UI
 export const fct = [];
 export function floatText(e, text, col, big = false) { fct.push({ e, text, col, big, t: 0, ox: (Math.random() - .5) * 30 }); if (fct.length > 40) fct.shift(); }
+
+// Build 6: hooks so new systems plug in without touching the core loop
+// tick(dt) · zone(zone) after a zone is built · kill(mob) on a party kill · turnin(q) · accept(q)
+// book: [key, name, render(body)] · talk: (key, npc, api) => [[label, fn, cls]] · ui: filled by ui.js
+export const X = { tick: [], zone: [], kill: [], turnin: [], accept: [], book: [], talk: [], ui: {}, objText: [], mapPins: [] };
+// the 24-minute day (main.js lights it): night runs from dusk's end to just before dawn
+export const dayPhase = () => ((S.time / 1440) + .3) % 1;
+export const isNight = () => { const p = dayPhase(); return p > .66 && p < .95; };
+X.light = [];

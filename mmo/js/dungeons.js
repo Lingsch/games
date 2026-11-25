@@ -208,7 +208,7 @@ valeHooks.build = a => {
 };
 
 // ---------- instanced dungeons: floor plans made of rooms and tunnels ----------
-function buildInstance(seed, plan) {
+export function buildInstance(seed, plan) {
   const C = 2;                              // the floor grid, in world units
   const inFloor = (x, z) => plan.rects.some(([x0, z0, x1, z1]) => x >= x0 && x <= x1 && z >= z0 && z <= z1);
   // heights: flat floor inside, a rock face rising outside
@@ -239,7 +239,7 @@ function buildInstance(seed, plan) {
   world.town = { x: 0, z: 64, R: 4 }; world.towns = [];
   world.regionNames = [plan.name]; world.regionFn = () => 0;
   world.places = [{ name: plan.name, x: 0, z: 0, R: 80, kind: 'dungeon' }];
-  world.zoneLines.push({ x: 0, z: 70, r: 3.2, to: 'vale', label: 'Back up to the Waste' });
+  world.zoneLines.push({ x: 0, z: 70, r: 3.2, to: plan.exitTo || 'vale', label: plan.exitLabel || 'Back up to the Waste' });
   zoneMarker(0, 71, 0);
   const sp = world.spawns, put = o => sp.push({ ...o, y: hgt(o.x, o.z), alive: null, timer: 0, respawn: 99999, area: 0, dungeon: true });
   for (const [x, z, list, lvl] of plan.packs) list.forEach((mob, k) => put({ x: x + (k % 2) * 2 - 1, z: z + Math.floor(k / 2) * 2, mob, lvl, camp: 'p' + x + z }));

@@ -93,7 +93,7 @@ function questTargets(q) {
 function questTargets0(q) {
   const o = q.obj, out = [];
   if (o.zone && o.zone !== S.zone) return out;
-  if (o.at) { const sp = world.spots?.[o.at]; if (sp && S.zone === 'vale') out.push({ x: sp.x, z: sp.z, r: Math.max(8, o.r || 9) }); return out; }
+  if (o.at) { const sp = world.spots?.[o.at]; if (sp && (q.zone || 'vale') === S.zone) out.push({ x: sp.x, z: sp.z, r: Math.max(8, o.r || 9) }); return out; }
   if (o.ask) {
     const asked = S.quests[q.id]?.asked || [];
     for (const k of o.ask) if (!asked.includes(k)) { const n = S.ents.find(e => !e.dead && !e.remove && (e.giver === k || (k.startsWith('vendor:') && e.vendor === k.slice(7)))); if (n) out.push({ x: n.x, z: n.z }); }

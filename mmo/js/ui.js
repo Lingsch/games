@@ -1,6 +1,6 @@
 // The HUD, touch and keyboard input, nameplates, and every panel.
 import * as THREE from './three.js';
-import { S, WH, TAU, clamp, dist, fct, chat } from './core.js';
+import { S, WH, TAU, clamp, dist, fct, chat, X } from './core.js';
 import { cam } from './render.js';
 import { world, hgt, regionAt, REGION_NAMES } from './world.js';
 import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, WTYPE, BASE_NAMES, SETS } from './data.js';
@@ -132,7 +132,7 @@ function screenOf(e, yOff = 1) { v3.set(e.rx ?? e.x, e.y + yOff * (e.scale || 1)
 function pickAt(x, y) {
   let best = null, bd = 1e9;
   for (const e of S.ents) {
-    if (e.remove || e === S.hero) continue;
+    if (e.remove || e === S.hero || e.mount) continue;
     if (e.dead && !(e.mob && e.loot?.length && e.lootFor === 'party') && !(e.cls && e.inParty)) continue;
     if (dist(e, S.hero) > 70) continue;
     const s = screenOf(e, e.mob ? .9 : 1); if (s.behind) continue;
@@ -356,7 +356,7 @@ function updateFrames() {
   const qn = QUESTS.filter(q => S.quests[q.id]?.state === 'done').length;
   if (qn) $('bookBtn').dataset.n = qn; else delete $('bookBtn').dataset.n;
 }
-const BUFF_ICON = { fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
+const BUFF_ICON = { mounted: '🐎', guildbanner: '🏳️', fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
   focusmind: '🎯', wolfspirit: '🐺', markwild: '🐾', poisonblades: '🗡️', restsong: '🎼', hastesong: '🥁', haste: '⏩', ward: '🛡️', shelter: '🔯', renew: '🌱', rejuv: '🍃', wild: '🌳', regrowth: '🍀',
   bear: '🐻', cat: '🐆', chain: '🤺', untouch: '🌪️', crescendo: '🎺', empower: '💪', unbound: '🌋', treeoflife: '🌲', guard: '🛡️', evade: '💨', shadowstep: '🌑', fists: '👐', crescendo2: '🎶' };
 for (const c in CLASSES) for (const [k, a] of Object.entries(CLASSES[c].abilities)) if (!BUFF_ICON[k]) BUFF_ICON[k] = a.icon;
@@ -376,7 +376,7 @@ function updatePlates(dt) {
   const box = $('plates'), h = S.hero;
   const list = [];
   for (const e of S.ents) {
-    if (e.remove || e === h) continue;
+    if (e.remove || e === h || e.mount) continue;
     const dd = dist(e, h); if (dd > 45) continue;
     if (e.dead && !(e.mob && e.loot?.length && e.lootFor === 'party')) continue;
     if (e.mob && !(e === S.target || (e.engaged && [...e.threat.keys()].some(k => S.party.includes(k))) || e.named || e.boss) && !e.dead) continue;
@@ -450,6 +450,7 @@ export function refreshSheet() { if (!sheetRender) return; const st = $('sheetBo
 export function closeSheet() { $('sheet').classList.add('hide'); sheetRender = null; swapPick = swapPick; }
 const sheetOpen = () => !$('sheet').classList.contains('hide');
 function el(html) { const d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild || d; }
+Object.assign(X.ui, { el, esc, toast, openSheet, refreshSheet, closeSheet, openBook: t => openBook(t), openTalk: n => openTalk(n), refreshKeys: f => refreshKeys(f) });
 function itemHtml(it, cmp) {
   const rc = RARITY[it.rarity].c, s = it.stats;
   const st = Object.entries(s).map(([k, v]) => { const dlt = cmp ? v - (cmp.stats[k] || 0) : 0; return `<span>${{ sta: 'Stamina', pow: 'Power', crit: 'Crit %', arm: 'Armor' }[k]} ${v}${cmp && dlt ? ` <i class="${dlt > 0 ? 'up' : 'down'}">${dlt > 0 ? '+' : ''}${Math.round(dlt * 10) / 10}</i>` : ''}</span>`; }).join('');
@@ -460,10 +461,12 @@ let bookTab = 'char';
 export function openBook(tab) {
   if (tab) bookTab = tab;
   openSheet('Book', body => {
-    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Spells'], ['quests', 'Quests'], ['bags', 'Bags'], ['trade', 'Trade'], ['lore', 'Lore'], ['social', 'Social']].map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
+    const extra = X.book.filter(b => !b[3] || b[3]());
+    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Spells'], ['quests', 'Quests'], ['bags', 'Bags'], ['trade', 'Trade'], ['lore', 'Lore'], ['social', 'Social'], ...extra].map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
     tabs.onclick = ev => { const t = ev.target.dataset.t; if (t) { bookTab = t; refreshSheet(); } };
     body.appendChild(tabs);
-    ({ char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial, trade: tabTrade })[bookTab](body);
+    const fns = { char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial, trade: tabTrade }; for (const b of extra) fns[b[0]] = b[2];
+    (fns[bookTab] || tabChar)(body);
   });
 }
 // ---------- weapons: equip a class's weapon to play it ----------
@@ -631,6 +634,7 @@ const orList = a => a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' or
 function objText(q) {
   const o = q.obj, nm = k => MOBS[k].name, n = o.n || 1;
   if (o.what) return Game.fill(o.what);
+  for (const f of X.objText) { const t = f(q); if (t) return t; }
   if (o.named) return `Defeat ${world.names[o.named] || MOBS[o.named]?.name || o.named}`;
   const where = o.dungeon ? ' in the Ossuary' : o.near === 'waste' ? ' in the Grey Waste' : o.reef ? ' on the Drowned Reef' : '';
   if (o.collect) return `Collect ${n} ${o.item}${n > 1 && !/s$/.test(o.item) && !/silk|ectoplasm|bacon/i.test(o.item) ? 's' : ''} from ${orList([...new Set(o.collect.map(k => plural(nm(k))))])}${where}`;
@@ -757,7 +761,8 @@ function renderConv(body) {
     if (nn?.vendor) list.push(['▸ Show me what you have for sale.', () => { closeSheet(); openVendor(nn); }, 'hl']);
     if (nn?.banker || k === 'banker') list.push(["▸ I'd like to use my vault.", () => { closeSheet(); openBank(); }, 'hl']);
     if (nn?.armory) { list.push(["▸ I'd like to switch weapons.", () => { closeSheet(); openBook('char'); }, 'hl']); if (S.unlockPicks > 0) list.push(['▸ Show me the weapon rack.', () => { closeSheet(); openWeaponPick(); }, 'hl']); }
-    for (const t of (T.topics || [])) if (!t.after || S.quests[t.after]?.state === 'turned') list.push([`▸ ${esc(Game.fill(t.q))}`, () => go({ view: 'topic', t })]);
+    for (const f of X.talk) list.push(...(f(k, nn, { go, close: closeSheet }) || []));
+    for (const t of (T.topics || [])) if ((!t.after || S.quests[t.after]?.state === 'turned') && (!t.when || t.when())) list.push([`▸ ${esc(Game.fill(t.q))}`, () => go({ view: 'topic', t })]);
     list.push(['▸ Farewell.', () => closeSheet()]);
     opts(list);
     return;
@@ -905,7 +910,7 @@ function renderSettings(box, inGame, back) {
     <div class="card" style="text-align:left"><h3>Graphics</h3>${segHtml('gfx')}<p class="dim" style="font-size:12px;margin:0">Low and Medium draw fewer pixels, so the game runs smoother and the phone stays cooler.</p></div>
     <div class="card" style="text-align:left"><h3>Save codes</h3>
       ${info ? `<p style="margin:0 0 6px">Your character: <b>${esc(info.name)}</b>, level ${info.lvl} ${CLASSES[info.cls]?.name || ''}.</p><div class="acts"><button data-a="copy">Copy save code</button></div><textarea id="codeOut" readonly class="hide" style="height:60px"></textarea>` : '<p class="dim" style="margin:0 0 6px">No character saved on this device yet.</p>'}
-      <p style="margin:8px 0 4px">Load a save code:</p><textarea id="codeIn" placeholder="Paste a code starting OSSU1." style="height:60px"></textarea><div class="acts"><button data-a="load">Load</button></div>
+      <p style="margin:8px 0 4px">Load a save code:</p><textarea id="codeIn" placeholder="Paste a code starting OSSU1." style="height:60px"></textarea><div class="acts"><button data-a="paste">📥 Paste</button><button data-a="load">Load</button></div><p class="dim" style="font-size:12px;margin:4px 0 0">Copy the code on one device, send it to yourself, then paste it here on the other. The game saves every few seconds.</p>
       ${info ? `<p style="margin:10px 0 4px">Delete character: this can't be undone. Copy your save code first if you might want them back.</p><div class="acts"><button data-a="del" style="color:#ff8a6a">Delete ${esc(info.name)}</button></div>` : ''}</div>
     ${inGame ? `<div class="card" style="text-align:left"><h3>Controls</h3><p>Left thumb: move. Right thumb: turn the camera, pinch to zoom. Tap someone to target them; tap again to talk, loot or attack. 🎯 cycles enemy targets. Tap the minimap for the full map. On a keyboard: WASD, Q/E turn, Tab, 1-0 - =, F to interact, X to sit, M for the map.</p></div>` : ''}`;
   let delArmed = false;
@@ -915,6 +920,7 @@ function renderSettings(box, inGame, back) {
     const a = b.dataset.a;
     if (a === 'back') back();
     if (a === 'copy') { if (S.running) Game.save(); const code = await Game.makeCode(inGame ? null : true); const t = $('codeOut'); t.value = code; t.classList.remove('hide'); try { await navigator.clipboard.writeText(code); toast('Save code copied'); } catch (e) { t.select(); toast('Select and copy the code'); } }
+    if (a === 'paste') { try { $('codeIn').value = await navigator.clipboard.readText(); } catch (e) { $('codeIn').focus(); toast('Long-press the box to paste'); } }
     if (a === 'load') { try { const sv = await Game.readCode($('codeIn').value); Game.loadSave(sv); closeSheet(); afterStart(); toast('Save loaded'); } catch (e) { toast("That code didn't work"); } }
     if (a === 'del') {
       if (!delArmed) { delArmed = true; b.textContent = `Tap again to delete ${info.name} forever`; return; }
@@ -938,14 +944,20 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 5.2 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 6 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
       <button class="${info ? '' : 'pri'}" data-a="new">New character</button>
-      <button data-a="set">Settings</button></div>`;
-    T.onclick = ev => {
+      <button data-a="set">Settings</button></div>
+      <div class="acts" style="justify-content:center;margin-top:10px">${info ? '<button data-a="copyc">📋 Copy save code</button>' : ''}<button data-a="pastec">📥 Paste save code</button></div>
+      <textarea id="codeBox" class="hide" style="height:70px;width:100%;margin-top:6px" placeholder="Paste a code starting OSSU1."></textarea><div class="acts hide" id="codeGo" style="justify-content:center"><button data-a="loadc">Load this code</button></div>`;
+    const loadCode = async code => { try { const sv = await Game.readCode(code); Game.loadSave(sv); afterStart(); toast('Save loaded'); } catch (e) { toast("That code didn't work"); } };
+    T.onclick = async ev => {
       const a = ev.target.closest('button')?.dataset.a;
+      if (a === 'copyc') { const code = await Game.makeCode(true); try { await navigator.clipboard.writeText(code); toast('Save code copied'); } catch (e) { const t = $('codeBox'); t.classList.remove('hide'); t.value = code; t.select(); toast('Select and copy the code'); } }
+      if (a === 'pastec') { let code = ''; try { code = await navigator.clipboard.readText(); } catch (e) { } if (code && code.trim().startsWith('OSSU1.')) { if (!info || confirmReplace(info)) loadCode(code); } else { $('codeBox').classList.remove('hide'); $('codeBox').value = ''; $('codeGo').classList.remove('hide'); $('codeBox').focus(); } }
+      if (a === 'loadc') loadCode($('codeBox').value);
       if (a === 'cont') { try { Game.loadSave(); afterStart(); } catch (e) { console.error(e); toast('That save could not be loaded'); } }
       if (a === 'new') showTitle('new');
       if (a === 'set') showTitle('set');
@@ -974,6 +986,8 @@ export function showTitle(view = 'home') {
     if (a === 'go' && pick) { const n = ($('heroName').value || 'Hero').trim().slice(0, 14) || 'Hero'; Game.newGame(pick, n, undefined, fcls.slice()); afterStart(); }
   };
 }
+let replArmed = 0;
+function confirmReplace(info) { if (Date.now() - replArmed < 4000) return true; replArmed = Date.now(); toast(`Tap Paste again to replace ${info.name}`); return false; }
 function pickName() { return ['Aldric', 'Wren', 'Corvane', 'Isolde', 'Taran', 'Merrow', 'Halcyon', 'Brisa'][(Math.random() * 8) | 0]; }
 function afterStart() {
   $('title').classList.add('hide'); $('hud').classList.remove('hide');

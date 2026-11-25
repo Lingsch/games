@@ -55,6 +55,8 @@ function coastLand(x, z, N) {
   for (const k in ISLES) { const I = ISLES[k], d = Math.hypot(x - I.x, z - I.z) * (1 + (N.fbm(x * .02 + I.x, z * .02, 2) - .5) * .5); f = Math.max(f, smooth((I.R - d) / 24) * (k === 'reef' ? .55 : 1)); }
   return f;
 }
+// Build 6: the coast grew, and new places hook in here (coast6.js)
+export const coastHooks = { terrain: [], color: [], build: [] };
 registerZone('coast', seed => {
   const rng = mulberry32(seed + 777), N = makeNoise(seed + 777), pick = a => a[(rng() * a.length) | 0];
   world.water = 0;
@@ -73,6 +75,7 @@ registerZone('coast', seed => {
     if (edge > 0 && !westRoad) h += edge * edge * .05;
     H[zi * HN + xi] = h;
   }
+  for (const f of coastHooks.terrain) f({ rng, N });
   const SAND = new THREE.Color('#d8c08a'), GRASS = new THREE.Color('#7a9a4a'), ROCK = new THREE.Color('#7b8094'), SEA = new THREE.Color('#2a6a7a'), DEEP = new THREE.Color('#1a3a5a'), COB = new THREE.Color('#9a8f7c');
   const colorAt = (x, z) => {
     const h = hgt(x, z); let c;
@@ -80,6 +83,7 @@ registerZone('coast', seed => {
     if (h > 7) c.lerp(ROCK, smooth((h - 7) / 4));
     for (const t of [port, fort, vill]) if (Math.hypot(x - t.x, z - t.z) < t.R - 1) c.lerp(COB, .55);
     if (Math.hypot(x - caves.x, z - caves.z) < caves.R) c.lerp(ROCK, .6);
+    for (const f of coastHooks.color) f(x, z, c, h);
     const sh = .9 + N.n2(x * .3, z * .3) * .18; return new THREE.Color(c.r * sh, c.g * sh, c.b * sh);
   };
   groundMesh(colorAt); addWater();
@@ -196,12 +200,14 @@ registerZone('coast', seed => {
   for (let i = 0; i < 8; i++) { const a = i / 8 * TAU, r = 7 + rng() * 6; put2({ x: ISLES.reef.x + Math.cos(a) * r, z: ISLES.reef.z + Math.sin(a) * r, mob: i % 3 === 2 ? 'drownedcaster' : 'drowned', lvl: [17, 19], respawn: 90, area: 5, camp: 'rf' + (i >> 1) }); }
   for (const s of sp) s.y = hgt(s.x, s.z);
   world.huntAreas = [{ area: 0, lvl: [10, 13] }, { area: 1, lvl: [12, 15] }, { area: 2, lvl: [15, 18] }, { area: 5, lvl: [17, 20] }];
+  for (const f of coastHooks.build) f({ rng, N, put2, inTown, near, tryP });
+  for (const s2 of sp) if (s2.y === undefined) s2.y = hgt(s2.x, s2.z);
 
   // ---------- scenery ----------
   const palms = [], rocks = [], tufts = [], tcol = [];
-  for (let n = 0; n < 30000; n++) {
+  for (let n = 0, nN = 30000 * (WH / 300) ** 2; n < nN; n++) {
     const x = (rng() * 2 - 1) * (WH - 10), z = (rng() * 2 - 1) * (WH - 10), h = hgt(x, z);
-    if (h < 1 || inTown({ x, z }) || sp.some(s => Math.hypot(s.x - x, s.z - z) < 2.5) || Math.abs(z) < 5 && x < -200) continue;
+    if (h < 1 || inTown({ x, z }) || sp.some(s => Math.hypot(s.x - x, s.z - z) < 2.5) || Math.abs(z) < 5 && x < -200 || world.clearSpots.some(c => Math.hypot(c.x - x, c.z - z) < c.r)) continue;
     const r = rng();
     if (h < 3.5 && r < .035) palms.push([x, h - .2, z, rng() * 6.3, 0, 0, .8 + rng() * .5]);
     else if (h > 5 && r < .05) rocks.push([x, h - .3, z, rng() * 6.3, 0, 0, .8 + rng() * 1.2]);
