@@ -25,5 +25,15 @@ window.GAMES = [
     blurb: "The same world, a hundred years after the summoner wars. Uncover the Gravelord's plot in the Vale with your two friends, then sail the Saltreach Coast to the Sunken Fleet.",
     facts: ["16 classes", "Levels 1–20", "2 zones"],
     accent: "#63b7c9"
+  },
+  {
+    title: "Oath of the East 3D",
+    folder: "oath3d",
+    version: "v0.39",
+    updated: "November 2026",
+    kind: "Open-world action RPG",
+    blurb: "A Skyrim-style adventure, the same game as the PSP and Windows builds. Walk the Vale, Ravensgate and the Thornwood, clear hand-built dungeons, and keep your oath. Play it sideways on a phone.",
+    facts: ["4 lands", "13 dungeons", "21 quests"],
+    accent: "#a995e6"
   }
 ];
