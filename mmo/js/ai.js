@@ -288,7 +288,7 @@ const BUFF_ID = { seasong: 'seasong', shout: 'shout', iron: 'iron', fort: 'fort'
   bloodpact: 'bloodpact', seal: 'seal', kinship: 'kinship', clarity: 'clarity', hasted: 'haste', insight: 'insight' };
 const buffLeft = (p, id) => p.buffs.find(b => b.id === id)?.t || 0;
 // keep buffs up: long ones out of combat, bard songs all the time
-function upkeepBuffs(e, group, combat = false) {
+export function upkeepBuffs(e, group, combat = false) {
   if (e.casting || e.gcdT > 0) return false;
   if (!combat && inCombat(e)) return false;
   const ab = CLASSES[e.cls].abilities;

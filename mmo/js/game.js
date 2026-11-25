@@ -5,6 +5,7 @@ import * as Sea from './sea.js';
 import { LORE, SCENES, PERKS } from './story.js';
 import './valeplus.js';
 import './dialogue.js';
+import * as Banter from './banter.js';
 import { FAMILIES } from './data.js';
 import * as Cb from './combat.js';
 import * as AI from './ai.js';
@@ -136,7 +137,7 @@ export function campOrder(mode) {
   let cx = 0, cz = 0; for (const m of mates) { cx += m.x; cz += m.z; } cx /= mates.length; cz /= mates.length;
   S.campOrder = { mode, c: { x: cx, z: cz }, r: Math.max(12, ...mates.map(m => Math.hypot(m.x - cx, m.z - cz) + 6)), spot: { x: h.x, z: h.z }, tank, said: {} };
   S.cmd = mode; S.target = null;
-  chat('party', h.name, mode === 'pull' ? `${tank.name}, pull that camp to us. One at a time.` : `${tank.name}, take us through. Clear the camp.`);
+  if (!S.quietCmd) chat('party', h.name, mode === 'pull' ? `${tank.name}, pull that camp to us. One at a time.` : `${tank.name}, take us through. Clear the camp.`);
   chat('party', tank.name, mode === 'pull' ? pick(["On it. Stay here, I'll bring them to you.", 'Pulling. Get ready.']) : pick(['Follow me in!', "Right behind me, everyone. Let's go."]));
 }
 export const campLeft = () => { const o = S.campOrder; return o ? S.ents.filter(m => m.mob && !m.dead && !m.remove && Cb.isEnemy(S.hero, m) && !m.charmed && Math.hypot(m.x - o.c.x, m.z - o.c.z) < o.r) : []; };
@@ -208,7 +209,7 @@ export function inspect(e) {
     if (p.tag === 'headstone') { chat('sys', null, 'You heave the headstone upright.'); e.kind = 'shrine'; e.remove = true; e.dead = true; }
     if (p.tag === 'bell') { chat('sys', null, 'BONNNG. The bell rings out over Hollin... and something in the fields answers.'); R.burst(e.x, e.y + 2, e.z, 30, [1, .9, .5], 3, 1, .6); for (let k = 0; k < 2; k++) { const g = Cb.makeMob('ghost', irnd(4, 5), { x: e.x + rnd(-9, 9), z: e.z + rnd(-9, 9), home: { x: e.x, z: e.z }, add: true }); g.y = hgt(g.x, g.z); Cb.addThreat(g, h, 5); } }
     if (p.tag === 'wardstone') { chat('sys', null, 'The runes flare blue. The stone hums, faintly approving.'); R.burst(e.x, e.y + 1.5, e.z, 30, [.5, .8, 1], 2.5, 1, .6); }
-    if (st.n >= q.obj.n) { st.state = 'done'; chat('sys', null, `${q.name}: done! Return to ${GIVERS[q.turnTo || q.giver].name}.`); }
+    if (st.n >= q.obj.n) { st.state = 'done'; chat('sys', null, `${q.name}: done! Return to ${GIVERS[q.turnTo || q.giver].name}.`); Banter.onQuest('done', q); }
   }
   if (p.lore && !S.lore[p.lore]) { S.lore[p.lore] = true; read = p.lore; chat('sys', null, `Lore found: ${LORE[p.lore].title}. (${Object.keys(S.lore).length}/${Object.keys(LORE).length} · Book → Lore)`); }
   if (p.tag === 'lore' && S.lore[p.lore]) { e.remove = true; e.dead = true; }
@@ -252,9 +253,9 @@ export function playScene(id, onEnd) {
 export function nextShot() {
   const sc = S.scene; if (!sc) return;
   sc.i++; sc.t = 0;
-  if (sc.i >= sc.shots.length) { S.scene = null; if (sc.onEnd) sc.onEnd(); }
+  if (sc.i >= sc.shots.length) { S.scene = null; if (sc.onEnd) sc.onEnd(); Banter.onScene(sc.id); }
 }
-export function endScene() { const sc = S.scene; S.scene = null; if (sc?.onEnd) sc.onEnd(); }
+export function endScene() { const sc = S.scene; S.scene = null; if (sc?.onEnd) sc.onEnd(); if (sc) Banter.onScene(sc.id); }
 // fill {town}, {hero} and friends into story text
 export function fill(t) {
   return String(t).replace(/\{(\w+)\}/g, (m, k) => k === 'hero' ? S.heroName : k === 'cls' ? CLASSES[S.heroCls].name : world.names?.[k] || (k === 'town' ? 'town' : m));
@@ -391,7 +392,7 @@ export function partyCommand(cmd) {
   S.cmd = cmd; S.campOrder = null;
   for (const p of S.party) p.pull = null;
   if (cmd === 'hold') for (const p of S.party) p.holdAt = { x: p.x, z: p.z };
-  chat('party', S.hero.name, { follow: 'Follow me.', assist: 'Assist me — attack my target.', hold: 'Hold here.' }[cmd]);
+  if (!S.quietCmd) chat('party', S.hero.name, { follow: 'Follow me.', assist: 'Assist me, and attack my target.', hold: 'Hold here.' }[cmd]);
 }
 
 // ---------- class switching ----------
@@ -430,6 +431,7 @@ export function acceptQuest(q) {
   chat('sys', null, `Quest accepted: ${q.name}`);
   if (q.rival && S.zone === 'coast') spawnRival(q.rival);
   if (q.sceneOnAccept && !S.scenesSeen[q.sceneOnAccept]) S.pendingScene = q.sceneOnAccept;
+  Banter.onQuest('accept', q);
   save();
 }
 export function turnIn(q, choice = null) {
@@ -445,6 +447,7 @@ export function turnIn(q, choice = null) {
   if (q.lore && !S.lore[q.lore]) { S.lore[q.lore] = true; chat('sys', null, `Lore found: ${LORE[q.lore].title}. (Book → Lore)`); }
   // choices move people around the Vale
   if (['m8', 'h5', 'm13'].includes(q.id)) storyFolk();
+  Banter.onQuest('turnin', q);
   if (q.id === 'm16') S.flags.wickCoast = true;
   save();
   return ch ? ch.reply : null;
@@ -459,7 +462,7 @@ function questProgress(mob, near) {
     if (o.kill && o.kill.includes(mob.mob) && mob.add && mob.mob === 'ghost' && nearOk) hit = true;
     if (o.named && mob.named === o.named) hit = true;
     if (o.collect && o.collect.includes(mob.mob)) { if (Math.random() < o.chance) { hit = true; chat('loot', null, `You loot ${o.item}.`); } }
-    if (hit) { st.n = Math.min(o.n, st.n + 1); floatText(S.hero, `${q.name} ${st.n}/${o.n}`, '#ffd34d'); if (st.n >= o.n) { st.state = 'done'; chat('sys', null, `${q.name}: done! Return to ${GIVERS[turnToOf(q)].name}.`); } }
+    if (hit) { st.n = Math.min(o.n, st.n + 1); floatText(S.hero, `${q.name} ${st.n}/${o.n}`, '#ffd34d'); if (st.n >= o.n) { st.state = 'done'; Banter.onQuest('done', q); chat('sys', null, `${q.name}: done! Return to ${GIVERS[turnToOf(q)].name}.`); } }
   }
 }
 
@@ -520,7 +523,7 @@ Cb.setHooks({
     if (m.spawn) { m.spawn.alive = null; m.spawn.timer = 99999; }
     S.flags.anselYielded = true;
     floatText(m, 'I yield!', '#ffd34d', true); chat('say', m.name, 'Enough! Enough, I yield!');
-    st.n = 1; st.state = 'done'; chat('sys', null, `${q.name}: done! Talk to ${m.name}.`);
+    st.n = 1; st.state = 'done'; chat('sys', null, `${q.name}: done! Talk to ${m.name}.`); Banter.onQuest('done', q);
     m.remove = true; m.dead = true; storyFolk(); save();
     return true;
   },
@@ -637,6 +640,7 @@ export function tick(dt) {
   }
   separate();
   Sea.tick(dt);
+  Banter.tick();
   if (world.levT && S.time >= world.levT) {
     world.levT = 0;
     const L = Cb.makeMob('leviathan', 20, { x: 0, z: -60, home: { x: 0, z: -60 }, named: 'leviathan', boss: true, dungeon: true });
@@ -653,7 +657,7 @@ export function tick(dt) {
       if (!q.obj.at || S.quests[q.id]?.state !== 'active') continue;
       const sp = world.spots[q.obj.at]; if (!sp || S.zone !== 'vale') continue;
       if (Math.hypot(h.x - sp.x, h.z - sp.z) < (q.obj.r || 10)) {
-        S.quests[q.id].state = 'done'; S.quests[q.id].n = 1;
+        S.quests[q.id].state = 'done'; S.quests[q.id].n = 1; if (!q.sceneAt) Banter.onQuest('done', q);
         chat('sys', null, `${q.name}: done! ${q.turnTo ? 'Talk to ' + GIVERS[q.turnTo].name + '.' : 'Return to ' + GIVERS[q.giver].name + '.'}`);
         if (q.sceneAt && !S.scenesSeen[q.sceneAt]) S.pendingScene = q.sceneAt;
         save();
@@ -786,3 +790,6 @@ export async function readCode(code) {
 }
 
 Sea.bindGame({ travel, addToBag, save });
+
+Banter.bindGame({ fill, partyCommand, nextOffer, inspectLabel, forceBuffs: p => AI.upkeepBuffs(p, S.party, false) });
+export const partySay = t => Banter.partySay(t);

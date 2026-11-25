@@ -575,6 +575,54 @@ export const TALK = {
     topics: [{ q: 'Tell me about Gullwick.', a: ["We're a fishing village, which means we're poor, wet and proud of it. The sea gives us everything we have, and every so often it takes something back. Lately, it has been taking more than it gives."] }],
   },
 };
+// shopkeepers, the armory, the guards and the villagers
+Object.assign(TALK, {
+  'vendor:vale': {
+    bio: "Odda Coin-Purse runs the general store in {town}. She sells potions, buys almost anything, and haggles as though her life depends on it, which, given the state of the Vale lately, it might.",
+    greet: ["Welcome, welcome! Potions, supplies and the finest prices in {town}. Well, the only prices in {town}, but they're very fine.", "Back again? You've got the look of someone with a full pack and an empty purse. I can fix one of those for you."],
+    topics: [
+      { q: 'What sells well these days?', a: ["Healing potions, mostly. Everyone in the Vale has been buying them by the crate since the graves started opening. I'd feel bad about it if business weren't quite so good."] },
+      { q: 'Where do you get your stock?', a: ["From the merchants up the Kingsroad, whenever the brigands let them through. Lately that's about one cart in three, so I'm grateful for anything you adventurers bring back to sell."] },
+    ],
+  },
+  'vendor:port': {
+    bio: 'Wexley the Chandler sells rope, lamp oil, potions and anything else a ship might need, along with a few things that a ship definitely should not.',
+    greet: ["Rope, oil, potions or advice? The first three cost money. The advice is free, and it's worth about that much.", 'Ahoy there! What can old Wexley do for you today?'],
+    topics: [{ q: "What's worth buying here?", a: ["Potions, if you're planning to swim out to the reef. The sharks don't care how brave you are, but a good potion will keep you breathing long enough to swim home."] }],
+  },
+  'vendor:fort': {
+    bio: "Quartermaster Bell keeps Fort Halyard's stores in perfect order and counts every potion twice, just to be sure.",
+    greet: ['Supplies are issued in an orderly fashion. Please form a queue of one.', 'Quartermaster Bell. Please state your requirements clearly.'],
+    topics: [{ q: 'Is the fort well supplied?', a: ["Well enough, as long as the ferry keeps running. The marines eat more than you'd think, and they drink considerably more than that."] }],
+  },
+  'vendor:vill': {
+    bio: 'Netmender Briggs mends nets, sells fishing poles, and tells the tallest fish stories in Gullwick.',
+    greet: ["Fishing pole? Bait? A story about the one that got away? I've got all three.", 'Morning! The fish are biting today, and so are the sharks, so mind your toes.'],
+    topics: [{ q: 'Any tips for fishing?', a: ["Stand at the edge of the water, cast your line, and wait for the bobber to dip. When it does, reel in fast. The rare catches, like Black Pearls, sell for a small fortune in Saltmarrow."] }],
+  },
+  armory: {
+    bio: "The armory master keeps the training hall, where you can take up any of the sixteen classes. Every class levels separately, so you never lose progress by switching.",
+    greet: ['Welcome to the armory. Every weapon in here has a story, and most of those stories end badly for somebody.', "Ready to try something different? Every class levels on its own, so you won't lose a thing by switching."],
+    topics: [{ q: 'How does changing class work?', a: ["Pick any class in your book and you'll take up its weapons and training straight away. Each class keeps its own level and its own gear, and your friends will switch roles to fill whatever gap you leave behind."] }],
+  },
+  guard: {
+    bio: 'A member of the guard, keeping the gates safe and the peace mostly intact.',
+    greet: ['Move along, citizen. Nothing to see here, and I intend to keep it that way.', "Stay out of trouble, adventurer. Or if you can't manage that, at least stay out of my district."],
+    topics: [{ q: 'Anything to report?', a: ["It's been quiet so far, which in my experience means something loud is on its way."] }, { q: 'Do you ever get a day off?', a: ["Once, about three years ago. I spent it worrying about who was guarding the gate."] }],
+  },
+  'villager:Hollin Villager': {
+    bio: 'One of the villagers of Little Hollin, getting on with life as best they can.',
+    greet: ['Mind how you go. The ghosts are worse after dark.', "Have you met the Mayor? He'll talk your ear off, but he means well."],
+    topics: [{ q: 'How are you holding up?', a: ["We're managing, thank you. The ghosts mostly keep to themselves, apart from Mrs. Gubbins, and she only really bothers the Mayor."] }, { q: 'Anything good to eat around here?', a: ["Turnips, usually. Well, not this year. Don't ask about the turnips."] }],
+  },
+  'villager:Mrs. Gubbins': {
+    bio: 'Mrs. Gubbins taught school in Little Hollin for fifty years, and death has not made her any less particular about where the furniture goes.',
+    greet: ['Young person, that chair does not belong there, and frankly, neither do you. Sit up straight.'],
+    topics: [{ q: 'Why do you keep moving the furniture?', a: ["Because it is in the wrong place, young person, and it has been in the wrong place for thirty years. Somebody has to keep standards up around here, and clearly nobody living is going to do it."] }],
+  },
+});
+TALK.banker.greet = ["Your vault is exactly where you left it, and so is everything in it. That's rather the point of a bank."];
+TALK.banker.topics = [{ q: 'Is my vault shared between classes?', a: ["It certainly is. Every class you play uses the same vault, so a sword you store as a Bulwark will be waiting for you as an Elementalist, in case you ever want to hit somebody with a sword while setting them on fire."] }];
 // ambient villagers
 export const VILLAGER_LINES = {
   'Mrs. Gubbins': "Young person, that chair does not belong there, and neither do you. Sit up straight.",
