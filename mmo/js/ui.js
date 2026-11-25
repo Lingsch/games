@@ -662,7 +662,7 @@ export function openCraft(st) {
   const S0 = Craft.STATIONS[st]; craftPick = 0;
   openSheet(S0.name, body => {
     const all = Craft.craftersAt(st);
-    if (!all.length) { body.appendChild(el(`<div class="card"><p style="margin:0">Nobody in your group knows ${S0.profs.map(p => Craft.PROFS[p].name).join(' or ')}. A trainer in the yard can teach you, or give a friend the job.</p></div>`)); return; }
+    if (!all.length) { body.appendChild(el(`<div class="card"><p style="margin:0">Nobody in your group knows ${S0.profs.map(p => Craft.PROFS[p].name).join(' or ')}. A trainer in the crafters' quarter can teach you, or give a friend the job.</p></div>`)); return; }
     if (craftPick >= all.length) craftPick = 0;
     if (all.length > 1) { const tabs = el(`<div class="seg">${all.map((c, i) => `<button data-i="${i}" class="${i === craftPick ? 'on' : ''}">${Craft.PROFS[c.p].icon} ${c.who ? esc(c.who.name) : 'You'} · ${Craft.skill(c.p, c.who)}</button>`).join('')}</div>`); tabs.onclick = ev => { const i = ev.target.closest('button')?.dataset.i; if (i !== undefined) { craftPick = +i; refreshSheet(); } }; body.appendChild(tabs); }
     for (const { who, p } of [all[craftPick]]) {
@@ -938,7 +938,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 5.1 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 5.2 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

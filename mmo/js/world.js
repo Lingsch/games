@@ -2,6 +2,7 @@
 // while the shape stays the same: a walled town in the middle, fields around it,
 // a bandit road, the orc wood to the south and the blighted waste with the War Ruin to the north.
 import * as THREE from './three.js';
+import { buildTown } from './town.js';
 import { WH, setWH, TAU, clamp, lerp, smooth, mulberry32, makeNoise } from './core.js';
 import { worldGroup, toon, detailTex, grassTex, uTime, addInstanced, addChunked, propMat, propOutline } from './render.js';
 import * as M from './models.js';
@@ -153,6 +154,7 @@ export function registerZone(name, fn) { zoneGens[name] = fn; }
 // Build 4: the Vale's story places hook in here (js/valeplus.js)
 export const valeHooks = { terrain: null, build: null };
 // build a zone: 'vale' (the starting zone), 'coast', or 'fleet' (the instance)
+let TOWN_SPOTS = null;
 export function generateWorld(seed, zone = 'vale') {
   disposeWorld(); sizeWorld(zone);
   world.mapLabels = []; world.huntAreas = null; world.buoy = null; world.underwater = false; world.cave = null; world.mapBounds = null;
@@ -165,7 +167,7 @@ function generateVale(seed) {
   const townName = pick(TOWN_A) + pick(TOWN_B);
   world.names = { town: townName, fields: townName + ' Fields', road: 'The Kingsroad', wood: pick(['Tuskwood', 'Gnarlwood', 'Bristle Wood']), waste: pick(['The Grey Waste', 'The Hollow Moor', 'The Ashen Reach']),
     ruin: 'The Ossuary of ' + pick(RUIN), captain: pick(CAPT), tusk: pick(TUSK), boss: pick(BOSS) };
-  const town = { x: 0, z: 0, R: 26, base: 2 };
+  const town = { x: 0, z: 0, R: 34, base: 2 };
   const ruin = { x: (rng() - .5) * 60, z: -228, R: 34, base: 0 };
   world.town = town; world.ruin = ruin;
   // heightmap
@@ -194,7 +196,7 @@ function generateVale(seed) {
       for (const [dx, dz] of [[6, 0], [-6, 0], [0, 6], [0, -6]]) c.lerp(REG_COL[regionAt(x + dx * 2, z + dz * 2)], .12);
       if (Math.abs(x) < 3.2 + N.n2(z * .1, 3) * 1.5 && Math.abs(z) < 210) c.lerp(road, .75);       // north-south road
       if (Math.abs(z - Math.sin(x * .02) * 12) < 3 && Math.abs(x) > 20 && Math.abs(x) < WH - 50) c.lerp(road, .7); // east-west road
-      if (Math.hypot(x, z) < town.R - 1) c.lerp(cobble, .6);
+      if (Math.hypot(x, z) < town.R - 1) { c.lerp(cobble, .6); if (Math.abs(x) < 3 || Math.abs(z) < 3 || Math.hypot(x, z) < 10) c.lerp(new THREE.Color('#77716a'), .55); }
       if (Math.hypot(x - ruin.x, z - ruin.z) < ruin.R) c.lerp(new THREE.Color('#5a5560'), .6);
       const out = Math.max(Math.abs(x), Math.abs(z)) - (WH - 18); c.lerp(rock, smooth(out / 12));
       const sh = .9 + N.n2(x * .3, z * .3) * .18;
@@ -220,24 +222,21 @@ function generateVale(seed) {
       const gg = M.gateGeo('human', segLen * 3 + .6); gr.add(new THREE.Mesh(gg, propMat), new THREE.Mesh(gg, propOutline(.04))); tg.add(gr);
     }
     addInstanced(M.towerGeo('human'), propMat, [0, 1, 2, 3].map(k => { const a = Math.PI / 4 + k * Math.PI / 2; return [Math.cos(a) * town.R, 0, Math.sin(a) * town.R, 0, 0, 0, 1]; }), .05, tg);
-    const items = [{ geo: M.keepGeo('human'), m: mat4(-12, 0, -2, .3, .9) }], hg = M.houseGeo('human');
-    const spots = [[8, -12], [14, -6], [16, 4], [10, 13], [-6, 14], [-15, 8], [-17, -9], [-8, -16], [4, -18], [18, -14]];
-    for (const [x, z] of spots) items.push({ geo: hg, m: mat4(x, 0, z, Math.atan2(-x, -z), .9 + rng() * .3) });
+    const items = [];
+    TOWN_SPOTS = buildTown(0, 0, rng, items);
     // well and a bind stone in the square
     items.push({ geo: build([P(T(Cyl(1.1, 1.2, .8, 10), 0, .4), 0, O, '#8f897c'), P(T(Cyl(.9, .9, .1, 10), 0, .78), 0, O, '#3a6ea8'),
-      ...[-1, 1].map(s => P(T(Box(.15, 1.6, .15), s * .9, 1.4), 0, O, '#5a3e28')), P(T(Cone(1.3, .8, 4), 0, 2.4, 0, 0, Math.PI / 4), 0, O, '#7a1f1c')]), m: mat4(3, 0, 3) });
-    items.push({ geo: build([P(T(Box(.9, 2.2, .5), 0, 1.1), 0, O, '#9aa3b4'), P(T(Oct(.25), 0, 2.5), 0, O, '#8dffef', 2.5), P(T(Cyl(1, 1.2, .3, 8), 0, .15), 0, O, '#6d685f')]), m: mat4(-4, 0, 6) });
+      ...[-1, 1].map(s => P(T(Box(.15, 1.6, .15), s * .9, 1.4), 0, O, '#5a3e28')), P(T(Cone(1.3, .8, 4), 0, 2.4, 0, 0, Math.PI / 4), 0, O, '#7a1f1c')]), m: mat4(4, 0, 3) });
+    addWall(4 - 1.1, 3, 4 + 1.1, 3, 1.1, true);
+    items.push({ geo: build([P(T(Box(.9, 2.2, .5), 0, 1.1), 0, O, '#9aa3b4'), P(T(Oct(.25), 0, 2.5), 0, O, '#8dffef', 2.5), P(T(Cyl(1, 1.2, .3, 8), 0, .15), 0, O, '#6d685f')]), m: mat4(-4, 0, 4) });
     // stalls
     const stall = (cl) => build([P(T(Box(2.4, .9, 1), 0, .45), 0, O, '#6b4a2e'), ...[-1, 1].flatMap(s => [-1, 1].map(t => P(T(Box(.1, 2, .1), s * 1.1, 1, t * .45), 0, O, '#4a3322'))), P(T(Box(2.7, .08, 1.4), 0, 2, 0, .2), 0, O, cl)]);
-    items.push({ geo: stall('#c0392b'), m: mat4(8, 0, 6, -.8) }, { geo: stall('#2e5a9e'), m: mat4(-9, 0, 2, .9) }, { geo: stall('#d8b24a'), m: mat4(9, 0, -3, -1.6) });
+    items.push({ geo: stall('#c0392b'), m: mat4(8.5, 0, 5.6, 0) }, { geo: stall('#2e5a9e'), m: mat4(-8, 0, -3.8, Math.PI) }, { geo: stall('#d8b24a'), m: mat4(7.5, 0, -4.2, Math.PI) });
     meshWithOutline(mergeBuilt(items), .05, tg);
-    // collision for the keep and houses
-    const box = (x, z, r) => { addWall(x - r, z, x + r, z, r * .8, true); };
-    box(-12, -2, 3); for (const [x, z] of spots) box(x, z, 1.6);
   }
   // npc spots in town (game.js creates the people)
   town.npcs = {
-    bind: { x: -4, z: 7.5 }, armory: { x: -10, z: 3.5 }, vendor: { x: 8.5, z: 7.4 }, quest1: { x: 2, z: -6 }, quest2: { x: -6, z: -8 }, quest3: { x: 10, z: -4 },
+    ...TOWN_SPOTS,
     guards: [[0, town.R - 3], [3, town.R - 3], [0, -town.R + 3], [3, -town.R + 3], [-town.R + 5, -6], [town.R - 5, 6]],
   };
 

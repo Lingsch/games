@@ -206,7 +206,7 @@ const NODES = {
   vale: [['copper', 'ore', 'orecopper', 1, [0, 1], 22], ['iron', 'ore', 'oreiron', 40, [2, 3], 18], ['meadowsweet', 'herb', 'herbmeadow', 1, [0, 1], 22], ['graveroot', 'herb', 'herbgrave', 40, [2, 3], 18]],
   coast: [['silver', 'ore', 'oresilver', 75, null, 18], ['iron', 'ore', 'oreiron', 40, null, 8], ['kelpbloom', 'herb', 'herbkelp', 75, null, 20]],
 };
-export const YARD = { x: -34, z: 44 };
+export const YARD = { x: -15, z: 15 };
 export function decorate(zone, seed) {
   initState();
   const list = NODES[zone]; if (!list) return;
@@ -224,12 +224,12 @@ export function decorate(zone, seed) {
     }
   }
   if (zone === 'vale') {
-    // the crafters' yard, south-west of the town's south gate
-    const Y = YARD, st = [['forge', -9, -2], ['tanrack', -6, -8], ['loom', 0, -10], ['alchemy', 7, -8], ['cookfire', 10, -1], ['enchant', -7, 6]];
+    // the crafters' quarter, inside the walls in the south-west of town
+    const Y = YARD, st = [['forge', -5, -3.5], ['tanrack', -6.5, 2], ['loom', -2, 6], ['alchemy', 3.5, 5.5], ['cookfire', 5.5, -.5], ['enchant', 1.5, -5.5]];
     for (const [k, dx, dz] of st) world.props.push({ id: 's' + k, kind: k, tag: 'station', station: k, name: STATIONS[k].name, x: Y.x + dx, z: Y.z + dz, yaw: Math.atan2(-dx, -dz), scale: 1 });
-    world.storyNpcs.push({ key: 'smith', x: Y.x - 13, z: Y.z + 2, yaw: Math.PI / 2 }, { key: 'weaver', x: Y.x + 3, z: Y.z - 14, yaw: 0 }, { key: 'herbalist', x: Y.x + 11, z: Y.z - 11, yaw: -Math.PI / 4 },
-      { key: 'cook', x: Y.x + 14, z: Y.z + 2, yaw: -Math.PI / 2 }, { key: 'tanner2', x: Y.x - 9, z: Y.z - 13, yaw: Math.PI / 4 });
-    world.extraPlaces.push({ name: "The Crafters' Yard", x: Y.x, z: Y.z, R: 10, kind: 'site' });
+    world.storyNpcs.push({ key: 'smith', x: Y.x - 2.8, z: Y.z - 2.2, yaw: Math.PI / 4 }, { key: 'weaver', x: Y.x - .6, z: Y.z + 3.2, yaw: Math.PI }, { key: 'herbalist', x: Y.x + 2.2, z: Y.z + 2.6, yaw: Math.PI * .8 },
+      { key: 'cook', x: Y.x + 3, z: Y.z - .6, yaw: -Math.PI / 2 }, { key: 'tanner2', x: Y.x - 3.8, z: Y.z + 1, yaw: Math.PI / 2 });
+    world.extraPlaces.push({ name: "The Crafters' Quarter", x: Y.x, z: Y.z, R: 8, kind: 'site' });
     // nothing hostile spawns on top of the yard
     world.spawns = world.spawns.filter(sp => Math.hypot(sp.x - Y.x, sp.z - Y.z) > 26);
   }
@@ -271,7 +271,7 @@ export function nodeLabel(p) {
 export function gather(e) {
   initState();
   const p = e.prop, n = p.node, prof = n.type === 'ore' ? 'mining' : 'herbalism';
-  if (skill(prof) === null) { chat('sys', null, `You need to learn ${PROFS[prof].name}. A trainer in the crafters' yard can teach you.`); return false; }
+  if (skill(prof) === null) { chat('sys', null, `You need to learn ${PROFS[prof].name}. A trainer in the crafters' quarter can teach you.`); return false; }
   if (S.prof[prof] < n.req) { chat('sys', null, `You need ${PROFS[prof].name} ${n.req} to gather this.`); return false; }
   const k = irnd(1, 3); addMat(n.mat, k, true);
   let gem = null; if (n.type === 'ore' && Math.random() < .15) { gem = n.mat === 'copper' ? 'garnet' : n.mat === 'iron' ? 'moonstone' : 'pearl'; addMat(gem, 1, true); }

@@ -102,7 +102,7 @@ export function addThreat(mob, src, amt) {
 function engage(mob, src) {
   mob.engaged = true;
   const M = MOBS[mob.mob];
-  if (mob.camp && M.social) for (const o of S.ents) if (o !== mob && !o.dead && o.camp === mob.camp && !o.engaged && dist(o, mob) < M.social + 10) { o.threat.set(src, Math.max(30, mob.threat.get(src) || 0)); o.combatT = S.time; o.engaged = true; }
+  if (mob.camp && M.social) for (const o of S.ents) if (o !== mob && !o.dead && o.camp === mob.camp && !o.engaged && dist(o, mob) < M.social + 10) { o.threat.set(src, 1); o.combatT = S.time; o.engaged = true; }
 }
 export function topThreat(mob) {
   let best = null, bv = -1;
@@ -200,7 +200,7 @@ export function heal(src, tgt, amt, quiet = false) {
   // healing makes every mob fighting the healed one angry at the healer
   if (real > 0) {
     const mobs = S.ents.filter(e => e.mob && !e.dead && e.engaged && (e.threat.has(tgt) || e.target === tgt));
-    for (const m of mobs) addThreat(m, src, real * .4 / mobs.length);
+    for (const m of mobs) addThreat(m, src, real * .5 / mobs.length);
     if (mobs.length) src.combatT = S.time;
   }
   return real;

@@ -13,7 +13,7 @@ const O = [0, 0, 0];
 addKinds({ wagon: [build([P(T(Box(2.2, .6, 4), 0, .9), 0, O, '#6b4a2e'), ...[-1, 1].flatMap(s => [-1.3, 1.3].map(z => P(T(Cyl(.55, .55, .15, 10), s * 1.15, .55, z, 0, 0, Math.PI / 2), 0, O, '#4a3322'))),
   P(T(Box(2.1, .9, 1.6), 0, 1.6, -.8, .2), 0, O, '#c8b890'), P(T(Box(.8, .5, .6), .5, 1.45, 1.2, 0, .4), 0, O, '#8a6a3a'), P(T(Box(.6, .4, .5), -.6, .4, 2.6, 0, .9, .4), 0, O, '#8a6a3a')]), [0, 0, 0, 0], 0, .04] });
 
-export const MSPOTS = { wagon: { x: -80, z: 2 }, shrine: { x: -95, z: -24 }, pond: { x: -206, z: 84 }, jail: { x: 15, z: -14 } };
+export const MSPOTS = { wagon: { x: -80, z: 2 }, shrine: { x: -95, z: -24 }, pond: { x: -206, z: 84 }, jail: { x: 9.9, z: -22.8 } };
 const prevB = valeHooks.build;
 valeHooks.build = a => {
   if (prevB) prevB(a);
@@ -41,7 +41,7 @@ valeHooks.build = a => {
   npc('rennick', Pd.x + 18, Pd.z - 14, { yaw: Math.PI, unless: ['case2', 'rennick'] });
   npc('linus', Pd.x + 6, Pd.z + 8, { yaw: Math.PI, when: ['case1', '!linus'], unless: ['case2', 'linus'] });
   // the cells behind the Watch house in town: whoever you accused waits here
-  for (const [k, flag, v, dx] of [['jodda', 'case1', 'odda', 0], ['jhask', 'case1', 'hask', 2.2], ['jlinus', 'case1', 'linus', 4.4], ['jlinus2', 'case2', 'linus', 4.4], ['jgarrow', 'case2', 'garrow', 6.6], ['jrennick', 'case2', 'rennick', 8.8]])
+  for (const [k, flag, v, dx] of [['jodda', 'case1', 'odda', 0], ['jhask', 'case1', 'hask', 2.4], ['jlinus', 'case1', 'linus', 4.8], ['jlinus2', 'case2', 'linus', 7.2], ['jgarrow', 'case2', 'garrow', 7.2], ['jrennick', 'case2', 'rennick', 7.2]])
     npc(k, J.x + dx, J.z, { yaw: Math.PI, when: [flag, v] });
 };
 

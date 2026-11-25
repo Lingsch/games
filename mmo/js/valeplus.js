@@ -50,7 +50,7 @@ valeHooks.build = ({ rng, town, ruin, put }) => {
   }
   // the drag marks and the law in town
   lore('drag', S.drag.x + 1.5, S.drag.z);
-  { const b = town.npcs.bind; lore('law', town.x + b.x + 2.8, town.z + b.z); const v = town.npcs.vendor; npc('banker', town.x + v.x - 3, town.z + v.z + 1.5, { yaw: Math.PI }); }
+  { const b = town.npcs.bind; lore('law', town.x + b.x + 2.8, town.z + b.z); const bk = town.npcs.banker; npc('banker', town.x + bk.x, town.z + bk.z, { yaw: 0 }); }
   lore('dedication', S.ruin.x + 4, S.ruin.z);
   { const c = world.camps.find(c => c.kind === 'orc'); if (c) lore('warchant', c.x + 6, c.z + 3); const b = world.camps.find(c => c.kind === 'bandit'); if (b) lore('bounty', b.x + 6, b.z + 3); }
 
