@@ -62,7 +62,13 @@ export function mobAI(m, dt) {
   m.attackT = (m.attackT || 0) - dt * Math.max(.3, 1 + Cb.buffSum(m, 'haste'));
   if (m.forcedT > 0) m.forcedT -= dt;
   if (m.evading) {
-    if (goTo(m, m.home.x, m.home.z, dt, .5, 1.6)) { m.evading = false; m.hp = m.maxHp; m.threat.clear(); m.engaged = false; m.tagged = null; m.buffs = []; Cb.recalc(m); }
+    // run home; if something is in the way and it can't get there in time, it simply resets at home
+    m.evadeT = (m.evadeT || 0) + dt;
+    const home = goTo(m, m.home.x, m.home.z, dt, 1.2, 1.6) || Math.hypot(m.x - m.home.x, m.z - m.home.z) < 2;
+    if (home || m.evadeT > 7) {
+      if (!home) { m.x = m.home.x; m.z = m.home.z; m.y = hgt(m.x, m.z); m.rx = m.x; m.rz = m.z; }
+      m.evading = false; m.evadeT = 0; m.hp = m.maxHp; m.threat.clear(); m.engaged = false; m.tagged = null; m.buffs = []; m.target = null; m.fled = false; Cb.recalc(m);
+    }
     m.hp = Math.min(m.maxHp, m.hp + m.maxHp * .3 * dt);
     return;
   }
@@ -549,6 +555,19 @@ export function companionAI(e, dt) {
     if (p.phase === 'back') { if (dist(e, p.spot) < 4 || goTo(e, p.spot.x, p.spot.z, dt, 3)) e.pull = null; else return; }
   }
   const ord = S.campOrder;
+  if (!inFight && ord && ord.mode === 'hunt' && ord.tank === e) {
+    const t = ord.next && !ord.next.dead && !ord.next.remove ? ord.next : null;
+    if (!t) {
+      if (ord.rest) { stopMove(e, dt); rest(e); return; }
+      if (ord.wait) { if (Math.hypot(e.x - ord.wait.x, e.z - ord.wait.z) > 5) { e.sit = false; goTo(e, ord.wait.x, ord.wait.z, dt, 4, .8); } else { stopMove(e, dt); rest(e); } return; }
+      stopMove(e, dt); return;
+    }
+    e.sit = false;
+    if (dist(e, t) > 3.2) { goTo(e, t.x, t.z, dt, 2.4, .85); return; }
+    face(e, t, dt); e.target = t;
+    if (!tryUse(e, PULL_AB[e.cls], t)) { Cb.addThreat(t, e, 10); e.anim.atk = 1; }
+    return;
+  }
   if (!inFight && ord && ord.mode === 'clear' && ord.tank === e) {
     const left = S.ents.filter(m => m.mob && !m.dead && !m.remove && isEnemy(e, m) && !m.charmed && Math.hypot(m.x - ord.c.x, m.z - ord.c.z) < ord.r).sort((a, b) => dist(a, e) - dist(b, e));
     const t = left[0];

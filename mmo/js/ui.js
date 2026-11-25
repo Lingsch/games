@@ -3,13 +3,15 @@ import * as THREE from './three.js';
 import { S, WH, TAU, clamp, dist, fct, chat } from './core.js';
 import { cam } from './render.js';
 import { world, hgt, regionAt, REGION_NAMES } from './world.js';
-import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName } from './data.js';
+import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, WTYPE, BASE_NAMES } from './data.js';
 import * as Sea from './sea.js';
 import { LORE, PERKS } from './story.js';
 import { TALK, VILLAGER_LINES, MOB_LORE } from './dialogue.js';
 import { QUICK } from './banter.js';
 import * as Cb from './combat.js';
 import * as Game from './game.js';
+import * as MapUI from './mapui.js';
+import { SET, OPTS, setOpt, apply as applySettings } from './settings.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -131,7 +133,7 @@ function pickAt(x, y) {
     if (e.dead && !(e.mob && e.loot?.length && e.lootFor === 'party') && !(e.cls && e.inParty)) continue;
     if (dist(e, S.hero) > 70) continue;
     const s = screenOf(e, e.mob ? .9 : 1); if (s.behind) continue;
-    const dd = Math.hypot(s.x - x, s.y - y), lim = 56 * Math.max(1, e.scale || 1) + 18 * (e.boss ? 2 : 0);
+    const dd = Math.hypot(s.x - x, s.y - y), lim = 56 * SET.tapSens * Math.max(1, e.scale || 1) + 18 * (e.boss ? 2 : 0);
     if (dd < lim && dd + dist(e, S.hero) * .5 < bd) { bd = dd + dist(e, S.hero) * .5; best = e; }
   }
   return best;
@@ -139,13 +141,13 @@ function pickAt(x, y) {
 const touches = new Map();
 let joyId = null, joyO = null;
 function onDown(ev) {
-  if (ev.target.closest('button,#sheet,#title,.pf,#mini,#death,#tgt')) return;
+  if (ev.target.closest('button,#sheet,#title,.pf,#mini,#death,#tgt,#bigmap,#huntTag,#track .go')) return;
   const p = { id: ev.pointerId, x0: ev.clientX, y0: ev.clientY, x: ev.clientX, y: ev.clientY, t: performance.now(), moved: 0 };
   // the joystick lives in the bottom-left corner: only touches that start on it move you; everywhere else is for tapping and turning
   const j = $('joy'), r = j.getBoundingClientRect(), jc = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
   if (joyId === null && Math.hypot(ev.clientX - jc.x, ev.clientY - jc.y) < r.width * .75) {
     joyId = ev.pointerId; joyO = jc; j.classList.add('on'); p.joy = true;
-    const jx = clamp(ev.clientX - jc.x, -46, 46), jy = clamp(ev.clientY - jc.y, -46, 46); j.firstChild.style.transform = `translate(${jx}px,${jy}px)`; input.mx = jx / 46; input.mz = jy / 46;
+    const jm = 46 * SET.joySize, jx = clamp(ev.clientX - jc.x, -jm, jm), jy = clamp(ev.clientY - jc.y, -jm, jm); j.firstChild.style.transform = `translate(${jx}px,${jy}px)`; input.mx = jx / jm; input.mz = jy / jm;
   }
   touches.set(ev.pointerId, p);
 }
@@ -153,7 +155,7 @@ function onMove(ev) {
   const p = touches.get(ev.pointerId); if (!p) return;
   const dx = ev.clientX - p.x, dy = ev.clientY - p.y; p.x = ev.clientX; p.y = ev.clientY; p.moved += Math.abs(dx) + Math.abs(dy);
   if (p.joy) {
-    let jx = ev.clientX - joyO.x, jy = ev.clientY - joyO.y; const l = Math.hypot(jx, jy), m = 46;
+    let jx = ev.clientX - joyO.x, jy = ev.clientY - joyO.y; const l = Math.hypot(jx, jy), m = 46 * SET.joySize;
     if (l > m) { jx *= m / l; jy *= m / l; }
     $('joy').firstChild.style.transform = `translate(${jx}px,${jy}px)`;
     input.mx = jx / m; input.mz = jy / m;
@@ -167,7 +169,7 @@ function onMove(ev) {
     input.pinch = dd; return;
   }
   if (p.moved > 14 && (ev.pointerType !== 'mouse' || ev.buttons)) {
-    S.camYaw -= dx * .006; S.camPitch = clamp(S.camPitch + dy * .004, -.15, 1.15); input.lastDragT = S.time;
+    S.camYaw -= dx * .006 * SET.camSpeed; S.camPitch = clamp(S.camPitch + dy * .004 * SET.camSpeed, -.15, 1.15); input.lastDragT = S.time;
   }
 }
 function onUp(ev) {
@@ -175,7 +177,7 @@ function onUp(ev) {
   if ([...touches.values()].filter(o => !o.joy).length < 2) input.pinch = null;
   if (!p) return;
   if (p.joy) { joyId = null; input.mx = input.mz = 0; $('joy').classList.remove('on'); $('joy').firstChild.style.transform = ''; return; }
-  if (p.moved < 18 && performance.now() - p.t < 550) {
+  if (p.moved < 18 * SET.tapSens && performance.now() - p.t < 550 * Math.max(1, SET.tapSens)) {
     const e = pickAt(ev.clientX, ev.clientY);
     if (e) tapEntity(e); else if (S.target) { S.target = null; }
   }
@@ -198,6 +200,7 @@ function onKey(ev, down) {
   const map = '1234567890-='; const i = map.indexOf(k); if (i >= 0 && S.running && !sheetOpen()) pressKey(i);
   if (k === 'escape') { if (!$('sheet').classList.contains('hide')) closeSheet(); else S.target = null; }
   if (k === 'f') doAct();
+  if (k === 'm') { if (MapUI.isOpen()) MapUI.closeBig(); else openMap(); }
   if (k === 'b') openBook('char'); if (k === 'l') openBook('quests'); if (k === 'o') openBook('social'); if (k === 'p') openBook('spells');
   if (k === 'x') toggleSit();
 }
@@ -248,18 +251,24 @@ function interact(n) {
 // ---------- frames ----------
 const partyEls = [];
 function frameRes(e) { return e.resType === 'mana' ? `${Math.round(e.res)} / ${e.resMax}` : `${Math.round(e.res)} ${e.resType}`; }
+// buff and debuff icons: debuffs get a red rim, long buffs about to run out fade and pulse
+const isDebuff = b => b.src && (b.src.mob || b.src.team === 'enemy') && !b.src.charmed;
+function buffRow(u, max) {
+  return u.buffs.filter(b => (b.dur > 1 || isDebuff(b)) && !b.id.includes(':') && b.id !== 'wardlock').slice(0, max)
+    .map(b => `<span class="${isDebuff(b) ? 'deb' : ''}${b.dur >= 60 && b.t < 30 ? ' low' : ''}">${BUFF_ICON[b.id] || '•'}${b.data.stacks ? b.data.stacks : ''}</span>`).join('');
+}
 function updateFrames() {
   const h = S.hero;
   $('meName').textContent = h.name; $('meLvl').textContent = `${h.lvl} ${CLASSES[h.cls].name}`;
   $('meHp').style.width = pct(h.hp, h.maxHp) + '%'; $('meHpT').textContent = `${Math.ceil(h.hp)} / ${h.maxHp}`;
   $('meRes').style.width = pct(h.res, h.resMax) + '%'; $('meRes').style.background = RES_COL[h.resType]; $('meResT').textContent = frameRes(h);
-  const bs = h.buffs.filter(b => b.dur > 1 && !b.id.includes(':') && b.id !== 'wardlock').slice(0, 12).map(b => `<span title="${b.id}">${BUFF_ICON[b.id] || '•'}${b.data.stacks ? b.data.stacks : ''}</span>`).join('') + (S.corpse ? '<span>🪦</span>' : '');
+  const bs = buffRow(h, 12) + (S.corpse ? '<span>🪦</span>' : '');
   if ($('buffs')._s !== bs) { $('buffs').innerHTML = bs; $('buffs')._s = bs; }
   // party
   const box = $('party'), mates = S.party.filter(p => !p.isHero);
   while (partyEls.length < mates.length) {
     const d = document.createElement('div'); d.className = 'pf plate';
-    d.innerHTML = '<div class="fname"><b></b><small></small></div><div class="bar"><i style="background:var(--hp)"></i></div><div class="bar thin"><i></i></div><span class="cast"></span>';
+    d.innerHTML = '<div class="fname"><b></b><small></small></div><div class="bar"><i style="background:var(--hp)"></i></div><div class="bar thin"><i></i></div><span class="cast"></span><div class="pbuffs"></div>';
     d.addEventListener('click', () => { const p = d._p; if (p) setTarget(p); });
     box.appendChild(d); partyEls.push(d);
   }
@@ -270,11 +279,12 @@ function updateFrames() {
     d.querySelectorAll('i')[0].style.width = pct(p.hp, p.maxHp) + '%'; const ri = d.querySelectorAll('i')[1]; ri.style.width = pct(p.res, p.resMax) + '%'; ri.style.background = RES_COL[p.resType];
     d.classList.toggle('dead', p.dead); d.classList.toggle('sel', S.target === p);
     d.querySelector('.cast').textContent = p.dead ? '💀' : p.casting ? '✦' : p.sit ? 'z' : '';
+    { const pb = d.querySelector('.pbuffs'), bh = p.dead ? '' : buffRow(p, 10); if (pb._s !== bh) { pb.innerHTML = bh; pb._s = bh; } }
     const aggro = !p.dead && S.ents.some(m => m.mob && !m.dead && m.target === p && m.engaged) && roleOf(p) !== 'tank';
     if (aggro && !d.querySelector('.aggro')) { const a = document.createElement('span'); a.className = 'aggro'; d.appendChild(a); } else if (!aggro) d.querySelector('.aggro')?.remove();
   });
   let cmds = $('cmds');
-  if (mates.length && !cmds) { cmds = document.createElement('div'); cmds.id = 'cmds'; cmds.innerHTML = ['follow', 'assist', 'hold', 'pull', 'clear'].map(c => `<button data-c="${c}">${{ follow: 'Follow', assist: 'Assist', hold: 'Hold', pull: 'Pull', clear: 'Clear' }[c]}</button>`).join('') + '<button data-c="say" class="say1">💬</button>'; cmds.onclick = ev => { const c = ev.target.closest('button')?.dataset.c; if (c === 'say') openSay(); else if (c) Game.partyCommand(c); }; box.appendChild(cmds); }
+  if (mates.length && !cmds) { cmds = document.createElement('div'); cmds.id = 'cmds'; cmds.innerHTML = ['follow', 'assist', 'hold', 'pull', 'clear', 'hunt'].map(c => `<button data-c="${c}">${{ follow: 'Follow', assist: 'Assist', hold: 'Hold', pull: 'Pull', clear: 'Clear', hunt: 'Hunt' }[c]}</button>`).join('') + '<button data-c="say" class="say1">💬</button>'; cmds.onclick = ev => { const c = ev.target.closest('button')?.dataset.c; if (c === 'say') openSay(); else if (c) Game.partyCommand(c); }; box.appendChild(cmds); }
   if (cmds) { cmds.style.display = mates.length ? '' : 'none'; box.appendChild(cmds); cmds.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.c === S.cmd)); }
   // target
   const t = S.target, tf = $('tgt');
@@ -326,9 +336,9 @@ function updateFrames() {
   // quest tracker under the target frame
   const tr = $('track'), r = tf.classList.contains('hide') ? null : tf.getBoundingClientRect();
   tr.style.top = (r && (innerWidth / innerHeight < 4 / 3) ? r.bottom + 6 : (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--st')) || 6) + 112) + 'px';
-  if (innerWidth / innerHeight >= 4 / 3) tr.style.top = '120px';
+  { const mb = $('mapbox').getBoundingClientRect().bottom + 6; if (innerWidth / innerHeight >= 4 / 3 || parseFloat(tr.style.top) < mb) tr.style.top = mb + 'px'; }
   const qs = QUESTS.filter(q => S.quests[q.id] && S.quests[q.id].state !== 'turned').sort((a, b) => (b.story ? 1 : 0) - (a.story ? 1 : 0)).slice(0, 3);
-  const tq = qs.map(q => { const st = S.quests[q.id]; return `<div>${esc(q.name)}: <b>${st.state === 'done' ? (q.obj.talk || q.obj.at ? 'talk to ' + esc(GIVERS[Game.turnToOf(q)].name.split(' ').pop()) : 'done ✓') : q.obj.at ? 'travel' : st.n + '/' + q.obj.n}</b></div>`; }).join('');
+  const tq = qs.map(q => { const st = S.quests[q.id]; return st.state === 'done' ? `<div class="go" data-q="${q.id}">${esc(q.name)}: <b>⤴ ${esc(GIVERS[Game.turnToOf(q)].name.split(' ').pop())}</b></div>` : `<div>${esc(q.name)}: <b>${q.obj.at ? 'travel' : st.n + '/' + q.obj.n}</b></div>`; }).join('');
   if (tr._s !== tq) { tr.innerHTML = tq; tr._s = tq; }
   // xp, cast bar
   $('xpFill').style.width = h.lvl >= MAX_LVL ? '100%' : pct(h.xp, xpNeed(h.lvl)) + '%';
@@ -419,32 +429,12 @@ export function questMark(k) {
 }
 function updateMini() {
   if (S.frame % 3) return;
-  const c = $('mini'), g = c.getContext('2d'), h = S.hero, W = c.width, span = 140, sc = W / span;
-  g.save(); g.clearRect(0, 0, W, W); g.beginPath(); g.arc(W / 2, W / 2, W / 2, 0, TAU); g.clip();
-  g.translate(W / 2, W / 2); g.rotate(-S.camYaw + Math.PI); g.translate(-W / 2, -W / 2);
-  const mm = world.minimap, k = mm.width / (2 * WH);
-  g.drawImage(mm, (h.x + WH - span / 2) * k, (h.z + WH - span / 2) * k, span * k, span * k, 0, 0, W, W);
-  const P = (x, z) => [(x - h.x) * sc + W / 2, (z - h.z) * sc + W / 2];
-  const dot = (x, z, r, col) => { const [px, pz] = P(x, z); g.fillStyle = col; g.beginPath(); g.arc(px, pz, r, 0, TAU); g.fill(); };
-  for (const e of S.ents) {
-    if (e.dead || e.remove || Math.abs(e.x - h.x) > span / 2 || Math.abs(e.z - h.z) > span / 2) continue;
-    if (e.mob) { if (e.engaged || e === S.target) dot(e.x, e.z, e.boss ? 6 : 3.5, e === S.target ? '#fff' : '#ff4a3a'); else if (e.named || e.boss) dot(e.x, e.z, 4, '#ff9a3a'); }
-    else if (e.inParty && !e.isHero) dot(e.x, e.z, 4, '#5fd3ff');
-    else if (e.fake) dot(e.x, e.z, 2.5, '#d8d8ff');
-    else if (e.giver) { const qs = Game.questsFor(e.giver); const mk = questMark(e.giver); if (mk) { const [px, pz] = P(e.x, e.z); g.fillStyle = '#ffd34d'; g.font = 'bold 18px Cinzel'; g.textAlign = 'center'; g.fillText(mk, px, pz + 6); } }
-  }
-  if (Sea.sea.ferry) { const f = Sea.sea.ferry; dot(f.x, f.z, 5, '#ffd34d'); }
-  for (const d of world.docks || []) dot(d.x, d.z, 2.5, '#c8a878');
-  if (S.corpse && (S.corpse.zone || 'vale') === S.zone) { const [px, pz] = P(S.corpse.x, S.corpse.z); g.strokeStyle = '#8dffef'; g.lineWidth = 3; g.beginPath(); g.moveTo(px - 6, pz - 6); g.lineTo(px + 6, pz + 6); g.moveTo(px + 6, pz - 6); g.lineTo(px - 6, pz + 6); g.stroke(); }
-  g.restore();
-  // you, as an arrow pointing where you face
-  g.save(); g.translate(W / 2, W / 2); g.rotate(-(h.yaw - S.camYaw)); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2;
-  g.beginPath(); g.moveTo(0, -10); g.lineTo(7, 8); g.lineTo(0, 4); g.lineTo(-7, 8); g.closePath(); g.stroke(); g.fill(); g.restore();
-  g.strokeStyle = 'rgba(238,228,204,.5)'; g.lineWidth = 3; g.beginPath(); g.arc(W / 2, W / 2, W / 2 - 1.5, 0, TAU); g.stroke();
-  // compass N
-  const na = -S.camYaw + Math.PI; g.fillStyle = '#ffd34d'; g.font = 'bold 20px Cinzel'; g.textAlign = 'center'; g.fillText('N', W / 2 + Math.sin(na) * (W / 2 - 14) * -1, W / 2 - Math.cos(na) * (W / 2 - 14) + 7);
-  const pl = placeAt(h.x, h.z), zn = pl ? pl.name : REGION_NAMES()[regionAt(h.x, h.z)] || world.names.zone;
+  MapUI.drawMini($('mini'));
+  const h = S.hero, pl = placeAt(h.x, h.z), zn = pl ? pl.name : REGION_NAMES()[regionAt(h.x, h.z)] || world.names.zone;
   if (zn !== zoneName) { if (zoneName) toast(zn); zoneName = zn; $('zone').textContent = zn; }
+  const hi = Game.huntInfo(), tag = $('huntTag');
+  tag.classList.toggle('hide', !hi);
+  if (hi) { const t = hi.zone ? `🏹 ${hi.zone.name}${hi.rest ? ' · resting' : hi.wait ? ' · waiting' : ''}` : '🏹 Hunting: no enemies here'; if (tag.textContent !== t) tag.textContent = t; }
 }
 
 // ---------- panels ----------
@@ -470,22 +460,82 @@ export function openBook(tab) {
     ({ char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial })[bookTab](body);
   });
 }
+// ---------- weapons: equip a class's weapon to play it ----------
+const WICON = { mace: '🔨', staff: '🪄', bow: '🏹', blade: '⚔️', greatsword: '🗡️', wraps: '👊', dagger: '🔪', rapier: '🤺', wand: '✨' };
+export const weaponOf = k => `${BASE_NAMES.weapon[WTYPE[k][0]][0]} & ${BASE_NAMES.off[WTYPE[k][1]][0]}`;
+const wIcon = k => WICON[WTYPE[k][0]] || '⚔️';
+function weaponRack(body) {
+  const own = CLASS_KEYS.filter(k => Game.owns(k)), lock = CLASS_KEYS.filter(k => !Game.owns(k));
+  const card = el(`<div class="card"><h3>Your weapons</h3>
+    ${S.unlockPicks > 0 ? `<div class="acts" style="margin:4px 0 8px"><button class="pri" data-a="pick">⭐ Choose your new weapon (${S.unlockPicks})</button></div>` : ''}
+    <div class="wrack">${own.map(k => { const c = CLASSES[k], on = k === S.heroCls, w = S.gear[k]?.weapon; return `<div class="wpn ${on ? 'on' : ''}" style="--c:${c.color}"><span class="wi">${wIcon(k)}</span><div style="flex:1;min-width:0"><b>${esc(w ? w.name : weaponOf(k))}</b><small>${roleIcon(k)} ${c.name} · level ${Game.levelOf(k)}</small></div>${on ? '<span class="dim" style="font-size:12px">Equipped</span>' : `<button data-eq="${k}">Equip</button>`}</div>`; }).join('')}</div>
+    <div class="acts" style="margin-top:6px"><button data-a="friends">👥 Friends' classes</button></div>
+    </div>`);
+  card.onclick = ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.a === 'pick') { openWeaponPick(); return; }
+    if (b.dataset.a === 'friends') { openFriendPick(false); return; }
+    if (b.dataset.eq && Game.switchClass(b.dataset.eq)) { refreshKeys(true); openFriendPick(false, true); }
+  };
+  body.appendChild(card);
+}
+export function openWeaponPick() {
+  if (!(S.unlockPicks > 0)) { openBook('char'); return; }
+  let sel = null;
+  openSheet('The weapon rack', body => {
+    const ch = Game.weaponChoices();
+    const fams = FAMILIES.filter(f => ch.some(k => CLASSES[k].family === f));
+    body.appendChild(el(`<p style="margin-top:0">Choose one.</p>`));
+    for (const f of fams) {
+      body.appendChild(el(`<p style="margin:8px 0 3px;font:700 12px Cinzel;color:var(--acc)">${FAMILY_ICON[f]} ${f}s</p>`));
+      for (const k of ch.filter(k => CLASSES[k].family === f)) {
+        const c = CLASSES[k];
+        const card = el(`<div class="card cls ${sel === k ? 'on' : ''}" style="--c:${c.color}"><div class="ic">${wIcon(k)}</div><div style="flex:1"><b style="color:${c.color}">${weaponOf(k)}</b> <span class="dim">· ${c.name} · ${c.role}</span><p style="margin:1px 0">${esc(c.blurb)}</p></div></div>`);
+        card.onclick = () => { sel = k; refreshSheet(); };
+        body.appendChild(card);
+      }
+    }
+    const b = el(`<div class="acts" style="position:sticky;bottom:0;background:var(--bg);padding:6px 0"><button class="pri" ${sel ? '' : 'disabled'} style="flex:1">${sel ? `Take the ${weaponOf(sel)} (${CLASSES[sel].name})` : 'Tap a weapon to choose it'}</button></div>`);
+    b.querySelector('button').onclick = () => { if (sel && Game.unlockClass(sel)) { toast(`${CLASSES[sel].name} unlocked`); openFriendPick(true, false, sel); } };
+    body.appendChild(b);
+  });
+}
+// you choose what your friends play; any class goes
+export function openFriendPick(afterUnlock, afterSwitch, newCls) {
+  const pend = {};
+  const friends = () => (S.friends || []).filter(fr => S.party.some(p => p.name === fr.name && p.fake?.bff));
+  if (!friends().length) { if (afterUnlock) openBook('char'); return; }
+  openSheet("Friends' classes", body => {
+    body.appendChild(el(`<p style="margin-top:0">${afterUnlock ? 'Your friends are picking up new weapons too.' : afterSwitch ? 'Your friends could switch too.' : ''} <span class="dim">You: ${roleIcon(S.heroCls)} ${CLASSES[S.heroCls].name}.</span></p>`));
+    for (const fr of friends()) {
+      const cur = pend[fr.name] || fr.cls;
+      const box = el(`<div class="card"><h3>${esc(fr.name)} <span class="dim" style="font:500 12px Alegreya Sans">· ${roleIcon(cur)} ${CLASSES[cur].name} (${CLASSES[cur].role})</span></h3><div class="fpick">${FAMILIES.map(f => CLASS_KEYS.filter(k => CLASSES[k].family === f).map(k => `<button data-k="${k}" class="${k === cur ? 'on' : ''}" style="--c:${CLASSES[k].color}">${roleIcon(k)} ${CLASSES[k].name}</button>`).join('')).join('')}</div></div>`);
+      box.onclick = ev => { const b = ev.target.closest('button'); if (b?.dataset.k) { pend[fr.name] = b.dataset.k; refreshSheet(); } };
+      body.appendChild(box);
+    }
+    const roles = [CLASSES[S.heroCls].role, ...friends().map(fr => CLASSES[pend[fr.name] || fr.cls].role)];
+    const gaps = ['tank', 'healer'].filter(r => !roles.includes(r));
+    const b = el(`<div class="acts" style="position:sticky;bottom:0;background:var(--bg);padding:6px 0"><button class="pri" style="flex:1">${Object.keys(pend).length ? 'Done' : afterUnlock ? 'Keep their classes' : 'Keep them as they are'}</button></div>`);
+    b.querySelector('button').onclick = () => { for (const [n, k] of Object.entries(pend)) Game.setFriendClass(n, k); openBook('char'); };
+    body.appendChild(b);
+  });
+}
 function tabChar(body) {
   const h = S.hero, C = CLASSES[S.heroCls];
   body.appendChild(el(`<div class="card"><h3 style="color:${C.color}">${esc(h.name)} · Level ${h.lvl} ${C.name}</h3><p>${C.family} · ${C.role}. ${esc(C.blurb)}</p>
     <div class="grid2" style="margin-top:6px"><div><div class="stat"><span>Health</span><span>${h.maxHp}</span></div><div class="stat"><span>${h.resType}</span><span>${h.resMax}</span></div><div class="stat"><span>Power</span><span>${Math.round(h.power)}</span></div></div>
     <div><div class="stat"><span>Armor</span><span>${Math.round(h.armor)}</span></div><div class="stat"><span>Crit</span><span>${(h.crit * 100).toFixed(1)}%</span></div><div class="stat"><span>XP</span><span>${h.lvl >= MAX_LVL ? 'max' : Math.round(h.xp) + ' / ' + xpNeed(h.lvl)}</span></div></div></div>
     <p>Gold: ${S.gold}</p></div>`));
-  // progression across classes: the level 10 lock, faster xp, account bonuses, perks
-  { const fam = FAMILIES.map(f => { const b = Game.famBest(f); return `<span class="fam ${b >= 10 ? 'ok' : ''}">${{ Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔮' }[f]} ${f} ${b}${b >= 10 ? ' ✓' : ''}</span>`; }).join('');
-    const locked = Game.lockedAt10(), A = h.acct || {}, boost = Math.round(Game.xpBoost() * 100);
-    body.appendChild(el(`<div class="card"><h3>Your classes</h3><div class="fams">${fam}</div>
-      <p style="margin:6px 0 2px">${locked ? 'Levels above 10 are <b style="color:#ff8a6a">locked</b> until you have one class from each family at level 10.' : 'Level 10 lock lifted. Every class can level to 20.'} ${Game.raidReady() ? 'Raid ready: one class from each family at 20.' : '<span class="dim">The raid needs one class from each family at 20.</span>'}</p>
-      <p class="dim" style="margin:2px 0">Faster xp for this class: <b style="color:var(--acc)">+${boost}%</b> (20% for each other class at 10+). Account bonus for every class: +${A.sta || 0} stamina, +${A.pow || 0} power.${S.vetXp > 0 ? ` Veteran xp banked: <b style="color:#c8a2ff">${Math.round(S.vetXp)}</b> (doubles xp for classes that can still level).` : ''}</p></div>`));
+  weaponRack(body);
+  // progression: just the numbers; the game doesn't explain itself
+  { const fam = FAMILIES.map(f => { const b = Game.famBest(f); return `<span class="fam ${b >= 10 ? 'ok' : ''}">${{ Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔮' }[f]} ${f} ${b}</span>`; }).join('');
+    body.appendChild(el(`<div class="card"><h3>Families</h3><div class="fams">${fam}</div></div>`));
     const open = Game.perksOpen();
-    const pc = el(`<div class="card"><h3>Perks <span class="dim" style="font:500 12px Alegreya Sans">· ${S.perks.length}/2 slotted · each class at level 10 unlocks one</span></h3><div class="perks">${CLASS_KEYS.map(k => { const P = PERKS[k], on = S.perks.includes(k), ok = open.includes(k); return `<button data-p="${k}" class="perk ${on ? 'on' : ''}" ${ok ? '' : 'disabled'}><span>${P.icon}</span><b>${esc(P.name)}</b><small>${ok ? esc(P.desc) : CLASSES[k].name + ' 10'}</small></button>`; }).join('')}</div></div>`);
-    pc.onclick = ev => { const b = ev.target.closest('button'); if (b && b.dataset.p) { Game.togglePerk(b.dataset.p); refreshSheet(); } };
-    body.appendChild(pc);
+    if (open.length) {
+      const pc = el(`<div class="card"><h3>Perks <span class="dim" style="font:500 12px Alegreya Sans">· ${S.perks.length}/2</span></h3><div class="perks">${open.map(k => { const P = PERKS[k], on = S.perks.includes(k); return `<button data-p="${k}" class="perk ${on ? 'on' : ''}"><span>${P.icon}</span><b>${esc(P.name)}</b><small>${esc(P.desc)}</small></button>`; }).join('')}</div></div>`);
+      pc.onclick = ev => { const b = ev.target.closest('button'); if (b && b.dataset.p) { Game.togglePerk(b.dataset.p); refreshSheet(); } };
+      body.appendChild(pc);
+    }
   }
   const g = S.gear[S.heroCls];
   body.appendChild(el('<h3 style="font:700 13px Cinzel;margin:8px 0 4px;color:var(--dim)">Equipped</h3>'));
@@ -496,14 +546,6 @@ function tabChar(body) {
     body.appendChild(c);
   }
   if (S.corpse) body.appendChild(el(`<p class="dim">Your ${CLASSES[S.corpse.cls].name} gear is on your corpse. Run back and recover it.</p>`));
-  body.appendChild(el('<h3 style="font:700 13px Cinzel;margin:10px 0 4px;color:var(--dim)">Classes (each levels on its own)</h3>'));
-  for (const k of CLASS_KEYS) {
-    if (k === CLASS_KEYS.find(x => CLASSES[x].family === CLASSES[k].family)) body.appendChild(el(`<p style="margin:8px 0 3px;font:700 12px Cinzel;color:var(--acc)">${CLASSES[k].family}s</p>`));
-    const c = CLASSES[k], on = k === S.heroCls;
-    const card = el(`<div class="card cls ${on ? 'on' : ''}" style="--c:${c.color}"><div class="ic">${roleIcon(k)}</div><div style="flex:1"><b style="color:${c.color}">${c.name}</b> <span class="dim">· ${c.family} · level ${S.classes[k].lvl}</span><p style="margin:1px 0">${esc(c.blurb)}</p></div>${on ? '' : '<button>Switch</button>'}</div>`);
-    if (!on) card.querySelector('button').onclick = () => { if (Game.switchClass(k)) { refreshKeys(true); refreshSheet(); } };
-    body.appendChild(card);
-  }
 }
 function tabSpells(body) {
   const C = CLASSES[S.heroCls], h = S.hero, bar = barOf();
@@ -565,10 +607,12 @@ function updateScene() {
 }
 function tabQuests(body) {
   const act = QUESTS.filter(q => S.quests[q.id] && S.quests[q.id].state !== 'turned');
-  if (!act.length) body.appendChild(el(`<p class="dim">No quests yet. Look for the <b style="color:#ffd34d">!</b> over people's heads in ${esc(world.names.town)}.</p>`));
+  if (!act.length) body.appendChild(el(`<p class="dim">No quests yet.</p>`));
   for (const q of act) {
     const st = S.quests[q.id];
-    body.appendChild(el(`<div class="card"><h3>${esc(q.name)} <span class="dim" style="font:500 12px Alegreya Sans">· level ${q.lvl}</span></h3><p>${esc(Game.fill(q.text))}</p><p style="color:var(--ink)">${q.story ? '<b style="color:#c8a2ff">Main story</b> · ' : ''}${objText(q)}: <b style="color:var(--acc)">${st.state === 'done' ? (q.obj.talk || q.obj.at ? 'Talk to ' : 'Done. Return to ') + GIVERS[Game.turnToOf(q)].name + '.' : q.obj.at ? 'travel there' : st.n + ' / ' + q.obj.n}</b></p></div>`));
+    const card = el(`<div class="card"><h3>${esc(q.name)} <span class="dim" style="font:500 12px Alegreya Sans">· level ${q.lvl}</span></h3><p>${esc(Game.fill(q.text))}</p><p style="color:var(--ink)">${q.story ? '<b style="color:#c8a2ff">Main story</b> · ' : ''}${objText(q)}: <b style="color:var(--acc)">${st.state === 'done' ? (q.obj.talk || q.obj.at ? 'Talk to ' : 'Done. Return to ') + GIVERS[Game.turnToOf(q)].name + '.' : q.obj.at ? 'travel there' : st.n + ' / ' + q.obj.n}</b></p></div>`);
+    if (st.state === 'done') { const b = el(`<div class="acts"><button class="pri">⤴ Return to ${esc(GIVERS[Game.turnToOf(q)].name)}</button></div>`); b.querySelector('button').onclick = () => { if (Game.returnToGiver(q)) closeSheet(); }; card.appendChild(b); }
+    body.appendChild(card);
   }
   const done = QUESTS.filter(q => S.quests[q.id]?.state === 'turned');
   if (done.length) body.appendChild(el(`<p class="dim" style="font-size:12px">Completed: ${done.map(q => esc(q.name)).join(', ')}</p>`));
@@ -634,7 +678,7 @@ const pickOf = a => a && a.length ? a[Math.floor(Math.random() * a.length)] : nu
 export const talkKey = n => n.giver ? n.giver : n.banker ? 'banker' : n.vendor ? 'vendor:' + n.vendor : n.armory ? 'armory' : n.guard ? 'guard' : 'villager:' + n.name;
 const talkOf = k => TALK[k] || (k.startsWith('villager:') ? TALK['villager:Hollin Villager'] : {});
 function openGiver(k) { const n = S.npcs?.[k]; openTalk(n && n.giver === k ? n : { giver: k, name: GIVERS[k].name, title: GIVERS[k].title }); }
-function openTalk(n) {
+export function openTalk(n) {
   const k = talkKey(n), T = talkOf(k);
   const greet = pickOf(T.greet) || (Array.isArray(VILLAGER_LINES[n.name]) ? pickOf(VILLAGER_LINES[n.name]) : VILLAGER_LINES[n.name]) || 'Hello there.';
   conv = { k, n, view: 'menu', lines: [greet] };
@@ -656,7 +700,7 @@ function renderConv(body) {
     for (const a of Game.activeFrom(k)) list.push([`▸ About "${esc(a.name)}"…`, () => go({ view: 'active', q: a })]);
     if (nn?.vendor) list.push(['▸ Show me what you have for sale.', () => { closeSheet(); openVendor(nn); }, 'hl']);
     if (nn?.banker || k === 'banker') list.push(["▸ I'd like to use my vault.", () => { closeSheet(); openBank(); }, 'hl']);
-    if (nn?.armory) list.push(["▸ I'd like to change my class.", () => { closeSheet(); openBook('char'); }, 'hl']);
+    if (nn?.armory) { list.push(["▸ I'd like to switch weapons.", () => { closeSheet(); openBook('char'); }, 'hl']); if (S.unlockPicks > 0) list.push(['▸ Show me the weapon rack.', () => { closeSheet(); openWeaponPick(); }, 'hl']); }
     for (const t of (T.topics || [])) if (!t.after || S.quests[t.after]?.state === 'turned') list.push([`▸ ${esc(Game.fill(t.q))}`, () => go({ view: 'topic', t })]);
     list.push(['▸ Farewell.', () => closeSheet()]);
     opts(list);
@@ -699,6 +743,7 @@ function renderConv(body) {
       const cc = ev.target.dataset.c; if (cc === undefined) return;
       const reply = Game.turnIn(q, +cc >= 0 ? +cc : null);
       refreshKeys(true);
+      if (q.unlock) { openWeaponPick(); return; }
       const lines = [...(reply ? [reply] : []), ['', `Quest complete: ${q.name}. You earn ${q.xp} xp and ${q.gold} gold.`]];
       if (S.pendingScene) { closeSheet(); return; }
       go({ view: 'reply', lines, k: def });
@@ -741,7 +786,7 @@ export function openInspect(t) {
     }
     if (t.cls) {
       const C = CLASSES[t.cls], f = t.fake, fam = { Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔮' }[C.family];
-      const rel = t.isHero ? 'This is you.' : f?.bff ? 'Your friend. Always your level, and always plays the role your group is missing.' : t.inParty ? 'In your group.' : f?.friend ? 'On your friends list.' : '';
+      const rel = t.isHero ? 'This is you.' : f?.bff ? '' : t.inParty ? 'In your group.' : f?.friend ? 'On your friends list.' : '';
       body.appendChild(el(`<div class="card"><h3>${fam} ${esc(t.name)}</h3><p style="margin:2px 0">Level ${t.lvl} ${esc(C.name)} · ${esc(C.family)} · ${esc(C.role === 'dps' ? 'damage' : C.role)}</p>
         ${f?.guild ? `<p class="dim" style="margin:2px 0">&lt;${esc(f.guild)}&gt;</p>` : ''}${f ? `<p style="margin:4px 0">${esc(PERSONA_TXT[f.bff ? 'friendly' : f.persona] || '')}</p>` : ''}${rel ? `<p class="dim" style="margin:2px 0">${rel}</p>` : ''}
         <p class="dim" style="margin:4px 0 0">Health ${Math.round(t.hp)} / ${t.maxHp} · Power ${Math.round(t.power)} · Armor ${Math.round(t.armor)}</p></div>`));
@@ -786,73 +831,82 @@ export function openLoot(m) {
     body.appendChild(el('<p class="dim" style="font-size:12px">✓ marks who can use it.</p>'));
   });
 }
-function openMap() {
-  openSheet('Map', body => {
-    const c = document.createElement('canvas'); c.width = c.height = 600; c.style.width = '100%'; c.style.borderRadius = '10px'; body.appendChild(c);
-    const g = c.getContext('2d'), sc = 600 / (2 * WH), P = (x, z) => [(x + WH) * sc, (z + WH) * sc];
-    g.drawImage(world.minimap, 0, 0, 600, 600);
-    g.font = 'bold 15px Cinzel'; g.textAlign = 'center'; g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 3;
-    const label = (t, x, z) => { const [px, pz] = P(x, z); g.strokeText(t, px, pz); g.fillText(t, px, pz); };
-    if (world.zone === 'vale') {
-      label(world.names.town, 0, -34); label(world.names.ruin.replace('The ', ''), world.ruin.x, world.ruin.z - 44);
-      label(world.names.wood, 0, 160); label(world.names.waste, 0, -150); label(world.names.road, 150, 80); label('Fields (1-3)', -50, 50);
-      g.font = '12px Alegreya Sans';
-      for (const cp of world.camps) label(cp.kind === 'bandit' ? 'Bandits (3-5)' : 'Orcs (5-7)', cp.x, cp.z);
-      label(`${world.names.tusk} (8)`, world.hollow.x, world.hollow.z + 12);
-      g.font = 'bold 13px Cinzel';
-      for (const p of world.extraPlaces || []) label(p.name, p.x, p.z - p.R - 4);
-      g.font = '12px Alegreya Sans';
-      label('Pale Choir (4-5)', world.spots.choircamp.x, world.spots.choircamp.z + 14); label('Boars (3-5)', -190, -20); label('Spiders (4-5)', world.spots.spiders.x, world.spots.spiders.z + 22); label('Harpies (6-8)', world.spots.crag.x + 16, world.spots.crag.z + 20); label('Deacon (8-9)', world.spots.deacon.x, world.spots.deacon.z + 14);
-    } else {
-      for (const p of world.places) label(p.name.replace('The ', ''), p.x, p.z - p.R - 6);
-      g.font = '12px Alegreya Sans';
-      for (const l of world.mapLabels || []) label(l.t, l.x, l.z);
-      for (const d of world.docks || []) label('⚓', d.x, d.z + 5);
-      if (Sea.sea.ferry) { const [fx, fz] = P(Sea.sea.ferry.x, Sea.sea.ferry.z); g.fillStyle = '#ffd34d'; g.beginPath(); g.arc(fx, fz, 6, 0, TAU); g.fill(); g.stroke(); }
+function openMap() { MapUI.openBig(); }
+// ---------- settings: on the title screen and in the menu ----------
+function renderSettings(box, inGame, back) {
+  const info = Game.saveInfo();
+  box.innerHTML = `${back ? '<button data-a="back" style="margin-bottom:8px">← Back</button>' : ''}
+    <div class="card" style="text-align:left"><h3>Camera &amp; touch</h3>${['camSpeed', 'joySize', 'tapSens'].map(segHtml).join('')}</div>
+    <div class="card" style="text-align:left"><h3>Text &amp; interface size</h3>${['ui', 'text'].map(segHtml).join('')}</div>
+    <div class="card" style="text-align:left"><h3>Graphics</h3>${segHtml('gfx')}<p class="dim" style="font-size:12px;margin:0">Low and Medium draw fewer pixels, so the game runs smoother and the phone stays cooler.</p></div>
+    <div class="card" style="text-align:left"><h3>Save codes</h3>
+      ${info ? `<p style="margin:0 0 6px">Your character: <b>${esc(info.name)}</b>, level ${info.lvl} ${CLASSES[info.cls]?.name || ''}.</p><div class="acts"><button data-a="copy">Copy save code</button></div><textarea id="codeOut" readonly class="hide" style="height:60px"></textarea>` : '<p class="dim" style="margin:0 0 6px">No character saved on this device yet.</p>'}
+      <p style="margin:8px 0 4px">Load a save code:</p><textarea id="codeIn" placeholder="Paste a code starting OSSU1." style="height:60px"></textarea><div class="acts"><button data-a="load">Load</button></div>
+      ${info ? `<p style="margin:10px 0 4px">Delete character: this can't be undone. Copy your save code first if you might want them back.</p><div class="acts"><button data-a="del" style="color:#ff8a6a">Delete ${esc(info.name)}</button></div>` : ''}</div>
+    ${inGame ? `<div class="card" style="text-align:left"><h3>Controls</h3><p>Left thumb: move. Right thumb: turn the camera, pinch to zoom. Tap someone to target them; tap again to talk, loot or attack. 🎯 cycles enemy targets. Tap the minimap for the full map. On a keyboard: WASD, Q/E turn, Tab, 1-0 - =, F to interact, X to sit, M for the map.</p></div>` : ''}`;
+  let delArmed = false;
+  box.onclick = async ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.o) { setOpt(b.dataset.o, isNaN(+b.dataset.v) ? b.dataset.v : +b.dataset.v); b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); return; }
+    const a = b.dataset.a;
+    if (a === 'back') back();
+    if (a === 'copy') { if (S.running) Game.save(); const code = await Game.makeCode(inGame ? null : true); const t = $('codeOut'); t.value = code; t.classList.remove('hide'); try { await navigator.clipboard.writeText(code); toast('Save code copied'); } catch (e) { t.select(); toast('Select and copy the code'); } }
+    if (a === 'load') { try { const sv = await Game.readCode($('codeIn').value); Game.loadSave(sv); closeSheet(); afterStart(); toast('Save loaded'); } catch (e) { toast("That code didn't work"); } }
+    if (a === 'del') {
+      if (!delArmed) { delArmed = true; b.textContent = `Tap again to delete ${info.name} forever`; return; }
+      Game.deleteSave(); closeSheet(); toast(`${info.name} has been deleted`); showTitle();
     }
-    g.font = '12px Alegreya Sans';
-    for (const z of world.zoneLines) label('➜ ' + z.label.replace(/ \(.*$/, ''), clamp(z.x, -WH + 50, WH - 50), z.z + 10);
-    const [hx, hz] = P(S.hero.x, S.hero.z); g.fillStyle = '#fff'; g.beginPath(); g.arc(hx, hz, 6, 0, TAU); g.fill(); g.stroke();
-    for (const p of S.party) if (!p.isHero) { const [px, pz] = P(p.x, p.z); g.fillStyle = '#5fd3ff'; g.beginPath(); g.arc(px, pz, 4, 0, TAU); g.fill(); }
-    if (S.corpse && (S.corpse.zone || 'vale') === S.zone) { const [px, pz] = P(S.corpse.x, S.corpse.z); g.fillStyle = '#8dffef'; g.font = 'bold 18px sans-serif'; g.fillText('✖', px, pz + 6); }
-    body.appendChild(el(`<p class="dim" style="font-size:12px">North is up. ${world.zone === 'vale' ? 'The Ossuary (levels 8-10) is a 6-person open-world dungeon. The Kingsroad runs east to the Saltreach Coast (11-20).' : world.zone === 'coast' ? 'The gold dot is the ferry (Saltmarrow, Fort Halyard, Smuggler\'s Rock, Gullwick). Rent rowboats at any dock ⚓. The Sea Caves (15-17) are open-world; the buoy on the Drowned Reef is the dive to the Sunken Fleet (level 20 instance).' : 'The Sunken Fleet: a 6-person instance. It resets when you leave.'}</p>`));
-  });
+  };
 }
+const segHtml = k => { const [label, opts] = OPTS[k]; return `<p class="setl">${label}</p><div class="seg">${opts.map(([n, v]) => `<button data-o="${k}" data-v="${v}" class="${SET[k] === v ? 'on' : ''}">${n}</button>`).join('')}</div>`; };
 function openMenu() {
   openSheet('Menu', body => {
-    const b = el(`<div><div class="card"><h3>Save code</h3><p>Copy this to move your progress to another build or device.</p><div class="acts"><button data-a="copy">Copy save code</button></div><textarea id="codeOut" readonly class="hide"></textarea></div>
-      <div class="card"><h3>Load a save code</h3><textarea id="codeIn" placeholder="Paste a code starting OSSU1."></textarea><div class="acts"><button data-a="load">Load</button></div></div>
-      <div class="card"><h3>Controls</h3><p>Left thumb: move. Right thumb: turn the camera, pinch to zoom. Tap someone to target them; tap again to talk, loot or attack. 🎯 cycles enemy targets. Hold a spell key to read it. On a keyboard: WASD, Q/E turn, Tab, 1-0 - =, F to interact, X to sit.</p></div>
-      <div class="card"><h3>Start over</h3><p>A new world with a new seed. Your current save is replaced.</p><div class="acts"><button data-a="new">New game</button></div></div></div>`);
-    b.onclick = async ev => {
-      const a = ev.target.dataset.a;
-      if (a === 'copy') { const code = await Game.makeCode(); const t = $('codeOut'); t.value = code; t.classList.remove('hide'); try { await navigator.clipboard.writeText(code); toast('Save code copied'); } catch (e) { t.select(); toast('Select and copy the code'); } }
-      if (a === 'load') { try { const sv = await Game.readCode($('codeIn').value); Game.loadSave(sv); closeSheet(); afterStart(); toast('Save loaded'); } catch (e) { toast("That code didn't work"); } }
-      if (a === 'new') { closeSheet(); showTitle(true); }
-    };
-    body.appendChild(b);
+    const box = document.createElement('div'); body.appendChild(box);
+    renderSettings(box, true, null);
+    const nw = el('<div class="card"><h3>New character</h3><p>Start someone new from the title screen. You only have room for one character on this device, so copy your save code first.</p><div class="acts"><button>Back to the title screen</button></div></div>');
+    nw.querySelector('button').onclick = () => { Game.save(); S.running = false; closeSheet(); MapUI.closeBig(); showTitle(); };
+    body.appendChild(nw);
   });
 }
 
 // ---------- title ----------
-export function showTitle(forceNew) {
+export function showTitle(view = 'home') {
+  if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
-  let pick = 'bulwark';
-  const has = Game.hasSave() && !forceNew;
-  const T = $('titleIn');
-  T.innerHTML = `<h1>Single-Player MMO</h1><div class="sub">Build 4.3 · the Vale's story · a century after the summoner wars</div>
-    ${has ? '<button class="pri" id="contBtn" style="width:100%;margin-bottom:12px">Continue</button>' : ''}
-    <div class="card" style="text-align:left"><h3>New hero</h3><input type="text" id="heroName" maxlength="14" placeholder="Hero name" value="${pickName()}">
-    ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Cinzel;color:var(--acc)">${f}s</p><div class="clsPick">${CLASS_KEYS.filter(k => CLASSES[k].family === f).map(k => { const c = CLASSES[k]; return `<div class="card" data-k="${k}" style="border-color:${c.color}"><b style="color:${c.color}">${roleIcon(k)} ${c.name}</b><p>${esc(c.blurb)}</p></div>`; }).join('')}</div>`).join('')}
-    <p class="dim" style="font-size:12px;margin:8px 0">🛡️ Fighter · 💚 Healer · 🗡️ Rogue · 🔮 Mage. The last class in each family is its support. Your hero can take up every class later; each levels on its own.</p>
-    <button class="pri" id="newBtn" style="width:100%">Enter the world</button></div>
-    <div class="card" style="text-align:left"><h3>Load a save code</h3><textarea id="titleCode" placeholder="OSSU1.…" style="height:60px"></textarea><div class="acts"><button id="codeBtn">Load</button></div></div>`;
-  const cards = T.querySelectorAll('.clsPick .card');
-  const sel = () => cards.forEach(c => c.classList.toggle('on', c.dataset.k === pick)); sel();
-  cards.forEach(c => c.onclick = () => { pick = c.dataset.k; sel(); });
-  $('newBtn').onclick = () => { const n = ($('heroName').value || 'Hero').trim().slice(0, 14) || 'Hero'; Game.newGame(pick, n); afterStart(); };
-  if (has) $('contBtn').onclick = () => { try { Game.loadSave(); afterStart(); } catch (e) { console.error(e); toast('That save could not be loaded'); } };
-  $('codeBtn').onclick = async () => { try { const sv = await Game.readCode($('titleCode').value); Game.loadSave(sv); afterStart(); } catch (e) { toast("That code didn't work"); } };
+  const T = $('titleIn'), info = Game.saveInfo();
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 4.4 · a century after the summoner wars</div>`;
+  if (view === 'home') {
+    T.innerHTML = `${head}<div class="tmenu">
+      ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
+      <button class="${info ? '' : 'pri'}" data-a="new">New character</button>
+      <button data-a="set">Settings</button></div>`;
+    T.onclick = ev => {
+      const a = ev.target.closest('button')?.dataset.a;
+      if (a === 'cont') { try { Game.loadSave(); afterStart(); } catch (e) { console.error(e); toast('That save could not be loaded'); } }
+      if (a === 'new') showTitle('new');
+      if (a === 'set') showTitle('set');
+    };
+    return;
+  }
+  if (view === 'set') { T.onclick = null; T.innerHTML = head; const box = document.createElement('div'); T.appendChild(box); renderSettings(box, false, () => showTitle('home')); return; }
+  // a new character starts with one weapon, and the weapon makes the class
+  let pick = null;
+  const draw = () => {
+    T.innerHTML = `${head}<button data-a="back" style="margin:8px 0">← Back</button>
+      <div class="card" style="text-align:left"><h3>Name your hero</h3><input type="text" id="heroName" maxlength="14" placeholder="Hero name" value="${esc(T.dataset.name || pickName())}"></div>
+      <div class="card" style="text-align:left"><h3>Choose your weapon</h3>
+      ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Cinzel;color:var(--acc)">${FAMILY_ICON[f]} ${f}s</p><div class="wpick">${CLASS_KEYS.filter(k => CLASSES[k].family === f).map(k => { const c = CLASSES[k]; return `<div class="card ${pick === k ? 'on' : ''}" data-k="${k}" style="border-color:${c.color}"><span class="wi">${wIcon(k)}</span><div><b style="color:${c.color}">${weaponOf(k)}</b><small>${c.name} · ${c.role}</small><p>${esc(c.blurb)}</p></div></div>`; }).join('')}</div>`).join('')}</div>
+      ${info ? `<p style="color:#ff8a6a;font-size:13px">Starting a new character replaces ${esc(info.name)} (level ${info.lvl}). Copy their save code in Settings first if you want to keep them.</p>` : ''}
+      <div style="position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,rgba(13,17,20,.95) 30%)"><button class="pri" data-a="go" style="width:100%;opacity:1" ${pick ? '' : 'disabled'}>${pick ? `Enter the world as a ${CLASSES[pick].name}` : 'Tap a weapon to choose it'}</button></div>`;
+  };
+  T.dataset.name = '';
+  draw();
+  T.onclick = ev => {
+    const card = ev.target.closest('.wpick .card'), a = ev.target.closest('button')?.dataset.a;
+    if (card) { T.dataset.name = $('heroName').value; const y = $('title').scrollTop; pick = card.dataset.k; draw(); $('title').scrollTop = y; return; }
+    if (a === 'back') showTitle('home');
+    if (a === 'go' && pick) { const n = ($('heroName').value || 'Hero').trim().slice(0, 14) || 'Hero'; Game.newGame(pick, n); afterStart(); }
+  };
 }
 function pickName() { return ['Aldric', 'Wren', 'Corvane', 'Isolde', 'Taran', 'Merrow', 'Halcyon', 'Brisa'][(Math.random() * 8) | 0]; }
 function afterStart() {
@@ -867,7 +921,7 @@ export function update(dt) {
   S.frame++;
   updateScene();
   if (S.scene) return;
-  updateFrames(); refreshKeys(); updateChat(); updatePlates(dt); updateMini(); updateAct();
+  updateFrames(); refreshKeys(); updateChat(); updatePlates(dt); updateMini(); updateAct(); MapUI.tick();
   { const h = S.hero, br = $('breath'), show = h.breath !== undefined && h.breath < Sea.BREATH_MAX - .01 && !h.dead; br.classList.toggle('hide', !show); if (show) br.firstElementChild.style.width = (h.breath / Sea.BREATH_MAX * 100) + '%'; }
   const dead = S.hero.dead;
   $('death').classList.toggle('hide', !dead);
@@ -897,6 +951,9 @@ export function init() {
   $('bookBtn').onclick = () => openBook();
   $('menuBtn').onclick = openMenu;
   $('mini').onclick = openMap;
+  MapUI.bind({ objText, questMark, toast }); MapUI.init(); applySettings();
+  $('huntTag').onclick = () => Game.partyCommand('hunt');
+  $('track').addEventListener('pointerup', ev => { const d = ev.target.closest('.go'); if (!d) return; ev.stopPropagation(); const q = QUESTS.find(q => q.id === d.dataset.q); if (q && Game.returnToGiver(q)) toast(`Back to ${GIVERS[Game.turnToOf(q)].name}`); });
   $('act').onclick = doAct;
   $('scene').addEventListener('pointerup', ev => { ev.stopPropagation(); if (ev.target.id === 'sceneSkip') Game.endScene(); else Game.nextShot(); });
   $('scene').addEventListener('pointerdown', ev => ev.stopPropagation());

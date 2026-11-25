@@ -600,6 +600,12 @@ Object.assign(TALK, {
     greet: ["Fishing pole? Bait? A story about the one that got away? I've got all three.", 'Morning! The fish are biting today, and so are the sharks, so mind your toes.'],
     topics: [{ q: 'Any tips for fishing?', a: ["Stand at the edge of the water, cast your line, and wait for the bobber to dip. When it does, reel in fast. The rare catches, like Black Pearls, sell for a small fortune in Saltmarrow."] }],
   },
+  armorer: {
+    bio: "The armory master runs the training hall and the weapon racks. Every class starts with its weapon, and every new weapon here has to be earned.",
+    greet: ['Welcome to the armory. Every weapon in here has a story, and most of those stories end badly for somebody.', "Back again? Good. Weapons don't like sitting on racks. Neither do I."],
+    topics: [{ q: 'Can I try another weapon?', a: ["Earn it first. Come back when you've mastered the one in your hand."] },
+      { q: 'What makes a master?', a: ["Ask me again when you think you are one. I'll know."] }],
+  },
   armory: {
     bio: "The armory master keeps the training hall, where you can take up any of the sixteen classes. Every class levels separately, so you never lose progress by switching.",
     greet: ['Welcome to the armory. Every weapon in here has a story, and most of those stories end badly for somebody.', "Ready to try something different? Every class levels on its own, so you won't lose a thing by switching."],

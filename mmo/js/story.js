@@ -1,7 +1,7 @@
 // Build 4: the Vale's story. "The graves are emptying."
 // Quests are done once per hero. Dialogue lines are a string (the giver speaks) or [speakerKey, text].
 // obj kinds: kill, collect, named (yield: they surrender), talk (done on accept), at (reach a spot), inspect (props with a tag)
-import { QUESTS, GIVERS, MOBS, NAMED_LOOT, xpNeed } from './data.js';
+import { QUESTS, GIVERS, MOBS, NAMED_LOOT, xpNeed, CLASSES, CLASS_KEYS } from './data.js';
 
 const qx = (lvl, f) => Math.round(xpNeed(Math.min(lvl, 19)) * f);
 const qg = lvl => Math.round(2 + lvl * 3.5);
@@ -259,3 +259,14 @@ for (const q of QUESTS) {
   if (q.id === 'q6') q.pre = 'm6';
 }
 QUESTS.push(...V);
+// ---------- the armory trials: reach level 10 in a class, prove it, and take up a weapon from a family you're missing ----------
+GIVERS.armorer = { name: 'Master Corvin', title: 'Armory · class trials', model: 'guard' };
+for (const k of CLASS_KEYS) {
+  QUESTS.push({ id: 'w_' + k, giver: 'armorer', cls: k, lvl: 10, needLvl: 10, unlock: true, name: `The ${CLASSES[k].name}'s Trial`, xp: qx(10, .45), gold: 25,
+    obj: { anyMin: 9, n: 10, what: 'Defeat 10 enemies of level 9 or higher' },
+    say: ["Ten levels as a {cls}, and you're still standing. Most people give up at four, usually because something ate them.",
+      "Here's how the armory works. Show me you've mastered one weapon, and I'll put a new one in your hands. Not just any weapon, either: one from a family you haven't touched yet.",
+      'Go and defeat ten enemies of level nine or higher. Then come back, and we will see what fits your hand.'],
+    done: ["Ten of them! The guards have been telling stories about you all week, and only some of them are exaggerated.",
+      "Come on, then, the rack's this way. Choose carefully. Your friends will want to rethink their own kit to fit around whatever you pick."] });
+}

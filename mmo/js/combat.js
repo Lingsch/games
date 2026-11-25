@@ -25,6 +25,7 @@ export function makeHuman(cls, lvl, o = {}) {
   recalc(e); e.hp = e.maxHp; e.res = startRes(e);
   return e;
 }
+export const XP_RATE = .75;          // Build 4.4: every source of xp gives three quarters of what it did
 export function makeMob(key, lvl, o = {}) {
   const M = MOBS[key];
   const e = makeEnt({ team: 'enemy', mob: key, lvl, kind: M.kind, spd: M.spd, name: M.name, scale: M.scale, r: .5 * M.scale, ...o });
@@ -155,6 +156,9 @@ export function damage(src, tgt, amt, school = 'phys', opts = {}) {
       return 0;
     }
   }
+  // level matters: higher-level enemies hit much harder, and shrug off more of what you throw at them
+  if (src.mob && !src.charmed && tgt.cls) { const dL = src.lvl - tgt.lvl; mult *= dL > 0 ? 1 + .18 * dL : Math.max(.55, 1 + .09 * dL); }
+  if (tgt.mob && (src.cls || src.pet)) { const dL = tgt.lvl - (src.lvl || 1); if (dL > 0) { mult *= Math.max(.45, 1 - .08 * dL); if (!opts.noMiss && Math.random() < .05 * dL) { if (src.isHero) floatText(tgt, 'Miss', '#cfcfcf'); return 0; } } }
   for (const b of tgt.buffs) if (b.data.vuln) mult *= 1 + b.data.vuln;
   amt *= mult * rnd(.92, 1.08);
   if (school === 'phys') amt *= 1 - tgt.armor / (tgt.armor + 60 + tgt.lvl * 14);
@@ -512,7 +516,7 @@ function mobDied(e, src) {
   // who gets credit: the party or fake group that tagged it
   const credit = e.tagged === 'party' ? S.party : Array.isArray(e.tagged) ? e.tagged : e.tagged ? [e.tagged] : [src];
   const near = credit.filter(p => p && p.cls && !p.dead && dist(p, e) < 70);
-  const base = mobXp(e.lvl) * (e.elite ? 2 : 1) * (e.named ? 4 : 1) * (e.boss ? 3 : 1);
+  const base = XP_RATE * mobXp(e.lvl) * (e.elite ? 2 : 1) * (e.named ? 4 : 1) * (e.boss ? 3 : 1);
   for (const p of near) {
     const dL = e.lvl - p.lvl;
     const mod = dL <= -4 ? 0 : dL < 0 ? 1 + dL * .2 : 1 + Math.min(4, dL) * .1;

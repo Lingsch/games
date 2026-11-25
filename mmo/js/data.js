@@ -402,8 +402,9 @@ export const MOBS = {
   wraith: { name: 'Choir Wraith', kind: 'wraith', hpM: .9, dmgM: 1, spd: 5.4, range: 18, ranged: true, caster: true, weak: 'storm', resist: 'frost', scale: 1, aggro: 12, social: 12, undead: true, fly: .4 },
   abom: { name: 'Grathul the Stitched', kind: 'abom', hpM: 1, dmgM: 1, spd: 5, range: 3.6, weak: 'fire', resist: 'earth', scale: 1.5, aggro: 14, social: 30, undead: true },
 };
-export const mobHp = L => 42 + 28 * L;
-export const mobDmg = L => 4 + 2.3 * L;
+// Build 4.4: enemies are tougher and hit harder across the board
+export const mobHp = L => (42 + 28 * L) * 1.5;
+export const mobDmg = L => (4 + 2.3 * L) * 1.75;
 export const mobXp = L => 18 + 13 * L + .9 * L * L;
 
 // ---------- items ----------

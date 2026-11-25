@@ -11,9 +11,12 @@ import * as Cb from './combat.js';
 import * as AI from './ai.js';
 import { generateWorld, world, hgt, REGION_NAMES, regionAt, collide, depthAt } from './world.js';
 import './zones.js';
+import { defineHuntZones, zoneAt } from './hunt.js';
 import * as R from './render.js';
 
 const SAVE_KEY = 'ossuary-mmo-1';
+// Build 4.4: quests give three quarters of the xp they used to, like everything else
+for (const q of QUESTS) q.xp = Math.round((q.xp || 0) * Cb.XP_RATE);
 
 // ---------- gear ----------
 export function canWear(cls, it) {
@@ -46,14 +49,13 @@ export function newGame(cls, heroName, seed = (Math.random() * 1e9) | 0) {
   S.seed = seed; S.time = 0; S.gold = 5; S.bag = []; S.pots = { hpot: 3, mpot: 3 }; S.quests = {}; S.friends = [];
   S.classes = {}; S.gear = {}; S.bar = {};
   for (const k of CLASS_KEYS) { S.classes[k] = { lvl: 1, xp: 0 }; S.gear[k] = starterGear(k); S.bar[k] = defaultBar(k); }
-  S.heroCls = cls; S.heroName = heroName;
+  S.heroCls = cls; S.heroName = heroName; S.owned = [cls]; S.unlockPicks = 0;
   S.pops = {}; S.bind = null; S.zone = 'vale'; S.pole = false;
-  S.flags = {}; S.lore = {}; S.perks = []; S.bank = []; S.used = {}; S.scenesSeen = {}; S.vetXp = 0;
+  S.flags = {}; S.lore = {}; S.perks = []; S.bank = []; S.used = {}; S.scenesSeen = {}; S.vetXp = 0; S.huntOn = false; S.campOrder = null; S.cmd = 'follow';
   startWorld({ zone: 'vale' });
   S.pendingScene = 'intro';
   makeFriends();
-  chat('sys', null, `Welcome to ${world.names.town}. Tap a fake player to invite them, or open Social to see who's around.`);
-  chat('sys', null, 'Quest givers have a ! over their heads. Wick the gravedigger is waiting outside the north gate. Your group can be up to 6.');
+  chat('sys', null, `Welcome to ${world.names.town}.`);
 }
 // fake players as plain data, so they keep their levels between zones and saves
 export function fakeData(f) { return { name: f.name, cls: f.cls, lvl: f.lvl, xp: f.xp || 0, pal: f.pal || 1, persona: f.fake.persona, guild: f.fake.guild, mood: f.fake.mood, friend: f.fake.friend, bff: !!f.fake.bff, bonusPow: f.bonusPow || 0, bonusSta: f.bonusSta || 0, bonusArm: f.bonusArm || 0 }; }
@@ -63,7 +65,7 @@ function startWorld(opts = {}) {
   S.ents.length = 0; S.party = []; S.dangers = []; S.meter = {}; S.target = null; S.dead = false; Cb.projectiles.length = 0;
   if (!opts.keepLog) S.log.length = 0;
   S.zone = zone; world.fleetT = 0; world.underwater = false;
-  generateWorld(S.seed, zone);
+  generateWorld(S.seed, zone); densify(zone); defineHuntZones();
   const tw = world.town, a = opts.arrive || { x: tw.x + 1, z: tw.z + 4 };
   const hero = Cb.makeHuman(S.heroCls, S.classes[S.heroCls].lvl, { name: S.heroName, isHero: true, inParty: true, x: a.x, z: a.z, pal: 0 });
   hero.xp = S.classes[S.heroCls].xp; hero.kind = CLASSES[S.heroCls].models[0];
@@ -82,6 +84,23 @@ function startWorld(opts = {}) {
   Sea.setupZone();
   S.running = true;
 }
+// Build 4.4: more enemies everywhere. Most spawns get a partner standing close by (dungeons a bit fewer).
+function densify(zone) {
+  let a = (S.seed ^ (zone.length * 2654435761)) >>> 0;
+  const rng = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const add = [];
+  for (const sp of world.spawns) {
+    if (sp.named || sp.ph || sp.boss || sp.boss2 || sp.gate || sp.elite) continue;
+    if (rng() > (sp.dungeon || zone === 'fleet' ? .5 : .8)) continue;
+    const wet = depthAt(sp.x, sp.z) > .5;
+    for (let k = 0; k < 6; k++) {
+      const ang = rng() * TAU, d = 2.6 + rng() * 2.4, x = sp.x + Math.sin(ang) * d, z = sp.z + Math.cos(ang) * d;
+      if ((depthAt(x, z) > .5) !== wet && !world.underwater) continue;
+      add.push({ ...sp, x, z, y: hgt(x, z), alive: null, timer: 0 }); break;
+    }
+  }
+  world.spawns.push(...add);
+}
 // ---------- your two friends: always your level, always the roles you're missing ----------
 const NEED = { tank: ['healer', 'dps'], healer: ['tank', 'dps'], dps: ['tank', 'healer'] };
 const FRIEND_CLS = { tank: ['bulwark', 'bladewarden', 'wardancer'], healer: ['cleric', 'lifebinder', 'aegis'], dps: ['longwatch', 'elementalist', 'knifeshade', 'warlock', 'blightblade'] };
@@ -96,24 +115,22 @@ export function makeFriends() {
   const need = NEED[CLASSES[S.heroCls].role];
   S.friends = need.slice(0, room).map((role, i) => ({ name: names[i] || 'Friend ' + (i + 1), pal: 1 + i, persona: 'friendly' }));
   S.friends.forEach((fr, i) => {
-    const cls = pick(FRIEND_CLS[need[i]]);
+    const cls = pick(FRIEND_CLS[need[i]]); S.friends[i].cls = cls;
     const f = addMate({ name: fr.name, cls, lvl: S.hero.lvl, pal: fr.pal, persona: fr.persona, guild: null, friend: true, bff: true }, S.hero);
     chat('party', f.name, FRIEND_HI[need[i]]);
   });
-  chat('sys', null, `Your friends ${S.friends.map(f => f.name).join(' and ')} have joined your group. They always match your level and fill the roles you need. Orders are under the party frames: Pull and Clear send your tank into a camp.`);
+  chat('sys', null, `${S.friends.map(f => f.name).join(' and ')} join you.`);
 }
-// keep friends at your level, and swap their classes to fill whatever role you're not playing
+// keep friends at your level, playing the classes you chose for them
 export function syncFriends() {
   const h = S.hero; if (!h) return;
   const bffs = S.party.filter(p => p.fake?.bff);
   if (!bffs.length) return;
-  const need = [...NEED[CLASSES[S.heroCls].role]];
-  // whoever already fills a needed role keeps it
-  const keep = new Map();
-  for (const f of bffs) { const r = CLASSES[f.cls].role, i = need.indexOf(r); if (i >= 0) { keep.set(f, r); need.splice(i, 1); } }
   for (const f of bffs) {
-    let cls = f.cls;
-    if (!keep.has(f) && need.length) { const r = need.shift(); cls = pick(FRIEND_CLS[r]); }
+    let fr = (S.friends || []).find(x => x.name === f.name);
+    if (!fr) { fr = { name: f.name, pal: f.pal || 1, persona: 'friendly' }; (S.friends = S.friends || []).push(fr); }
+    if (!fr.cls) fr.cls = f.cls;                     // older saves: they keep what they were playing
+    const cls = fr.cls;
     if (cls !== f.cls || f.lvl !== h.lvl) {
       const swap = cls !== f.cls, frac = f.dead ? .5 : f.hp / f.maxHp, at = { x: f.x, z: f.z };
       S.party = S.party.filter(p => p !== f); S.fakes = S.fakes.filter(p => p !== f); f.remove = true; f.dead = true;
@@ -142,7 +159,7 @@ export function campOrder(mode) {
 }
 export const campLeft = () => { const o = S.campOrder; return o ? S.ents.filter(m => m.mob && !m.dead && !m.remove && Cb.isEnemy(S.hero, m) && !m.charmed && Math.hypot(m.x - o.c.x, m.z - o.c.z) < o.r) : []; };
 function campTick() {
-  const o = S.campOrder; if (!o) return;
+  const o = S.campOrder; if (!o || o.mode === 'hunt') return;
   const tank = o.tank;
   if (!tank || tank.dead || !S.party.includes(tank) || S.hero.dead) { S.campOrder = null; S.cmd = 'follow'; return; }
   const left = campLeft(), fighting = S.ents.some(m => m.mob && !m.dead && m.threat && [...m.threat.keys()].some(k => S.party.includes(k)) && !m.evading);
@@ -158,13 +175,80 @@ function campTick() {
     tank.pull = { tgt: t, phase: 'go', spot: { ...o.spot } };
   }
 }
+// ---------- hunting: stays on until you switch it off; the tank works through whatever zone you're in ----------
+export function setHunt(on) {
+  const h = S.hero;
+  S.huntOn = !!on;
+  for (const p of S.party) p.pull = null;
+  if (on) {
+    S.campOrder = null; S.cmd = 'hunt'; S.target = null;
+    const tank = tankOf(), zn = zoneAt(h.x, h.z);
+    if (!S.quietCmd) chat('party', h.name, zn ? `Let's hunt ${zn.name}. Keep it going till I say stop.` : "Let's go hunting.");
+    if (tank) chat('party', tank.name, pick(["Hunting it is. I'll keep pulling, you keep up.", "On it. I'll work my way through. Stay close.", "Right. Next one's mine. Follow me."]));
+    
+    huntTick(true);
+  } else {
+    if (S.campOrder?.mode === 'hunt') S.campOrder = null;
+    S.cmd = 'follow';
+    if (!S.quietCmd) chat('party', h.name, "That's enough hunting for now. Follow me.");
+  }
+  save();
+}
+const huntable = (zn, h) => S.ents.filter(m => m.mob && !m.dead && !m.remove && m.spawn?.hz === zn.id && !m.boss && !m.boss2 && !m.charmed && !m.evading
+  && m.lvl <= h.lvl + 2 && Cb.isEnemy(h, m) && (world.underwater || depthAt(m.x, m.z) < 1.3) && Math.hypot(m.x - zn.x, m.z - zn.z) < zn.r + 15
+  && !(m.threat && [...m.threat.keys()].some(k => !k.dead && !S.party.includes(k) && !(k.pet && S.party.includes(k.owner)))));
+export const huntInfo = () => { const o = S.campOrder; return S.huntOn ? { zone: o?.mode === 'hunt' ? o.zone : zoneAt(S.hero.x, S.hero.z), rest: o?.rest, wait: o?.wait && !o?.next, next: o?.next } : null; };
+function huntTick(first) {
+  if (!S.huntOn) return;
+  const h = S.hero; if (!h || h.dead || S.scene) return;
+  let o = S.campOrder;
+  if (o && o.mode !== 'hunt') return;             // a pull or clear you asked for runs first
+  if (!o) { o = S.campOrder = { mode: 'hunt', tank: null, said: {}, zone: null, next: null }; S.cmd = 'hunt'; }
+  const tank = tankOf(), heroTank = !tank && CLASSES[S.heroCls].role === 'tank';
+  if (tank !== o.tank) { o.tank = tank; o.next = null; }
+  // the zone: the one you're in, until you walk out of it
+  if (!o.zone || Math.hypot(h.x - o.zone.x, h.z - o.zone.z) > o.zone.r + 8) {
+    const zn = zoneAt(h.x, h.z);
+    if (zn !== o.zone) { o.zone = zn; o.next = null; o.wait = null; o.said = {}; if (zn && !first) chat('party', (tank || h).name, `New hunting ground: ${zn.name}.`); }
+  }
+  const zn = o.zone;
+  if (!zn) { if (!o.said.none) { o.said.none = 1; chat('sys', null, 'No hunting ground here. Walk to some enemies and your group will start hunting.'); } o.next = null; return; }
+  o.said.none = 0;
+  if (!tank && !heroTank) { if (!o.said.tank) { o.said.tank = 1; chat('sys', null, 'You need a tank in your group to hunt.'); } return; }
+  const fighting = S.ents.some(m => m.mob && !m.dead && m.threat && [...m.threat.keys()].some(k => S.party.includes(k)) && !m.evading);
+  if (fighting) { o.rest = false; return; }
+  // rest when anyone is hurt or low on mana
+  const ready = S.party.every(p => p.dead || (p.hp > p.maxHp * .7 && !(p.resType === 'mana' && p.res < p.resMax * .45)));
+  if (!ready) { o.rest = true; o.next = null; if (!o.said.rest) { o.said.rest = 1; const healer = S.party.find(p => !p.isHero && CLASSES[p.cls].role === 'healer') || tank; if (healer) chat('party', healer.name, pick(['Quick breather. Let me get my mana back.', 'Resting up a moment.', 'Hold up, drinking.'])); } return; }
+  if (o.rest) { o.rest = false; o.said.rest = 0; if (tank) chat('party', tank.name, pick(['Everyone topped up? Moving on.', 'Right, back to it.', 'Ready. Next one.'])); }
+  const list = huntable(zn, h), from = tank || h;
+  if (o.next && !list.includes(o.next)) o.next = null;
+  if (!o.next && list.length) {
+    o.next = list.sort((a, b) => dist(a, from) - dist(b, from))[0]; o.wait = null;
+    if (o.said.empty) { o.said.empty = 0; chat('party', (tank || h).name, pick(['One just popped. Going.', "Something's up. Let's go.", 'Respawn! Moving.'])); }
+  }
+  if (heroTank && o.next && (!S.target || S.target.dead)) S.target = o.next;
+  if (!list.length) {
+    // nothing up: wait where the next one will appear
+    o.next = null;
+    const sp = world.spawns.filter(s => s.hz === zn.id && !s.boss && !s.boss2 && !(s.alive && !s.alive.dead)).sort((a, b) => (b.timer || 0) / (b.respawn || 60) - (a.timer || 0) / (a.respawn || 60))[0];
+    if (sp) { const from = tank || h; let dx = from.x - sp.x, dz = from.z - sp.z; const d = Math.hypot(dx, dz) || 1; o.wait = { x: sp.x + dx / d * 16, z: sp.z + dz / d * 16 }; }
+    else o.wait = { x: zn.x, z: zn.z };
+    if (!o.said.empty) { o.said.empty = 1; chat('party', (tank || h).name, pick(["That's the zone cleared for now. We'll wait for respawns.", "Nothing left up. Let's wait for the next one.", 'All quiet. Waiting on respawns.'])); }
+  }
+}
 // where you walk on your own while an order runs (null: stay put)
 export function autoFollowPoint() {
-  const o = S.campOrder, h = S.hero; if (!o || !o.tank || o.tank.dead) return null;
+  const o = S.campOrder, h = S.hero; if (!o || !o.tank || o.tank.dead) { if (h) h.autoFol = false; return null; }
   const t = o.tank;
-  if (o.mode === 'pull' && (t.pull || Math.hypot(t.x - o.spot.x, t.z - o.spot.z) > 10)) return Math.hypot(h.x - o.spot.x, h.z - o.spot.z) > 2.5 ? o.spot : null;
-  const d = dist(h, t), keep = CLASSES[S.heroCls].melee ? 4 : 8;
-  if (d < keep + 1.5) return null;
+  // pulling: you hold the spot the whole time and let the tank bring them to you
+  if (o.mode === 'pull') { const d = Math.hypot(h.x - o.spot.x, h.z - o.spot.z); if (h.autoFol ? d > 1 : d > 4) { h.autoFol = true; return o.spot; } h.autoFol = false; return null; }
+  // in a fight you stand where you like
+  if (S.ents.some(m => m.mob && m.engaged && !m.dead && !m.evading && m.target && S.party.includes(m.target))) { h.autoFol = false; return null; }
+  const d = dist(h, t), keep = CLASSES[S.heroCls].melee ? 4 : 7;
+  // walk only once the tank is well ahead, then stop near them (no constant shuffling)
+  if (h.autoFol ? d < keep + .5 : d < keep + 5) { h.autoFol = false; return null; }
+  h.autoFol = true;
   const a = Math.atan2(h.x - t.x, h.z - t.z);
   return { x: t.x + Math.sin(a) * keep, z: t.z + Math.cos(a) * keep };
 }
@@ -277,7 +361,7 @@ function townsfolk(zone) {
     const tw = world.town, N = tw.npcs;
     for (const [k, g] of Object.entries(GIVERS)) { const p = { warden: N.quest1, tanner: N.quest2, sister: N.quest3 }[k]; if (p) S.npcs[k] = npc({ name: g.name, title: g.title, kind: g.model, x: tw.x + p.x, z: tw.z + p.z, giver: k }); }
     S.npcs.vendor = npc({ name: 'Odda Coin-Purse', title: 'Supplies', kind: 'bandit', x: tw.x + N.vendor.x, z: tw.z + N.vendor.z, vendor: 'vale' });
-    S.npcs.armory = npc({ name: 'Master Corvin', title: 'Armory (change class)', kind: 'guard', x: tw.x + N.armory.x, z: tw.z + N.armory.z, armory: true });
+    S.npcs.armorer = S.npcs.armory = npc({ name: 'Master Corvin', title: 'Armory · class trials', kind: 'guard', x: tw.x + N.armory.x, z: tw.z + N.armory.z, armory: true, giver: 'armorer' });
     S.npcs.bind = npc({ name: 'Bind Stone', title: 'Bind here', kind: 'corpse', x: tw.x + N.bind.x, z: tw.z + N.bind.z, bindstone: true, scale: 1.6 });
     if (!S.bind) S.bind = { zone: 'vale', x: S.npcs.bind.x, z: S.npcs.bind.z + 1.5 };
     for (const [x, z] of N.guards) guard(tw, tw.x + x, tw.z + z, 'Town Guard');
@@ -291,7 +375,7 @@ function townsfolk(zone) {
       if (type === 'giver') S.npcs[key] = npc({ name: GIVERS[key].name, title: GIVERS[key].title, kind: GIVERS[key].model, x, z, giver: key });
       if (type === 'vendor') npc({ name: VEND[key], title: key === 'vill' ? 'Supplies and fishing poles' : 'Supplies', kind: 'pirate1', x, z, vendor: key });
       if (type === 'bind') npc({ name: 'Bind Stone', title: 'Bind here', kind: 'corpse', x, z, bindstone: true, scale: 1.6 });
-      if (type === 'armory') npc({ name: 'Mistress Hale', title: 'Armory (change class)', kind: 'guard', x, z, armory: true });
+      if (type === 'armory') S.npcs.armorer = npc({ name: 'Mistress Hale', title: 'Armory · class trials', kind: 'guard', x, z, armory: true, giver: 'armorer' });
     }
     for (const [dx, dz] of t.guards) guard(t, t.x + dx, t.z + dz, t.key === 'fort' ? 'Halyard Marine' : 'Port Watch');
     if (t.key === 'port') {
@@ -318,6 +402,24 @@ function arrivalFor(zone, from) {
   if (zone === 'coast') return { x: -280, z: 0 };
   if (zone === 'fleet') return { x: 0, z: 55 };
   const zx = 278; return { x: zx, z: Math.sin(zx * .02) * 12 };
+}
+// a finished quest can whisk you (and your group) straight back to whoever gets the hand-in
+export function returnToGiver(q) {
+  const k = turnToOf(q), h = S.hero; if (!h || h.dead) return false;
+  if (Cb.inCombat(h) && S.ents.some(m => m.mob && !m.dead && m.threat?.has(h))) { chat('sys', null, "You can't do that in the middle of a fight."); return false; }
+  const find = () => (S.npcs[k] && !S.npcs[k].remove && !S.npcs[k].dead ? S.npcs[k] : S.ents.find(e => e.giver === k && !e.dead && !e.remove));
+  let n = find();
+  for (const z of ['coast', 'vale']) { if (n || z === S.zone) continue; if (!travel(z, null, false)) return false; n = find(); }
+  if (!n) { chat('sys', null, `You can't find ${GIVERS[k]?.name || 'them'} right now.`); return false; }
+  S.campOrder = null; for (const p of S.party) p.pull = null;
+  R.burst(h.x, h.y + 1, h.z, 30, [1, .9, .5], 2.5, 1, .6);
+  const spot = (dx, dz) => ({ x: n.x + dx, z: n.z + dz });
+  const at = spot(Math.sin(n.yaw || 0) * 2.6, Math.cos(n.yaw || 0) * 2.6);
+  h.x = at.x; h.z = at.z; collide(h, h.r); h.y = hgt(h.x, h.z); h.yaw = Math.atan2(n.x - h.x, n.z - h.z); S.camYaw = h.yaw;
+  for (const p of S.party) if (p !== h) { p.x = h.x + rnd(-2.5, 2.5); p.z = h.z + rnd(-2.5, 2.5); collide(p, p.r); p.y = hgt(p.x, p.z); p.rx = p.x; p.rz = p.z; }
+  h.rx = h.x; h.rz = h.z;
+  R.burst(h.x, h.y + 1, h.z, 40, [1, .9, .5], 3, 1.2, .7);
+  save(); return true;
 }
 // a class quest's rival waits on the beach below Smuggler's Rock
 function spawnRival(cls) {
@@ -388,6 +490,8 @@ export function kick(f) {
 }
 export function befriend(f) { if (!f.fake) return; f.fake.friend = !f.fake.friend; chat('sys', null, f.fake.friend ? `${f.name} is now your friend. Friends always say yes when they're free.` : `${f.name} removed from friends.`); save(); }
 export function partyCommand(cmd) {
+  if (cmd === 'hunt') { setHunt(!S.huntOn); return; }
+  if (S.huntOn) { S.huntOn = false; if (S.campOrder?.mode === 'hunt') S.campOrder = null; }
   if (cmd === 'pull' || cmd === 'clear') { campOrder(cmd); return; }
   S.cmd = cmd; S.campOrder = null;
   for (const p of S.party) p.pull = null;
@@ -396,7 +500,27 @@ export function partyCommand(cmd) {
 }
 
 // ---------- class switching ----------
+// ---------- weapons: you play a class by equipping its weapon; the armory trials unlock new ones ----------
+export const owns = k => (S.owned || []).includes(k);
+export function weaponChoices() {
+  const have = new Set((S.owned || []).map(k => CLASSES[k].family));
+  const missing = CLASS_KEYS.filter(k => !owns(k) && !have.has(CLASSES[k].family));
+  return missing.length ? missing : CLASS_KEYS.filter(k => !owns(k));
+}
+export function unlockClass(k) {
+  if (owns(k) || !(S.unlockPicks > 0) || !weaponChoices().includes(k)) return false;
+  S.owned.push(k); S.unlockPicks--;
+  const w = S.gear[k]?.weapon;
+  chat('sys', null, `You take up ${w ? 'the ' + w.name : 'a new weapon'}.`);
+  save(); return true;
+}
+// your friends play whatever classes you choose for them
+export function setFriendClass(name, k) {
+  const fr = (S.friends || []).find(f => f.name === name); if (!fr || !CLASSES[k]) return;
+  fr.cls = k; syncFriends(); save();
+}
 export function switchClass(cls) {
+  if (!owns(cls)) return false;
   S.campOrder = null; if (S.cmd === 'pull' || S.cmd === 'clear') S.cmd = 'follow';
   const h = S.hero;
   if (Cb.inCombat(h)) { chat('sys', null, "You can't change class in combat."); return false; }
@@ -424,7 +548,7 @@ export const nextOffer = k => offerQueue(k)[0] || null;
 export const turnInsFor = k => QUESTS.filter(q => turnToOf(q) === k && S.quests[q.id]?.state === 'done' && (!q.cls || q.cls === S.heroCls));
 export const activeFrom = k => QUESTS.filter(q => q.giver === k && S.quests[q.id]?.state === 'active');
 export function declineQuest(q) { S.declined = S.declined || {}; S.declined[q.id] = (S.declined[q.id] || 0) + 1; }
-export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
+export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
 export function acceptQuest(q) {
   S.quests[q.id] = { state: q.obj.talk ? 'done' : 'active', n: 0 };
   if (S.declined) delete S.declined[q.id];
@@ -449,6 +573,7 @@ export function turnIn(q, choice = null) {
   if (['m8', 'h5', 'm13'].includes(q.id)) storyFolk();
   Banter.onQuest('turnin', q);
   if (q.id === 'm16') S.flags.wickCoast = true;
+  if (q.unlock) { S.unlockPicks = (S.unlockPicks || 0) + 1;  }
   save();
   return ch ? ch.reply : null;
 }
@@ -460,6 +585,7 @@ function questProgress(mob, near) {
     const nearOk = !o.near || (o.near === 'waste' ? regionAt(mob.x, mob.z) === 3 : world.spots[o.near] && Math.hypot(mob.x - world.spots[o.near].x, mob.z - world.spots[o.near].z) < 70);
     if (o.kill && o.kill.includes(mob.mob) && nearOk && (!o.dungeon || mob.dungeon) && (!o.reef || mob.spawn?.area === 5) && !mob.named && !mob.add) hit = true;
     if (o.kill && o.kill.includes(mob.mob) && mob.add && mob.mob === 'ghost' && nearOk) hit = true;
+    if (o.anyMin && mob.lvl >= o.anyMin && !mob.add) hit = true;
     if (o.named && mob.named === o.named) hit = true;
     if (o.collect && o.collect.includes(mob.mob)) { if (Math.random() < o.chance) { hit = true; chat('loot', null, `You loot ${o.item}.`); } }
     if (hit) { st.n = Math.min(o.n, st.n + 1); floatText(S.hero, `${q.name} ${st.n}/${o.n}`, '#ffd34d'); if (st.n >= o.n) { st.state = 'done'; Banter.onQuest('done', q); chat('sys', null, `${q.name}: done! Return to ${GIVERS[turnToOf(q)].name}.`); } }
@@ -512,7 +638,7 @@ Cb.setHooks({
   },
   onOverflow(p, over) { if (over > 0) S.vetXp = Math.min(40000, (S.vetXp || 0) + Math.round(over)); },
   lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : MAX_LVL),
-  onCapped(p) { if (cappedSaid) return; cappedSaid = true; chat('sys', null, `Level 10 cap: to go past 10, first reach level 10 with one class from each family (${FAMILIES.join(', ')}). See Book → Character. Extra xp becomes veteran xp, which doubles xp for your lower classes until it's spent.`); },
+  onCapped(p) { if (cappedSaid) return; cappedSaid = true; chat('sys', null, `You have learned all this weapon can teach you, for now.`); },
   onYield(m, src) {
     // he only surrenders to your group, and only while you're on his quest
     const q = QUESTS.find(q => q.obj.named === m.named && q.obj.yield), st = q && S.quests[q.id];
@@ -649,10 +775,10 @@ export function tick(dt) {
     chat('sys', null, 'The seabed shakes. Something enormous rises from the dark beyond the flagship!');
     R.burst(0, 3, -60, 80, [.3, .7, .9], 6, 1.6, 1.2);
   }
-  for (const sp of world.spawns) if (!sp.alive) { sp.timer -= dt; if (sp.timer <= 0 && !nearParty(sp, 25) && !(sp.gate && S.flags[sp.gate + 'Yielded'])) spawn(sp); }
+  for (const sp of world.spawns) if (!sp.alive) { sp.timer -= dt; if (sp.timer <= 0 && !nearParty(sp, S.huntOn ? 13 : 25) && !(sp.gate && S.flags[sp.gate + 'Yielded'])) spawn(sp); }
   if ((atT -= dt) <= 0) {
     atT = .5;
-    syncFriends(); campTick();
+    syncFriends(); campTick(); huntTick();
     for (const q of QUESTS) {
       if (!q.obj.at || S.quests[q.id]?.state !== 'active') continue;
       const sp = world.spots[q.obj.at]; if (!sp || S.zone !== 'vale') continue;
@@ -742,18 +868,20 @@ export function snapshot() {
   return {
     v: 2, seed: S.seed, heroName: S.heroName, heroCls: S.heroCls, classes: S.classes, gold: S.gold, pots: S.pots, quests: S.quests, bar: S.bar, time: S.time,
     zone: S.zone, hx: h ? h.x : 0, hz: h ? h.z : 0, bind: S.bind, pole: !!S.pole, pops,
-    flags: S.flags, lore: S.lore, perks: S.perks, vetXp: S.vetXp || 0, friendsMade: !!S.friendsMade, friends: S.friends || [], bank: S.bank.map(strip), used: S.used, scenesSeen: S.scenesSeen,
+    flags: S.flags, lore: S.lore, perks: S.perks, vetXp: S.vetXp || 0, friendsMade: !!S.friendsMade, friends: S.friends || [], bank: S.bank.map(strip), used: S.used, scenesSeen: S.scenesSeen, huntOn: !!S.huntOn, owned: S.owned, unlockPicks: S.unlockPicks || 0,
     gear: Object.fromEntries(Object.entries(S.gear).map(([k, g]) => [k, Object.fromEntries(Object.entries(g).map(([s, it]) => [s, strip(it)]))])),
     bag: S.bag.map(strip), corpse: S.corpse ? { zone: S.corpse.zone || 'vale', x: S.corpse.x, z: S.corpse.z, cls: S.corpse.cls, gear: S.corpse.gear } : null,
     partyData: S.party.filter(p => !p.isHero).map(fakeData),
   };
 }
 export function save() { if (!S.running) return; try { localStorage.setItem(SAVE_KEY, JSON.stringify(snapshot())); } catch (e) { } }
+export function saveInfo() { try { const sv = JSON.parse(localStorage.getItem(SAVE_KEY)); if (!sv) return null; const lvl = sv.classes?.[sv.heroCls]?.lvl || 1; return { name: sv.heroName, cls: sv.heroCls, lvl }; } catch (e) { return null; } }
+export function deleteSave() { try { localStorage.removeItem(SAVE_KEY); } catch (e) { } S.running = false; }
 export function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch (e) { return false; } }
 export function loadSave(data) {
   const sv = data || JSON.parse(localStorage.getItem(SAVE_KEY));
   Object.assign(S, { seed: sv.seed, heroName: sv.heroName, heroCls: sv.heroCls, classes: sv.classes, gold: sv.gold, pots: sv.pots || { hpot: 0, mpot: 0 }, quests: sv.quests || {}, bar: sv.bar, bag: sv.bag || [], gear: sv.gear, pole: !!sv.pole,
-    flags: sv.flags || {}, lore: sv.lore || {}, vetXp: sv.vetXp || 0, friendsMade: !!sv.friendsMade, friends: sv.friends || [], perks: sv.perks || [], bank: sv.bank || [], used: sv.used || {}, scenesSeen: sv.scenesSeen || { intro: true } });
+    flags: sv.flags || {}, lore: sv.lore || {}, vetXp: sv.vetXp || 0, friendsMade: !!sv.friendsMade, friends: sv.friends || [], perks: sv.perks || [], bank: sv.bank || [], used: sv.used || {}, scenesSeen: sv.scenesSeen || { intro: true }, huntOn: !!sv.huntOn, unlockPicks: sv.unlockPicks || 0, owned: sv.owned || CLASS_KEYS.filter(k => k === sv.heroCls || (sv.classes?.[k]?.lvl || 1) > 1) });
   // older saves: the old Ossuary quests are now part of the main story, so a hero who finished them skips ahead
   if (!sv.flags && S.quests.q9?.state === 'turned') for (const id of ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12', 'm13']) S.quests[id] = S.quests[id] || { state: 'turned', n: 0 };
   for (const k of CLASS_KEYS) { if (!S.classes[k]) S.classes[k] = { lvl: 1, xp: 0 }; if (!S.gear[k]) S.gear[k] = starterGear(k); if (!S.bar[k]) S.bar[k] = defaultBar(k); }
@@ -770,13 +898,14 @@ export function loadSave(data) {
   // older saves kept only names: find those friends among the fake players
   if (!sv.partyData) for (const n of sv.party || []) { const f = S.fakes.find(x => x.name === n); if (f) { f.x = S.hero.x + rnd(-2, 2); f.z = S.hero.z + rnd(-2, 2); f.y = hgt(f.x, f.z); f.fake.group = null; f.inParty = true; f.fake.state = 'party'; S.party.push(f); } }
   S.time = sv.time || 0;
-  S.campOrder = null; if (S.cmd === 'pull' || S.cmd === 'clear') S.cmd = 'follow';
+  S.campOrder = null; S.cmd = S.huntOn ? 'hunt' : 'follow';
   chat('sys', null, `Welcome back, ${S.heroName}.`);
   if (!S.friendsMade) makeFriends();
 }
 // save codes: compressed JSON, so progress can move between builds and devices
-export async function makeCode() {
-  const raw = new TextEncoder().encode(JSON.stringify(snapshot()));
+export async function makeCode(fromStore) {
+  const data = fromStore || !S.running ? JSON.parse(localStorage.getItem(SAVE_KEY)) : snapshot();
+  const raw = new TextEncoder().encode(JSON.stringify(data));
   const cs = new Blob([raw]).stream().pipeThrough(new CompressionStream('deflate-raw'));
   const buf = new Uint8Array(await new Response(cs).arrayBuffer());
   let s = ''; for (const b of buf) s += String.fromCharCode(b);

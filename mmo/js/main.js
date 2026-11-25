@@ -55,13 +55,13 @@ function moveHero(dt, inp) {
     h.moving = Math.min(1, h.moving + dt * 8);
     // the camera drifts back behind you when you run forward
     if (S.time - UI.input.lastDragT > 1.2 && inp.mz < -.4) S.camYaw += wrapA(h.yaw - S.camYaw) * Math.min(1, dt * 1.6);
-  } else if (!h.casting && !Cb.rooted(h) && !Cb.ccd(h) && (follow = Game.autoFollowPoint())) {
+  } else if (!h.casting && !Cb.rooted(h) && !Cb.ccd(h) && (follow = Game.autoFollowPoint()) && Math.hypot(follow.x - h.x, follow.z - h.z) > .05) {
     const dx = follow.x - h.x, dz = follow.z - h.z, d = Math.hypot(dx, dz), sp = Math.min(h.spd * Cb.spdOf(h), d / dt);
     h.sit = false;
     h.x += dx / d * sp * dt; h.z += dz / d * sp * dt; collide(h, h.r);
     h.yaw += wrapA(Math.atan2(dx, dz) - h.yaw) * Math.min(1, dt * 10);
     h.moving = Math.min(1, h.moving + dt * 8);
-    S.camYaw += wrapA(h.yaw - S.camYaw) * Math.min(1, dt * .8);
+    if (S.time - UI.input.lastDragT > 2) S.camYaw += wrapA(h.yaw - S.camYaw) * Math.min(1, dt * .5);
   } else {
     h.moving = Math.max(0, h.moving - dt * 8);
     const t = S.target;
