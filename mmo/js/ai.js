@@ -1,5 +1,5 @@
 // AI: mobs (aggro, camp linking, leashing, fleeing, casters), the boss, your companions and the fake players.
-import { S, clamp, dist, angTo, wrapA, rnd, pick, chat, floatText, TAU } from './core.js';
+import { S, X, clamp, dist, angTo, wrapA, rnd, pick, chat, floatText, TAU } from './core.js';
 import { CLASSES, MOBS, CHAT, PETS, roleOf } from './data.js';
 import * as Cb from './combat.js';
 import { hgt, collide, blocked, world, route, depthAt } from './world.js';
@@ -100,6 +100,7 @@ export function mobAI(m, dt) {
   const leash = m.dungeon ? 34 : 50;
   if (dist(m, m.home) > leash) { m.evading = true; m.target = null; return; }
   if (M.flee && !m.fled && m.hp < m.maxHp * .15) { m.fled = true; m.fleeT = 5; if (dist(m, S.hero) < 40) chat('say', m.name, pick(['I yield— no!', 'Run!', 'Not like this!'])); return; }
+  if (X.mobSmart && !m.boss && !m.boss2 && X.mobSmart(m, t, dt, M)) return;
   if ((m.boss || m.boss2) && bossAI(m, t, dt)) return;
   // casters heal friends and throw bolts
   if (m.mcast) {

@@ -105,7 +105,12 @@ function densify(zone) {
     for (let k = 0; k < 6; k++) {
       const ang = rng() * TAU, d = 2.6 + rng() * 2.4, x = sp.x + Math.sin(ang) * d, z = sp.z + Math.cos(ang) * d;
       if ((depthAt(x, z) > .5) !== wet && !world.underwater) continue;
-      add.push({ ...sp, x, z, y: hgt(x, z), alive: null, timer: 0 }); break;
+      // Build 12: in the early game the partner is a real pack: they fight together, and some packs are three strong
+      const early = sp.lvl[1] <= 11 && !sp.dungeon;
+      if (early) { sp.camp = sp.camp || 'pk' + zone + add.length; }
+      add.push({ ...sp, x, z, y: hgt(x, z), alive: null, timer: 0 });
+      if (early && rng() < .35) { const a2 = ang + 2.1; add.push({ ...sp, x: sp.x + Math.sin(a2) * d, z: sp.z + Math.cos(a2) * d, y: hgt(sp.x + Math.sin(a2) * d, sp.z + Math.cos(a2) * d), alive: null, timer: 0 }); }
+      break;
     }
   }
   world.spawns.push(...add);
@@ -299,6 +304,7 @@ export function storyFolk() {
   }
 }
 export function spawnProp(p) {
+  if (!world.props.includes(p)) world.props.push(p);   // so storyFolk() brings it back when it rebuilds the town
   const e = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, prop: p, name: p.lore ? LORE[p.lore].title : p.name, kind: p.kind, x: p.x, z: p.z, scale: p.scale });
   e.yaw = p.yaw; e.y = p.y ?? hgt(e.x, e.z); return e;
 }

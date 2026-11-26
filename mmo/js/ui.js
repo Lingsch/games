@@ -292,7 +292,7 @@ function updateFrames() {
   });
   let cmds = $('cmds');
   if (mates.length && !cmds) { cmds = document.createElement('div'); cmds.id = 'cmds'; cmds.innerHTML = ['follow', 'assist', 'hold', 'pull', 'clear', 'hunt'].map(c => `<button data-c="${c}">${{ follow: 'Follow', assist: 'Assist', hold: 'Hold', pull: 'Pull', clear: 'Clear', hunt: 'Hunt' }[c]}</button>`).join('') + '<button data-c="say" class="say1">💬</button>'; cmds.onclick = ev => { const c = ev.target.closest('button')?.dataset.c; if (c === 'say') openSay(); else if (c) Game.partyCommand(c); }; box.appendChild(cmds); }
-  if (cmds) { cmds.style.display = mates.length ? '' : 'none'; box.appendChild(cmds); cmds.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.c === S.cmd)); }
+  if (cmds) { cmds.style.display = mates.length ? '' : 'none'; if (cmds.parentElement !== box || cmds.nextElementSibling?.classList.contains('pf')) box.appendChild(cmds); /* re-appending every frame ate mouse clicks on PC */ cmds.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.c === S.cmd)); }
   // target
   const t = S.target, tf = $('tgt');
   if (!t || t.remove) { tf.classList.add('hide'); }
@@ -887,6 +887,13 @@ export function openLoot(m) {
   if (m.lootGold) { S.gold += m.lootGold; chat('loot', null, `You loot ${m.lootGold} gold.`); m.lootGold = 0; }
   m.loot = m.loot.filter(it => !(X.isSmall(it) && X.takeSmall(it)));
   if (!m.loot.length) { Game.save(); return; }
+  // Build 12: by default gear goes to need-or-greed rolls; recipes and collectibles are yours. A raid keeps its guild loot rule.
+  if (SET.loot !== 'master' && S.party.length <= 6 && X.rollItems) {
+    const mine = m.loot.filter(it => it.recipe || it.collect), roll = m.loot.filter(it => !(it.recipe || it.collect));
+    for (const it of mine) Game.assignLoot({ loot: [it] }, it, S.hero);
+    if (S.party.some(p => !p.isHero && !p.dead)) X.rollItems(roll, 'You'); else for (const it of roll) Game.assignLoot({ loot: [it] }, it, S.hero);
+    m.loot = []; Game.save(); return;
+  }
   openSheet('Loot: ' + m.name, body => {
     if (!m.loot.length) { body.appendChild(el('<p class="dim">Nothing left.</p>')); setTimeout(closeSheet, 400); return; }
     body.appendChild(el('<p class="dim" style="margin-top:0">You are the master looter. Choose who gets each item. Your companions notice whether you\'re fair.</p>'));
@@ -906,6 +913,7 @@ function renderSettings(box, inGame, back) {
   box.innerHTML = `${back ? '<button data-a="back" style="margin-bottom:8px">← Back</button>' : ''}
     <div class="card" style="text-align:left"><h3>Camera &amp; touch</h3>${['camSpeed', 'joySize', 'tapSens'].map(segHtml).join('')}</div>
     <div class="card" style="text-align:left"><h3>Text &amp; interface size</h3>${['ui', 'text'].map(segHtml).join('')}</div>
+    <div class="card" style="text-align:left"><h3>Loot</h3>${segHtml('loot')}</div>
     <div class="card" style="text-align:left"><h3>Graphics</h3>${segHtml('gfx')}<p class="dim" style="font-size:12px;margin:0">Low and Medium draw fewer pixels, so the game runs smoother and the phone stays cooler.</p></div>
     <div class="card" style="text-align:left"><h3>Save codes</h3>
       ${info ? `<p style="margin:0 0 6px">Your character: <b>${esc(info.name)}</b>, level ${info.lvl} ${CLASSES[info.cls]?.name || ''}.</p><div class="acts"><button data-a="copy">Copy save code</button></div><textarea id="codeOut" readonly class="hide" style="height:60px"></textarea>` : '<p class="dim" style="margin:0 0 6px">No character saved on this device yet.</p>'}
@@ -944,7 +952,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 11 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 12 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

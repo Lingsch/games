@@ -410,3 +410,22 @@ export function campVisual(cx, y0, cz, faction, rng) {
   const gr = new THREE.Group(); gr.position.set(cx, y0, cz); worldGroup.add(gr);
   const geo = mergeBuilt(items); gr.add(new THREE.Mesh(geo, propMat), new THREE.Mesh(geo, propOutline(.04)));
 }
+
+// Build 12: is a point inside a building or too close to a wall? (rays in 8 directions: walled in on most sides = inside)
+export function wallNear(x, z, r = 1.6) {
+  for (const w of wallsNear(x, z)) { const t = clamp(((x - w.x1) * w.dx + (z - w.z1) * w.dz) / w.l2, 0, 1); if (Math.hypot(x - (w.x1 + w.dx * t), z - (w.z1 + w.dz * t)) < r + w.th) return true; }
+  return false;
+}
+export function insideBuilding(x, z, reach = 9) {
+  let hits = 0; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; if (blocked(x, z, x + Math.sin(a) * reach, z + Math.cos(a) * reach)) hits++; }
+  return hits >= 6;
+}
+// a free standing spot near (cx, cz): out of walls and buildings, and not on top of another person
+export function freeSpot(cx, cz, r0 = 4, r1 = 26, a0 = 0, avoid = []) {
+  for (let ring = r0; ring <= r1; ring += 2) for (let k = 0; k < 16; k++) {
+    const a = a0 + k / 16 * Math.PI * 2 * (k % 2 ? 1 : -1) / 2, x = cx + Math.cos(a) * ring, z = cz + Math.sin(a) * ring;
+    if (wallNear(x, z) || insideBuilding(x, z) || avoid.some(p => Math.hypot(p.x - x, p.z - z) < 2.5)) continue;
+    return { x, z };
+  }
+  return { x: cx + Math.cos(a0) * r0, z: cz + Math.sin(a0) * r0 };
+}

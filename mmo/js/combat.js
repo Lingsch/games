@@ -103,7 +103,7 @@ export function addThreat(mob, src, amt) {
 function engage(mob, src) {
   mob.engaged = true;
   const M = MOBS[mob.mob];
-  if (mob.camp && M.social) for (const o of S.ents) if (o !== mob && !o.dead && o.camp === mob.camp && !o.engaged && dist(o, mob) < M.social + 10) { o.threat.set(src, 1); o.combatT = S.time; o.engaged = true; }
+  if (mob.camp && (M.social || String(mob.camp).startsWith('pk'))) for (const o of S.ents) if (o !== mob && !o.dead && o.camp === mob.camp && !o.engaged && dist(o, mob) < (M.social || 4) + 10) { o.threat.set(src, 1); o.combatT = S.time; o.engaged = true; }
 }
 export function topThreat(mob) {
   let best = null, bv = -1;
@@ -534,7 +534,8 @@ function mobDied(e, src) {
     for (let i = 0; i < (e.boss ? 2 : 1); i++) e.loot.push(makeItem({ ...pool[i], named: true }));
   } else {
     const ch = e.elite ? .35 : .14;
-    if (Math.random() < ch) e.loot.push(randomGear(e.lvl, null, e.elite ? .1 : 0));
+    // Build 12: fewer pointless commons. Most plain (common) pieces never drop; uncommon and better drop as before.
+    if (Math.random() < ch) { const it = randomGear(e.lvl, null, e.elite ? .1 : 0); if (it.rarity > 0 || Math.random() < .3) e.loot.push(it); }
   }
   e.lootFor = e.tagged === 'party' ? 'party' : 'other';
   hooks.onMobDeath(e, credit, near);

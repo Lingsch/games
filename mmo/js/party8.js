@@ -72,7 +72,7 @@ function resolve(r, mine) {
   if (mine && mine !== 'pass') all.push({ p: S.hero, kind: mine, n: irnd(1, 100) });
   all.sort((a, b) => (a.kind === 'need' ? 0 : 1) - (b.kind === 'need' ? 0 : 1) || b.n - a.n);
   const best = all[0];
-  if (!best) { chat('party', null, `Everyone passed on ${it.name}. ${r.from} sells it, and gives you the ${it.value}g.`); S.gold += it.value; }
+  if (!best) { chat('party', null, r.from === 'You' ? `Everyone passed on ${it.name}. You sell it for ${it.value}g.` : `Everyone passed on ${it.name}. ${r.from} sells it, and gives you the ${it.value}g.`); S.gold += it.value; }
   else {
     chat('party', null, `${best.p.isHero ? 'You win' : best.p.name + ' wins'} ${it.name} (${best.kind} ${best.n}${all.length > 1 ? ', against ' + all.slice(1).map(x => `${x.p.isHero ? 'your' : x.p.name + "'s"} ${x.kind} ${x.n}`).join(', ') : ''}).`);
     if (best.p.isHero) { if (!Game.addToBag(it)) { if (S.bank.length < Game.BANK_SLOTS) { S.bank.push(it); chat('sys', null, `Your bags are full. ${it.name} goes to your bank.`); } else { S.gold += it.value; chat('sys', null, `No room anywhere. You sell ${it.name} for ${it.value}g.`); } } }
@@ -97,6 +97,7 @@ function drawRolls() {
       <div class="rb"><button data-k="need" ${can ? '' : 'disabled'}>🎲 Need</button><button data-k="greed">💰 Greed</button><button data-k="pass">Pass</button></div><i class="rt"></i></div>`; }).join('') + (rolls.length > 3 ? `<div class="dim" style="font-size:11px;text-align:center">+${rolls.length - 3} more</div>` : '');
 }
 X.rollsOpen = () => rolls.length;
+X.rollItems = (items, from) => { for (const it of items) rolls.push({ it, t: ROLL_T, from, id: ++rollId }); drawRolls(); };
 
 // ---------- stats: you and everyone with you ----------
 const pctS = v => (v * 100).toFixed(1) + '%', cap = t => t[0].toUpperCase() + t.slice(1);

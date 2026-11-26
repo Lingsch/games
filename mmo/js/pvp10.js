@@ -106,7 +106,7 @@ X.zone.push(zone => {
 });
 function raiseBanner() {
   const P0 = posts()[O.zone], mine = P0.owner === 'mine', p = O.p;
-  if (O.banner) { O.banner.remove = true; O.banner.dead = true; }
+  if (O.banner) { O.banner.remove = true; O.banner.dead = true; if (O.banner.prop) world.props = world.props.filter(p => p !== O.banner.prop); }
   O.banner = mine ? Cb.makeEnt({ team: 'ally', guard: true, name: `<${myGuild() || 'Your guild'}> Banner`, title: LANDS[O.zone].post, kind: 'pvp_mybanner', x: p.x, z: p.z, maxHp: 4000 + L() * 400, hp: 4000 + L() * 400, lvl: L(), armor: 300, home: { x: p.x, z: p.z } })
     : Game.spawnProp({ id: 'pbanner', kind: 'pvp_banner', name: `<${P0.owner}> Banner`, x: p.x, z: p.z, yaw: 0, scale: 1 });
   O.banner.y = hgt(p.x, p.z); O.banner.postBanner = true; O.banner.spd = 0;
