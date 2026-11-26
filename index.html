@@ -6,6 +6,11 @@
 <title>Rod's Games</title>
 <meta name="description" content="Browser games to play on your phone or computer.">
 <meta name="theme-color" content="#0b0a10">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Games">
+<link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -75,6 +80,22 @@
   .tip li{margin:6px 0}
   .tip p{margin:0;padding:0 20px 18px;color:var(--dim);font-size:16px}
 
+  .sync{margin:34px 0 0;border:1px solid var(--line);border-radius:14px;background:#110f17;padding:18px 20px}
+  .sync h2{font-family:"Alegreya Sans",system-ui,sans-serif;font-size:19px;margin:0;display:flex;align-items:center;gap:10px;letter-spacing:0}
+  .dot{width:10px;height:10px;border-radius:50%;background:#6b6577;flex:none}
+  .dot.on{background:#6fd08c}.dot.bad{background:#ff9d8a}
+  .sync p{margin:8px 0 0;color:#cfc8ba;font-size:16px}
+  .sync ul{list-style:none;margin:10px 0 0;padding:0;color:var(--dim);font-size:15px}
+  .sync li{display:flex;justify-content:space-between;gap:12px;padding:4px 0;border-top:1px solid var(--line)}
+  .sync li span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+  .btns{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+  .btns button{min-height:46px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:#211e2a;color:var(--ink);font:700 16px "Alegreya Sans",system-ui,sans-serif;cursor:pointer}
+  .btns button.pri{background:var(--gold);border-color:var(--gold);color:#120e08}
+  .btns button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+  #qrBox{margin-top:14px;display:none}
+  #qrBox.show{display:block}
+  #qrBox .qr{background:#fff;padding:12px;border-radius:12px;display:inline-block;line-height:0}
+  #qrBox .qr svg{width:min(260px,70vw);height:auto;display:block}
   footer{color:var(--dim);font-size:15px;text-align:center;padding:40px 0 48px}
   @media (prefers-reduced-motion:reduce){.play{transition:none}}
 </style>
@@ -91,6 +112,18 @@
     <div class="rule">The shelf</div>
     <div class="shelf" id="shelf"></div>
 
+    <section class="sync" aria-labelledby="syncH">
+      <h2 id="syncH"><span class="dot" id="syncDot"></span><span id="syncTitle">Save sync</span></h2>
+      <p id="syncText"></p>
+      <ul id="syncList"></ul>
+      <div class="btns" id="syncBtns"></div>
+      <div id="qrBox">
+        <p>Point the other device's camera at this, then open the link it shows. That device is then set up too.</p>
+        <div class="qr" id="qr"></div>
+        <p>Keep this code to yourself: it carries your key.</p>
+      </div>
+    </section>
+
     <details class="tip">
       <summary>Play full screen on iPhone</summary>
       <ol>
@@ -98,13 +131,14 @@
         <li>Tap the Share button, then <b>Add to Home Screen</b>.</li>
         <li>Launch it from the new icon. It opens with no browser bars.</li>
       </ol>
-      <p>Each game keeps its own save on the device you play on. A Home Screen copy keeps a separate save from Safari, so pick one and stick with it.</p>
+      <p>Tip: add <b>this page</b> to your Home Screen instead and every game opens full screen from one icon, sharing one save-sync setup. A Home Screen icon keeps its own saves and its own sync setup, separate from Safari.</p>
     </details>
   </main>
 
   <footer id="foot"></footer>
 </div>
 
+<script src="sync.js"></script>
 <script src="games.js"></script>
 <script>
 (function(){
@@ -128,6 +162,40 @@
         (g.updated?'<p class="stamp">Updated '+esc(g.updated)+'</p>':'')+
       '</div></article>';
   }).join("");
+  // ---- save sync panel
+  var S = window.RodSync, $ = function(id){ return document.getElementById(id); };
+  function ago(t){ if(!t) return "not yet"; var m = Math.round((Date.now()-t)/60000); if(m<1) return "just now"; if(m<60) return m+" min ago"; var h=Math.round(m/60); if(h<24) return h+(h===1?" hour ago":" hours ago"); var d=Math.round(h/24); return d+(d===1?" day ago":" days ago"); }
+  function paint(){
+    if(!S){ $("syncText").textContent = "Save sync couldn't load on this device."; return; }
+    var on = !!S.key();
+    $("syncDot").className = "dot" + (on ? " on" : "");
+    $("syncTitle").textContent = on ? "Save sync is on" : "Save sync is off";
+    $("syncText").textContent = on
+      ? "Saves on this device are stored in your GitHub account and follow you to your other devices. Nothing else to do."
+      : "Turn it on and your saves follow you between phone and computer on their own. One-time setup per device.";
+    $("syncList").innerHTML = on ? games.map(function(g){ var i = S.info(g.folder); return "<li><span>"+esc(g.title)+"</span><span>"+(i.linked ? "synced "+ago(i.when) : "syncs when you next play")+"</span></li>"; }).join("") : "";
+    $("syncBtns").innerHTML = on
+      ? '<button type="button" class="pri" id="bQr">Add another device</button><button type="button" id="bCopy">Copy key</button><button type="button" id="bOff">Turn off here</button>'
+      : '<button type="button" class="pri" id="bOn">Turn on save sync</button>';
+    if(on){
+      $("bQr").onclick = function(){
+        var box = $("qrBox"); if(box.classList.toggle("show")){
+          var go = function(){ var q = qrcode(0, "M"); q.addData(location.origin + location.pathname + "#k=" + S.key()); q.make(); $("qr").innerHTML = q.createSvgTag({ cellSize: 4, margin: 0, scalable: true }); };
+          if(window.qrcode) go(); else { var sc = document.createElement("script"); sc.src = "vendor/qrcode.js"; sc.onload = go; document.head.appendChild(sc); }
+        } else $("qr").innerHTML = "";
+      };
+      $("bCopy").onclick = function(){ try { navigator.clipboard.writeText(S.key()).then(function(){ S.toast("Key copied"); }, function(){ S.toast("Couldn't copy on this device"); }); } catch(e){ S.toast("Couldn't copy on this device"); } };
+      $("bOff").onclick = function(){ S.clearKey(); $("qrBox").classList.remove("show"); $("qr").innerHTML = ""; paint(); S.toast("Save sync is off on this device. Your saves stay here."); };
+    } else $("bOn").onclick = function(){ S.setup().then(function(ok){ if(ok){ paint(); S.toast("Save sync is on"); } }); };
+  }
+  // A link from "Add another device" carries the key after #k= ; store it and wipe it from the address bar.
+  var m = /^#k=(.+)$/.exec(location.hash || "");
+  if(m && S){
+    try { history.replaceState(null, "", location.pathname + location.search); } catch(e){ location.hash = ""; }
+    S.setKey(decodeURIComponent(m[1])).then(function(){ paint(); S.toast("Save sync is on for this device"); },
+      function(e){ paint(); S.toast(e && e.code === "offline" ? "Couldn't reach GitHub. Open that link again when you're online." : "That link's key didn't work. Use Add another device again.", 6000); });
+  }
+  paint();
   document.getElementById("foot").textContent = games.length + (games.length===1?" game":" games") + " on the shelf. More on the way.";
 })();
 </script>

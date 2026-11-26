@@ -223,5 +223,11 @@ textarea{height:80px;resize:none}
 </div></div>
 <div id="load">Kindling the world…</div>
 <div id="gen" class="hide">Shaping a new world…</div>
-<script type="module" src="./js/main.js"></script>
+<script src="../sync.js"></script>
+<script type="module">
+// Save sync first (so the newest save is in place), then the game.
+if (window.RodSync) { try { await RodSync.start({ game: "summoners", keys: ["shr_meta", "shr_run"] }); } catch (e) { console.warn(e); } }
+await import("./js/main.js");
+if (window.RodSync) RodSync.arm();
+</script>
 </body></html>
