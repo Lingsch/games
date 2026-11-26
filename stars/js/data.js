@@ -373,11 +373,14 @@ export const PETS = {
   treant: { name: 'Treant', kind: 'treant', role: 'dps', hpM: .9, powM: .6, spd: 6, r: .6, scale: .8 },
 };
 // default 12-key bars: actives first, then buffs, then the ultimate
+// abilities a class keeps in the Book rather than on its default bar when there are more than twelve
+export const BENCH = {};
 export function defaultBar(cls) {
   const ab = CLASSES[cls].abilities, keys = Object.keys(ab);
   const act = keys.filter(k => ab[k].kind !== 'buff' && ab[k].kind !== 'ult'), buf = keys.filter(k => ab[k].kind === 'buff'), ult = keys.filter(k => ab[k].kind === 'ult');
   let bar = ['attack', ...act, ...buf, ...ult];
   if (bar.length > 12) bar = bar.filter(k => k !== 'attack');
+  if (bar.length > 12 && BENCH[cls]) { for (const k of BENCH[cls]) { if (bar.length <= 12) break; bar = bar.filter(x => x !== k); } }
   if (bar.length > 12) bar = [...act, ...buf].slice(0, 12 - ult.length).concat(ult);
   while (bar.length < 12) bar.push(null);
   return bar.slice(0, 12);

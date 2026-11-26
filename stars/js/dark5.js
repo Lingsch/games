@@ -13,7 +13,7 @@ const REN = {
   wardancer: ['Dusk Knight', "A knight of the Dusk Covenant. Black plate and a dusk blade in each hand: a lamp blade that eats light instead of giving it. You turn blows aside, and every one you slip builds momentum for the kill.",
     { flicker: 'Gutter Strike', challenge: 'Dominate', counter: 'Riposte', whirl: 'Wheel of Dusk', blur: 'Smother', flourish: "Executioner's Flourish", keen: 'Whetted Hate', lightfeet: 'Soft Tread' }],
   lifebinder: ['Bloodbinder', "The Covenant's healer, which is a generous word for it. Blood is a currency: you move it from where it is to where you need it, and keep several transfusions running at once.",
-    { thorn: 'Lancet', renew: 'Transfusion', bloom: 'Clotting', rejuv: 'Quicken', wild: 'Shared Vein', swift: 'Suture', lifebloom: 'Second Pulse', tranq: 'Bloodtide', vigor: 'Thick Blood', rooted: 'Cold Hands', treeoflife: 'The Open Vein' }],
+    { thorn: 'Lancet', mark: 'Open Wound', renew: 'Transfusion', bloom: 'Clotting', rejuv: 'Quicken', wild: 'Shared Vein', swift: 'Suture', lifebloom: 'Second Pulse', tranq: 'Bloodtide', vigor: 'Thick Blood', rooted: 'Cold Hands', treeoflife: 'The Open Vein' }],
   knifeshade: ['Shade', "The Covenant's knife in the dark. A dusk knife, a black cloak and no conscience to speak of. Enormous damage from behind while somebody else holds the enemy's eye.",
     { gouge: 'Blind', step: 'Shadowstep', shadowpact: 'Oath of Dusk', deathmark: 'Mark of Death' }],
   warlock: ['Necromancer', "The Gravelord's art, two thousand years on and still illegal almost everywhere. Rot that eats over time, life drained to mend yourself, and the recently dead put back to work.",
