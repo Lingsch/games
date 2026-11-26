@@ -22,7 +22,8 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const RES_COL = { mana: 'var(--mana)', rage: 'var(--rage)', focus: 'var(--focus)', energy: '#f0d040', momentum: '#ff8a4a' };
 const ROLE_ICON = { tank: '🛡️', healer: '✚', dps: '⚔️' };
 // one icon per family, so you can tell who's who at a glance
-export const FAMILY_ICON = { Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔮' };
+const resName = e => e.resType === 'mana' && !(X.magicCls || []).includes(e.cls) ? 'charge' : e.resType;
+export const FAMILY_ICON = { Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔧' };
 const roleIcon = c => FAMILY_ICON[CLASSES[c].family];
 export const input = { mx: 0, mz: 0, camDrag: 0, lastDragT: -99 };
 
@@ -257,7 +258,7 @@ function interact(n) {
 
 // ---------- frames ----------
 const partyEls = [];
-function frameRes(e) { return e.resType === 'mana' ? `${Math.round(e.res)} / ${e.resMax}` : `${Math.round(e.res)} ${e.resType}`; }
+function frameRes(e) { return e.resType === 'mana' ? `${Math.round(e.res)} / ${e.resMax}` : `${Math.round(e.res)} ${resName(e)}`; }
 // buff and debuff icons: debuffs get a red rim, long buffs about to run out fade and pulse
 const isDebuff = b => b.src && (b.src.mob || b.src.team === 'enemy') && !b.src.charmed;
 function buffRow(u, max) {
@@ -455,7 +456,7 @@ export function openBook(tab) {
   if (tab) bookTab = tab;
   openSheet('Book', body => {
     const extra = X.book.filter(b => !b[3] || b[3]());
-    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Spells'], ['quests', 'Quests'], ['bags', 'Bags'], ['trade', 'Trade'], ['lore', 'Lore'], ['social', 'Social'], ...extra].filter(t => !(X.hideTabs || []).includes(t[0])).map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
+    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Abilities'], ['quests', 'Quests'], ['bags', 'Bags'], ['trade', 'Trade'], ['lore', 'Lore'], ['social', 'Social'], ...extra].filter(t => !(X.hideTabs || []).includes(t[0])).map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
     tabs.onclick = ev => { const t = ev.target.dataset.t; if (t) { bookTab = t; refreshSheet(); } };
     body.appendChild(tabs);
     const fns = { char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial, trade: tabTrade }; for (const b of extra) fns[b[0]] = b[2];
@@ -463,7 +464,7 @@ export function openBook(tab) {
   });
 }
 // ---------- weapons: equip a class's weapon to play it ----------
-const WICON = { mace: '🔨', staff: '🪄', bow: '🏹', blade: '⚔️', greatsword: '🗡️', wraps: '👊', dagger: '🔪', rapier: '🤺', wand: '✨' };
+const WICON = { cannon: '💥', injector: '💉', mace: '🔨', staff: '🪄', bow: '🏹', blade: '⚔️', greatsword: '🗡️', wraps: '👊', dagger: '🔪', rapier: '🤺', wand: '✨' };
 export const weaponOf = k => `${BASE_NAMES.weapon[WTYPE[k][0]][0]} & ${BASE_NAMES.off[WTYPE[k][1]][0]}`;
 const wIcon = k => WICON[WTYPE[k][0]] || '⚔️';
 function weaponRack(body) {
@@ -489,7 +490,7 @@ export function openWeaponPick() {
     const fams = FAMILIES.filter(f => ch.some(k => CLASSES[k].family === f));
     body.appendChild(el(`<p style="margin-top:0">Choose one.</p>`));
     for (const f of fams) {
-      body.appendChild(el(`<p style="margin:8px 0 3px;font:700 12px Orbitron;color:var(--acc)">${FAMILY_ICON[f]} ${f}s</p>`));
+      body.appendChild(el(`<p style="margin:8px 0 3px;font:700 12px Orbitron;color:var(--acc)">${FAMILY_ICON[f]} ${X.famPl?.[f] || f + 's'}</p>`));
       for (const k of ch.filter(k => CLASSES[k].family === f)) {
         const c = CLASSES[k];
         const card = el(`<div class="card cls ${sel === k ? 'on' : ''}" style="--c:${c.color}"><div class="ic">${wIcon(k)}</div><div style="flex:1"><b style="color:${c.color}">${weaponOf(k)}</b> <span class="dim">· ${c.name} · ${c.role}</span><p style="margin:1px 0">${esc(c.blurb)}</p></div></div>`);
@@ -527,13 +528,13 @@ export function openFriendPick(afterUnlock, afterSwitch, newCls) {
 }
 function tabChar(body) {
   const h = S.hero, C = CLASSES[S.heroCls];
-  body.appendChild(el(`<div class="card"><h3 style="color:${C.color}">${esc(h.name)} · Level ${h.lvl} ${C.name}</h3><p>${C.family} · ${C.role}. ${esc(C.blurb)}</p>
-    <div class="grid2" style="margin-top:6px"><div><div class="stat"><span>Health</span><span>${h.maxHp}</span></div><div class="stat"><span>${h.resType}</span><span>${h.resMax}</span></div><div class="stat"><span>Power</span><span>${Math.round(h.power)}</span></div></div>
+  body.appendChild(el(`<div class="card"><h3 style="color:${C.color}">${esc(h.name)} · Level ${h.lvl} ${C.name}</h3><p>${X.fam?.[C.family] || C.family} · ${C.role}. ${esc(C.blurb)}</p>
+    <div class="grid2" style="margin-top:6px"><div><div class="stat"><span>Health</span><span>${h.maxHp}</span></div><div class="stat"><span>${resName(h)}</span><span>${h.resMax}</span></div><div class="stat"><span>Power</span><span>${Math.round(h.power)}</span></div></div>
     <div><div class="stat"><span>Armor</span><span>${Math.round(h.armor)}</span></div><div class="stat"><span>Crit</span><span>${(h.crit * 100).toFixed(1)}%</span></div><div class="stat"><span>XP</span><span>${h.lvl >= MAX_LVL ? 'max' : Math.round(h.xp) + ' / ' + xpNeed(h.lvl)}</span></div></div></div>
     <p>Credits: ${S.gold}</p></div>`));
   weaponRack(body);
   // progression: just the numbers; the game doesn't explain itself
-  { const fam = FAMILIES.map(f => { const b = Game.famBest(f); return `<span class="fam ${b >= 10 ? 'ok' : ''}">${{ Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔮' }[f]} ${f} ${b}</span>`; }).join('');
+  { const fam = FAMILIES.map(f => { const b = Game.famBest(f); return `<span class="fam ${b >= 10 ? 'ok' : ''}">${{ Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔧' }[f]} ${f} ${b}</span>`; }).join('');
     body.appendChild(el(`<div class="card"><h3>Families</h3><div class="fams">${fam}</div></div>`));
     const open = Game.perksOpen();
     if (open.length) {
@@ -554,7 +555,7 @@ function tabChar(body) {
 }
 function tabSpells(body) {
   const C = CLASSES[S.heroCls], h = S.hero, bar = barOf();
-  body.appendChild(el(`<p class="dim" style="margin-top:0">Tap a spell to put it on the bar, then tap a bar slot below to place it. Swap two bar slots by tapping one, then the other. Default bars hold your active spells, then your buffs, then the ultimate.</p>`));
+  body.appendChild(el(`<p class="dim" style="margin-top:0">Tap an ability to put it on the bar, then tap a bar slot below to place it. Swap two bar slots by tapping one, then the other. Default bars hold your active abilities, then your buffs, then the ultimate.</p>`));
   const slots = el('<div id="barEdit" style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:10px"></div>');
   bar.forEach((k, i) => {
     const ab = k && k !== 'attack' ? C.abilities[k] : null, known = !ab || ab.lvl <= h.lvl;
@@ -851,7 +852,7 @@ export function openInspect(t) {
       return;
     }
     if (t.cls) {
-      const C = CLASSES[t.cls], f = t.fake, fam = { Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔮' }[C.family];
+      const C = CLASSES[t.cls], f = t.fake, fam = { Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔧' }[C.family];
       const rel = t.isHero ? 'This is you.' : f?.bff ? '' : t.inParty ? 'In your group.' : f?.friend ? 'On your friends list.' : '';
       body.appendChild(el(`<div class="card"><h3>${fam} ${esc(t.name)}</h3><p style="margin:2px 0">Level ${t.lvl} ${esc(C.name)} · ${esc(C.family)} · ${esc(C.role === 'dps' ? 'damage' : C.role)}</p>
         ${f?.guild ? `<p class="dim" style="margin:2px 0">&lt;${esc(f.guild)}&gt;</p>` : ''}${f ? `<p style="margin:4px 0">${esc(PERSONA_TXT[f.bff ? 'friendly' : f.persona] || '')}</p>` : ''}${rel ? `<p class="dim" style="margin:2px 0">${rel}</p>` : ''}
@@ -944,7 +945,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Stars Beneath</h1><div class="sub">Build 1 · two thousand years after the Gravelord fell</div>`;
+  const head = `<h1>Stars Beneath</h1><div class="sub">Build 2 · two thousand years after the Gravelord fell</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
@@ -971,7 +972,7 @@ export function showTitle(view = 'home') {
     T.innerHTML = `${head}<button data-a="back" style="margin:8px 0">← Back</button>
       <div class="card" style="text-align:left"><h3>Name your captain</h3><input type="text" id="heroName" maxlength="14" placeholder="Hero name" value="${esc(T.dataset.name || pickName())}"></div>
       <div class="card" style="text-align:left"><h3>Choose your weapon</h3>
-      ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Orbitron;color:var(--acc)">${FAMILY_ICON[f]} ${f}s</p><div class="wpick">${CLASS_KEYS.filter(k => CLASSES[k].family === f && !(X.hiddenCls || []).includes(k)).map(k => { const c = CLASSES[k]; return `<div class="card ${pick === k ? 'on' : ''}" data-k="${k}" style="border-color:${c.color}"><span class="wi">${wIcon(k)}</span><div><b style="color:${c.color}">${weaponOf(k)}</b><small>${c.name} · ${c.role}</small><p>${esc(c.blurb)}</p></div></div>`; }).join('')}</div>`).join('')}</div>
+      ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Orbitron;color:var(--acc)">${FAMILY_ICON[f]} ${X.famPl?.[f] || f + 's'}</p><div class="wpick">${CLASS_KEYS.filter(k => CLASSES[k].family === f && !(X.hiddenCls || []).includes(k)).map(k => { const c = CLASSES[k]; return `<div class="card ${pick === k ? 'on' : ''}" data-k="${k}" style="border-color:${c.color}"><span class="wi">${wIcon(k)}</span><div><b style="color:${c.color}">${weaponOf(k)}</b><small>${c.name} · ${c.role}</small><p>${esc(c.blurb)}</p></div></div>`; }).join('')}</div>`).join('')}</div>
       ${info ? `<p style="color:#ff8a6a;font-size:13px">Starting a new character replaces ${esc(info.name)} (level ${info.lvl}). Copy their save code in Settings first if you want to keep them.</p>` : ''}
       <div style="position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,rgba(13,17,20,.95) 30%)"><button class="pri" data-a="go" style="width:100%;opacity:1" ${pick ? '' : 'disabled'}>${pick ? `Wake up on Dustfall as a ${CLASSES[pick].name}` : 'Tap a weapon to choose it'}</button></div>`;
   };

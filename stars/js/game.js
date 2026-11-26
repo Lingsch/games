@@ -46,7 +46,7 @@ function starterGear(cls) {
   return {
     weapon: makeItem({ name: 'Plain ' + BASE_NAMES.weapon[t[0]][0], slot: 'weapon', type: t[0], lvl: 1, rarity: 0, stats: { pow: 3, sta: 1 }, value: 2 }),
     off: makeItem({ name: 'Plain ' + BASE_NAMES.off[t[1]][0], slot: 'off', type: t[1], armorType: t[1] === 'shield' ? 'plate' : null, lvl: 1, rarity: 0, stats: t[1] === 'shield' ? { sta: 2, arm: 8 } : { pow: 1, sta: 1 }, value: 2 }),
-    chest: makeItem({ name: { plate: 'Dented Breastplate', leather: 'Patched Jerkin', cloth: 'Initiate Robe' }[a], slot: 'chest', type: a, armorType: a, lvl: 1, rarity: 0, stats: { sta: 2, arm: arm * 3 }, value: 2 }),
+    chest: makeItem({ name: { plate: 'Dented Battle Plate', leather: 'Patched Flight Jacket', cloth: 'Worn Longcoat' }[a], slot: 'chest', type: a, armorType: a, lvl: 1, rarity: 0, stats: { sta: 2, arm: arm * 3 }, value: 2 }),
   };
 }
 

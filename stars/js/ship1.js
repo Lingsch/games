@@ -10,6 +10,7 @@ import { buildInstance } from './dungeons.js';
 import * as Cb from './combat.js';
 import * as Game from './game.js';
 import * as UI from './ui.js';
+import { openAH } from './social6.js';
 import { D1, crateGeo, consoleGeo, lampGeo, shipGeo } from './moon1.js';
 import { addKinds } from './render.js';
 const O = [0, 0, 0];
@@ -91,18 +92,24 @@ registerZone('halfway', seed => {
   Object.assign(world.spots, { dock: { x: 0, z: 56 }, concourse: { x: 0, z: 16 } });
   return w;
 });
-const IDLERS = [['Republic Clerk', 'villager2', -6, 22, "Papers, please. I'm joking, of course. I'm off duty. I would still quite like to see your papers."], ['Imperial Attaché', 'guard', 7, 21, "The Empire wishes the free captains nothing but prosperity. It also wishes to know where each of them is at all times, purely out of warmth."],
+const IDLERS = [['Republic Clerk', 'n_clerk', -6, 22, "Papers, please. I'm joking, of course. I'm off duty. I would still quite like to see your papers."], ['Imperial Attaché', 'n_officer', 7, 21, "The Empire wishes the free captains nothing but prosperity. It also wishes to know where each of them is at all times, purely out of warmth."],
   ['Hauler Captain', 'pirate2', 20, -8, "I've flown the Sarn run for twenty years, and I won't fly it again. I can't tell you why. I looked out the port one night and I just knew I shouldn't be there."], ['Scrap Merchant', 'villager1', -22, 22, "Everything on this stall fell off a ship. Some of it fell off while the ship was still using it, which is why it's so reasonably priced."],
   ['Off-shift Docker', 'villager0', 18, -11, "Lock four's been sealed a month now. They say it's a pressure fault. I've fixed pressure faults, and they don't generally need six guards."], ['Wandering Preacher', 'priest', -3, 8, "The old words were never a curse, friend, they were a count. 'When the last lamp falls.' Somebody was counting them, even then. I wonder how many are left."]];
 for (const [n, , , , line] of IDLERS) VILLAGER_LINES[n] = line;
 
 // ---------- the helm and the star map ----------
-Object.assign(GIVERS, { helm: { name: 'Helm', title: 'Star map', model: 'helm' } });
+Object.assign(GIVERS, { helm: { name: 'Helm', title: 'Helm and star map', model: 'helm' },
+  auct3: { name: 'Odalys Finch', title: 'Halfway Exchange', model: 'villager1' }, reg3: { name: 'Registrar Pell-Ames', title: 'Crew and guild charters', model: 'villager2' }, bank3: { name: 'Teller Unit Nine', title: 'Halfway Vaults', model: 'sdrone' } });
 Object.assign(TALK, {
   helm: { bio: "The Second Chance's helm has been rebuilt so many times that only the brass compass rose in the middle is original. Tilly says the ship was built around the nav core. The helm seems to agree, and hums when you put a hand on it.", greet: ['The console wakes under your hand. A map of small, patient lights unfolds above it.'], topics: [] },
   vault: { bio: 'A strongbox welded to the deck in the hold. Osric scratched a tally on the door: nineteen marks, each one a time somebody tried to open it who should not have.', greet: ['The vault hums and unlocks at your touch.'], topics: [] },
 });
-X.talk.push((k, n, api) => k === 'helm' ? [['▸ Open the star map.', () => { api.close(); openStarMap(); }, 'hl']] : null);
+Object.assign(TALK, {
+  auct3: { bio: "Odalys Finch runs the Halfway Exchange from a booth with three screens and one rule: everything has a price, and she already knows it. She has sold the same crate of fuses eleven times and bought it back ten.", greet: ["Welcome to the Exchange. Buying or selling? Do say both, because both is where I make my living.", "Power cells are up, hull plate is down, and somebody keeps paying silly money for old star charts. I'd love to know why."], topics: [] },
+  reg3: { bio: "Registrar Pell-Ames charters every crew and guild that flies out of Halfway, and files each one under the name it gave and the name it deserves. The second list is longer and much funnier.", greet: ["Charters, rosters and disputes. Take a number. You're the only one here, so the number is one.", "A guild is only a crew that has learned to argue in writing. Which will it be today?"], topics: [] },
+  bank3: { bio: "Teller Unit Nine has guarded the Halfway Vaults for a hundred and forty years without a single loss, a single holiday or a single joke. Units One through Eight are not discussed.", greet: ['WELCOME, DEPOSITOR. YOUR VALUABLES ARE SAFE. YOUR VALUABLES HAVE ALWAYS BEEN SAFE.', 'UNIT NINE IS PLEASED TO SEE YOU. THIS IS A FIGURE OF SPEECH.'], topics: [] },
+});
+X.talk.push((k, n, api) => k === 'helm' ? [['▸ Open the star map.', () => { api.close(); openStarMap(); }, 'hl']] : k === 'auct3' ? [["▸ I'd like to see the Exchange.", () => { api.close(); openAH(n); }, 'hl']] : k === 'reg3' ? [["▸ I'm here about guilds.", () => { api.close(); UI.openBook('guild'); }, 'hl']] : null);
 
 function mapCanvas(sel) {
   const c = document.createElement('canvas'); c.width = 600; c.height = 380; c.style.cssText = 'width:100%;border-radius:10px;background:#070b14;touch-action:manipulation';
@@ -133,6 +140,12 @@ export function openStarMap() {
 }
 export function jump(to) {
   if (S.zone !== 'ship' || !SYSTEMS[to]?.zone || to === here()) return;
+  if (X.jumpEvent && X.jumpEvent(to, () => arrive(to))) return;     // Build 2: a jump can be broken on the way
+  arrive(to);
+}
+function arrive(to) {
+  if (S.zone !== 'ship' || !SYSTEMS[to]?.zone || to === here()) return;
+  X.flightEnd?.();
   const from = SYSTEMS[here()].name;
   S.ext.sys = to; S.ext.jumps = (S.ext.jumps || 0) + 1;
   for (const z of world.zoneLines) { z.to = SYSTEMS[to].zone; z.label = `Down the ramp to ${SYSTEMS[to].name}`; }
@@ -159,6 +172,8 @@ X.recruit = key => {
 X.zone.push(zone => {
   const npc = o => { const e = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, ...o }); e.y = hgt(e.x, e.z); return e; };
   if (zone === 'moon') { if (!S.ext.sys || S.ext.sys !== 'moon') S.ext.sys = 'moon'; if (!S.bind) S.bind = { zone: 'moon', x: D1.port.x + 5, z: D1.port.z + 7.5 }; }
+  if (zone === 'halfway') { S.npcs.auct3 = npc({ name: GIVERS.auct3.name, title: GIVERS.auct3.title, kind: 'villager1', x: -12, z: 22, giver: 'auct3' }); S.npcs.reg3 = npc({ name: GIVERS.reg3.name, title: GIVERS.reg3.title, kind: 'villager2', x: 12, z: 22, giver: 'reg3' });
+    npc({ name: GIVERS.bank3.name, title: GIVERS.bank3.title, kind: 'sdrone', x: 22, z: 10, banker: true, tk: 'bank3' }).yaw = -Math.PI / 2; }
   if (zone === 'halfway') { S.ext.sys = 'halfway'; for (const [name, kind, x, z] of IDLERS) { const e = npc({ name, title: 'Halfway Station', kind, x, z }); e.yaw = Math.atan2(-x, 16 - z); } }
   if (zone === 'ship') {
     for (const z of world.zoneLines) { z.to = SYSTEMS[here()].zone; z.label = `Down the ramp to ${SYSTEMS[here()].name}`; }

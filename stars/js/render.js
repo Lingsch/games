@@ -183,6 +183,8 @@ export const kinds = {};
 for (const k in defs) kinds[k] = makeKind(...defs[k]);
 // later modules (dungeons, crafting) register their own models
 export function addKinds(o) { for (const k in o) if (!kinds[k]) kinds[k] = makeKind(...o[k]); }
+// Stars Beneath: swap a model for a new one (the old meshes leave the scene)
+export function replaceKinds(o) { for (const k in o) { const K = kinds[k]; if (K) { for (const m of [K.mesh, K.ol]) { m.parent?.remove(m); m.material.dispose?.(); } K.mesh.geometry.dispose(); } kinds[k] = makeKind(...o[k]); } }
 
 export const shadows = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
   new THREE.MeshBasicMaterial({ map: softTex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 }), 400);

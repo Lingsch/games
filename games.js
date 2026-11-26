@@ -29,11 +29,11 @@ window.GAMES = [
   {
     title: "Stars Beneath",
     folder: "stars",
-    version: "Build 1",
+    version: "Build 2",
     updated: "November 2026",
     kind: "Space opera MMO, solo",
-    blurb: "The same world, two thousand years on. You inherit a grounded freighter and a debt on a frontier moon. Work it off, win your first crew member, walk your own ship and make your first jump.",
-    facts: ["12 classes", "Levels 1–5", "1 moon, 1 station"],
+    blurb: "The same world, two thousand years on. You inherit a grounded freighter and a debt on a frontier moon. Work it off, win your first crew member, then take the helm: dogfight pirates, salvage wrecks and jump between systems.",
+    facts: ["12 tech classes", "Flight and dogfights", "1 moon, 1 station"],
     accent: "#ffb347"
   },
   {

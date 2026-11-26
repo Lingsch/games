@@ -29,10 +29,12 @@ import './ach7.js';
 import './stars.js';
 import './moon1.js';
 import './moonq.js';
+import './models3.js';
 import * as Ship from './ship1.js';
+import * as Flight from './flight2.js';
 
 UI.init();
-window.__G = { S, Game, Cb, UI, Sea, world, Rep, Social, X, Vale6, Raid, P8, Ship }; // a handle for testing from the console
+window.__G = { S, Game, Cb, UI, Sea, world, Rep, Social, X, Vale6, Raid, P8, Ship, Flight }; // a handle for testing from the console
 generateWorld(7, 'moon');         // a backdrop for the title screen
 UI.showTitle();
 document.getElementById('load').remove();
@@ -180,6 +182,8 @@ function loop() {
   if (S.running && S.hero && S.scene) {
     // a story scene: the world holds still while the camera tells it
     sceneCam(dt); dayNight(S.time); ruinGloom(S.hero);
+  } else if (S.running && S.hero && Flight.on()) {
+    Flight.frame(dt, UI.pollInput());   // Build 2: at the helm, the ship's own world takes over
   } else if (S.running && S.hero) {
     scKey = '';
     const inp = UI.pollInput();
@@ -193,7 +197,7 @@ function loop() {
     R.cam.position.set(Math.cos(t * .04) * 60, 22, Math.sin(t * .04) * 60); R.cam.lookAt(0, 6, 0);
     dayNight(t * 6);
   }
-  drawDt = dt; draw();
+  drawDt = dt; if (!(S.running && Flight.on())) draw();
   R.magic.update(dt); R.dust.update(dt);
   R.renderer.render(R.scene, R.cam);
   UI.update(dt);
