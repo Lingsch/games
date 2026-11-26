@@ -7,7 +7,7 @@ import * as R from './render.js';
 
 // path classes: not offered yet (the Blade Knight, Lifebinder, Shade and Voidcaller split into light and dark later)
 X.hiddenCls = ['wardancer', 'lifebinder', 'knifeshade', 'warlock'];
-X.fakeLvl = zone => zone === 'moon' ? clamp(Math.round(1 + Math.random() ** 1.3 * 5), 1, 6) : zone === 'sunder' || zone === 'city' ? clamp(Math.round(6 + Math.random() * 4.4), 6, 10) : zone === 'fort' ? clamp(Math.round(1 + Math.random() ** 1.3 * 5), 1, 6) : clamp(Math.round(3 + Math.random() * 5), 3, 8);
+X.fakeLvl = zone => zone === 'moon' ? clamp(Math.round(1 + Math.random() ** 1.3 * 5), 1, 6) : zone === 'sunder' || zone === 'city' || zone === 'hollow' ? clamp(Math.round(6 + Math.random() * 4.4), 6, 10) : zone === 'fort' || zone === 'cinder' ? clamp(Math.round(1 + Math.random() ** 1.3 * 5), 1, 6) : clamp(Math.round(3 + Math.random() * 5), 3, 8);
 
 const REN = {
   bulwark: ['Vanguard', 'Shield trooper. Battle plate, a riot shield, and rage that rises every time something hits you.',

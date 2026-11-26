@@ -20,7 +20,7 @@ import * as R from './render.js';
 
 const SLOT = { smuggler: 'stars-beneath-1', justice: 'stars-beneath-justice', dark: 'stars-beneath-dark' };
 let SAVE_KEY = SLOT[(() => { try { return localStorage.getItem('stars-slot'); } catch (e) { return null; } })()] || SLOT.smuggler;
-export function setSlot(p) { SAVE_KEY = SLOT[p] || SLOT.smuggler; try { localStorage.setItem('stars-slot', p); } catch (e) { } }
+export function setSlot(p) { SAVE_KEY = SLOT[p] || SLOT.smuggler; try { localStorage.setItem('stars-slot', p); } catch (e) { } X.pathSet?.(p); }
 export function saveInfoFor(p) { const k = SAVE_KEY; SAVE_KEY = SLOT[p] || k; const i = saveInfo(); SAVE_KEY = k; return i; }
 // Build 4.4: quests give three quarters of the xp they used to, like everything else
 for (const q of QUESTS) q.xp = Math.round((q.xp || 0) * Cb.XP_RATE);
@@ -491,6 +491,8 @@ function makeFakes(saved, zone = 'vale') {
   const used = new Set([...Object.values(S.pops || {}).flat().map(f => f.name), ...S.party.map(p => p.name)]);
   const names = [...FAKE_NAMES, 'Brinehart', 'Saltjaw', 'Kelpie', 'Wavecrest', 'Anchora', 'Tidewalker', 'Gullet', 'Mariner', 'Coralyn', 'Riptide', 'Barnacle', 'Seafoam', 'Squallbringer', 'Marlow', 'Pearlie', 'Drift', 'Skiff', 'Harpoona', 'Undertow', 'Galeheart', 'Selkie', 'Foghorn', 'Bilgewater', 'Sternmast']
     .filter(n => !used.has(n)).sort(() => Math.random() - .5);
+  // Stars Beneath: many worlds, one name list. When it runs dry, spacers go by a call sign.
+  { const CS = ['Vex', 'Orrin', 'Talia', 'Brask', 'Niko', 'Sable', 'Juno', 'Kestrel', 'Dax', 'Lyra', 'Corvo', 'Zeph', 'Mako', 'Riven', 'Sola', 'Jett', 'Nova', 'Tarn', 'Echo', 'Quill']; let k = 0; while (names.length < 40 && k < 400) { const c = CS[k % CS.length] + '-' + (11 + ((k * 37) % 88)); k++; if (!used.has(c) && !names.includes(c)) names.push(c); } }
   const n = saved ? saved.length : zone === 'coast' ? 24 : 30;
   const byRole = r => CLASS_KEYS.filter(k => CLASSES[k].role === r && !(X.hiddenCls || []).includes(k));
   const tw = world.town, areas = (world.huntAreas || [{ area: 0 }, { area: 1 }, { area: 2 }, { area: 3 }]);

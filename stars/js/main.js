@@ -35,6 +35,10 @@ import './sunder3.js';
 import './light4.js';
 import './fort4.js';
 import './city4.js';
+import './aliens5.js';
+import './dark5.js';
+import './cinder5.js';
+import './hollow5.js';
 import * as Flight from './flight2.js';
 
 UI.init();

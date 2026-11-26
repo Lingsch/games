@@ -464,7 +464,7 @@ export function openBook(tab) {
   });
 }
 // ---------- weapons: equip a class's weapon to play it ----------
-const WICON = { lampblade: '🔆', lantern: '🏮', shortblade: '🗡️', cannon: '💥', injector: '💉', mace: '🔨', staff: '🪄', bow: '🏹', blade: '⚔️', greatsword: '🗡️', wraps: '👊', dagger: '🔪', rapier: '🤺', wand: '✨' };
+const WICON = { duskblade: '🩸', reliquary: '⚱️', duskknife: '🗡️', skullcase: '💀', lampblade: '🔆', lantern: '🏮', shortblade: '🗡️', cannon: '💥', injector: '💉', mace: '🔨', staff: '🪄', bow: '🏹', blade: '⚔️', greatsword: '🗡️', wraps: '👊', dagger: '🔪', rapier: '🤺', wand: '✨' };
 export const weaponOf = k => `${BASE_NAMES.weapon[WTYPE[k][0]][0]} & ${BASE_NAMES.off[WTYPE[k][1]][0]}`;
 const wIcon = k => WICON[WTYPE[k][0]] || '⚔️';
 function weaponRack(body) {
@@ -945,10 +945,10 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const PATHS = { smuggler: ['Smuggler', 'The free worlds', 'You inherit a grounded freighter and a debt on the frontier moon of Dustfall.', '#ffb347'], justice: ['Justice', 'The Republic and the order', 'A first-year novice of the lamp-keepers, posted to a freezing fort on the edge of Republic space.', '#6ad8ff'] };
+  const PATHS = { smuggler: ['Smuggler', 'The free worlds', 'You inherit a grounded freighter and a debt on the frontier moon of Dustfall.', '#ffb347'], justice: ['Justice', 'The Republic and the order', 'A first-year novice of the lamp-keepers, posted to a freezing fort on the edge of Republic space.', '#6ad8ff'], dark: ['Dark', 'The Empire and the Dusk Covenant', 'A conscript who survived the Winnowing. Now an initiate of the Covenant on the furnace world of Cinder, where the other initiates would like your bunk.', '#ff4a3a'] };
   const heroes = Object.keys(PATHS).map(p => [p, Game.saveInfoFor(p)]).filter(x => x[1]);
   if (view === 'home') X.newPath = null;
-  const head = `<h1>Stars Beneath</h1><div class="sub">Build 4 · two thousand years after the Gravelord fell</div>`;
+  const head = `<h1>Stars Beneath</h1><div class="sub">Build 5 · two thousand years after the Gravelord fell</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${heroes.map(([p, i]) => `<button class="pri" data-a="cont" data-p="${p}">Continue<small>${esc(i.name)} · level ${i.lvl} ${CLASSES[i.cls]?.name || ''} · ${PATHS[p][0]}</small></button>`).join('')}
@@ -971,7 +971,7 @@ export function showTitle(view = 'home') {
   if (view === 'path') {
     T.innerHTML = `${head}<button data-a="back" style="margin:8px 0">← Back</button><div class="card" style="text-align:left"><h3>Choose your path</h3><p class="dim" style="margin:0 0 6px">Each path has its own hero, its own start and its own story.</p>
       ${Object.entries(PATHS).map(([p, [n, who, txt, c]]) => `<div class="card" data-path="${p}" style="cursor:pointer;border-color:${c};margin:6px 0"><b style="color:${c}">${n}</b> <small class="dim">· ${who}</small><p style="margin:3px 0 0">${txt}</p>${Game.saveInfoFor(p) ? `<p style="color:#ff8a6a;font-size:12px;margin:3px 0 0">You already have a ${n.toLowerCase()} hero. A new one replaces them.</p>` : ''}</div>`).join('')}
-      <div class="card" style="margin:6px 0;opacity:.5"><b>Dark side</b> <small class="dim">· The Empire</small><p style="margin:3px 0 0">Not yet open.</p></div></div>`;
+      </div>`;
     T.onclick = ev => { const c = ev.target.closest('[data-path]'); if (c) { X.newPath = c.dataset.path; Game.setSlot(X.newPath); showTitle('new'); return; } if (ev.target.closest('button')?.dataset.a === 'back') showTitle('home'); };
     return;
   }
@@ -984,7 +984,7 @@ export function showTitle(view = 'home') {
       <div class="card" style="text-align:left"><h3>Choose your weapon</h3>
       ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Orbitron;color:var(--acc)">${FAMILY_ICON[f]} ${X.famPl?.[f] || f + 's'}</p><div class="wpick">${CLASS_KEYS.filter(k => CLASSES[k].family === f && !(X.hiddenCls || []).includes(k)).map(k => { const c = CLASSES[k]; return `<div class="card ${pick === k ? 'on' : ''}" data-k="${k}" style="border-color:${c.color}"><span class="wi">${wIcon(k)}</span><div><b style="color:${c.color}">${weaponOf(k)}</b><small>${c.name} · ${c.role}</small><p>${esc(c.blurb)}</p></div></div>`; }).join('')}</div>`).join('')}</div>
       ${info ? `<p style="color:#ff8a6a;font-size:13px">Starting a new character replaces ${esc(info.name)} (level ${info.lvl}). Copy their save code in Settings first if you want to keep them.</p>` : ''}
-      <div style="position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,rgba(13,17,20,.95) 30%)"><button class="pri" data-a="go" style="width:100%;opacity:1" ${pick ? '' : 'disabled'}>${pick ? `${X.newPath === 'justice' ? 'Report to Fort Lastlight' : 'Wake up on Dustfall'} as a ${CLASSES[pick].name}` : 'Tap a weapon to choose it'}</button></div>`;
+      <div style="position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,rgba(13,17,20,.95) 30%)"><button class="pri" data-a="go" style="width:100%;opacity:1" ${pick ? '' : 'disabled'}>${pick ? `${X.newPath === 'justice' ? 'Report to Fort Lastlight' : X.newPath === 'dark' ? 'Kneel at the Ember Citadel' : 'Wake up on Dustfall'} as a ${CLASSES[pick].name}` : 'Tap a weapon to choose it'}</button></div>`;
   };
   T.dataset.name = '';
   draw();

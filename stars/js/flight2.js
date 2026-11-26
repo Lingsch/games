@@ -142,15 +142,15 @@ function buildSystem(sys) {
     for (let i = 0; i < 4; i++) { const a = rng() * TAU; const e = spawn('bait', Math.cos(a) * 110, 40 + Math.sin(a) * 110, { team: 'neutral', name: 'Free hauler', lane: a }); e.hull = e.max = 9999; }
   }
   if (!F.objs.some(o => o.type === 'dock')) {
-    const Sy = Ship.SYSTEMS[sys] || { name: 'Port' }, ice = sys === 'cairn';
-    const pl = new THREE.Mesh(new THREE.SphereGeometry(520, 40, 24), new THREE.MeshLambertMaterial({ color: ice ? '#dce8f4' : '#9ab8d8', fog: false })); addObj({ type: 'decor', x: 0, y: -560, z: 60, mesh: pl });
+    const Sy = Ship.SYSTEMS[sys] || { name: 'Port' }, ice = sys === 'cairn', drk = Sy.path === 'dark';
+    const pl = new THREE.Mesh(new THREE.SphereGeometry(520, 40, 24), new THREE.MeshLambertMaterial({ color: ice ? '#dce8f4' : sys === 'cinder' ? '#5a2a22' : sys === 'hollow' ? '#6a6a52' : '#9ab8d8', fog: false })); addObj({ type: 'decor', x: 0, y: -560, z: 60, mesh: pl });
     addObj({ type: 'dock', name: Sy.name, label: `Land on ${Sy.name}`, x: 0, z: 0, r: 13, mesh: mk(ringGeo(12, '#9be36b'), .1) });
     addObj({ type: 'buoy', name: 'Jump buoy', label: 'Open the star map', x: -70, z: -330, r: 13, mesh: mk(ringGeo(12, '#6ad8ff'), .1) });
     rocksAt(230, -110, 130, 36); rocksAt(-250, 140, 110, 26);
     for (const [x, z] of [[250, -130], [-270, 160], [-130, -270]]) addObj({ type: 'wreck', name: 'Drifting wreck', x: x + rnd(-30, 30), z: z + rnd(-30, 30), r: 15, prog: 0, mesh: mk(wreckGeo(), .1) });
     const foes = ice ? [['skiff', 'skiff'], ['pirate', 'drone'], ['pirate', 'skiff']] : [['pirate', 'pirate'], ['pirate', 'raider']];
-    foes.forEach((ks, i) => { const a = 1 + i * 2.1; pack(Math.cos(a) * 250, Math.sin(a) * 250, ks).forEach(e => { e.name = ice ? (e.kind === 'drone' ? 'Imperial Probe' : e.kind === 'pirate' ? 'Imperial Interceptor' : 'Deserter Skiff') : (e.kind === 'raider' ? 'Black-flag Gunship' : 'Lane Pirate'); }); });
-    if (!ice) for (let i = 0; i < 5; i++) { const a = rng() * TAU; const e = spawn('bait', Math.cos(a) * 120, 40 + Math.sin(a) * 120, { team: 'neutral', name: 'Republic hauler', lane: a }); e.hull = e.max = 9999; }
+    foes.forEach((ks, i) => { const a = 1 + i * 2.1; pack(Math.cos(a) * 250, Math.sin(a) * 250, ks).forEach(e => { e.name = ice ? (e.kind === 'drone' ? 'Imperial Probe' : e.kind === 'pirate' ? 'Imperial Interceptor' : 'Deserter Skiff') : (drk ? (e.kind === 'raider' ? 'Republic Picket' : 'Rebel Raider') : e.kind === 'raider' ? 'Black-flag Gunship' : 'Lane Pirate'); }); });
+    if (!ice) for (let i = 0; i < 5; i++) { const a = rng() * TAU; const e = spawn('bait', Math.cos(a) * 120, 40 + Math.sin(a) * 120, { team: 'neutral', name: drk ? 'Imperial ore hauler' : 'Republic hauler', lane: a }); e.hull = e.max = 9999; }
   }
   const w = S.ext.wreck; if (w && w.sys === sys) F.wreck = addObj({ type: 'wreck', mine: true, name: 'Your lost cargo', x: w.x, z: w.z, r: 15, prog: 0, mesh: mk(wreckGeo(), .1) });
 }
@@ -463,7 +463,7 @@ const EVENTS = {
     F.ev = { text: () => o.gone ? 'Derelict stripped' : woke && hostiles().length ? `Drive off the scavengers: ${hostiles().length} left` : 'Hold beside the derelict to salvage it', onSalvage() { chat('sys', null, pick(["Her log is gone, but the last entry is scratched into the bulkhead by hand: 'The lamp went out. We never saw what took it.'", "Her nav plot still shows a heading: straight for a star that the tables say was never there.", "Every clock aboard stopped at the same second. Juno says that doesn't happen. Then she stops talking about it."])); eventDone('Salvage aboard. Resuming the jump.'); }, tick() { } };
   },
   patrol(proceed) {
-    const rep = X.path?.() === 'justice' ? false : Math.random() < .5, who = rep ? 'Republic' : 'Imperial', fine = Math.min(S.gold, Math.round(12 + lvl() * 3)), smooth = ['blightblade', 'bard'].includes(S.heroCls);
+    const rep = X.path?.() === 'justice' ? false : X.path?.() === 'dark' ? true : Math.random() < .5, who = rep ? 'Republic' : 'Imperial', fine = Math.min(S.gold, Math.round(12 + lvl() * 3)), smooth = ['blightblade', 'bard'].includes(S.heroCls);
     chat('sys', null, `A ${who} patrol cutter matches your course and paints the Second Chance with a targeting beam.`);
     UI.openSheet(`${who} patrol`, body => {
       const el = h => { const d = document.createElement('div'); d.innerHTML = h; body.appendChild(d.firstElementChild); return body.lastElementChild; };

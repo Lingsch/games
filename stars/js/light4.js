@@ -11,13 +11,14 @@ import { SYSTEMS, LANES, CREW } from './ship1.js';
 X.path = () => X.newPath || S.ext?.path || 'smuggler';
 // which classes a hero may be: smugglers have the twelve tech classes; the order's novices add the four light ones
 const LIGHT = ['wardancer', 'lifebinder', 'knifeshade', 'warlock'];
-Object.defineProperty(X, 'hiddenCls', { get: () => X.path() === 'justice' ? [] : LIGHT, configurable: true });
+Object.defineProperty(X, 'hiddenCls', { get: () => X.path() === 'smuggler' ? LIGHT : [], configurable: true });
 X.magicCls = LIGHT;
-const ZONE_PATH = { moon: 'smuggler', sunder: 'smuggler', fort: 'justice', city: 'justice' };
+const ZONE_PATH = { moon: 'smuggler', sunder: 'smuggler', fort: 'justice', city: 'justice', cinder: 'dark', hollow: 'dark' };
 X.lfgOk = d => !ZONE_PATH[d.zone] || ZONE_PATH[d.zone] === X.path();
-X.shipName = () => X.path() === 'justice' ? 'Vigilant' : 'Second Chance';
-X.shipLook = () => X.path() === 'justice' ? ['#c8d0d8', '#2e5a9e'] : ['#8a8e96', '#c8782a'];
-X.textFix = t => X.path() === 'justice' && typeof t === 'string' ? t.replace(/Second Chance/g, 'Vigilant') : t;
+const SHIPS = { justice: ['Vigilant', ['#c8d0d8', '#2e5a9e']], dark: ['Eventide', ['#2c2c34', '#c0392b']] };
+X.shipName = () => SHIPS[X.path()]?.[0] || 'Second Chance';
+X.shipLook = () => SHIPS[X.path()]?.[1] || ['#8a8e96', '#c8782a'];
+X.textFix = t => SHIPS[X.path()] && typeof t === 'string' ? t.replace(/Second Chance/g, SHIPS[X.path()][0]) : t;
 
 // ---------- the light classes ----------
 const REN = {
@@ -31,15 +32,21 @@ const REN = {
     { sbolt: 'Radiant Bolt', corruption: 'Searing Brand', agony: 'Brand of Truth', drain: 'Draw the Light', weakness: 'Dimming', terror: 'Blinding Glare', rain: 'Rain of Light', bargain: 'Kindle', darkpact: 'Lamp Oath', bloodpact: 'Shared Flame', harvest: 'Gather the Light' }],
 };
 const LIGHT_WORDS = [[/\bshadow\b/gi, 'radiant'], [/\bcurses?\b/gi, 'brand'], [/\bdark\b/gi, 'bright'], [/\bsoul\b/gi, 'light'], [/\bpoison(ed)?\b/gi, 'searing'], [/\bnecromancy\b/gi, 'the lamp lore'], [/\bthorn\w*\b/gi, 'ray'], [/\bnature\b/gi, 'light'], [/\btree\b/gi, 'beacon']];
-for (const [k, [name, blurb, abs]] of Object.entries(REN)) {
-  const c = CLASSES[k]; c.name = name; c.blurb = blurb;
-  for (const [a, n] of Object.entries(abs)) if (c.abilities[a]) c.abilities[a].name = n;
-  for (const ab of Object.values(c.abilities)) if (ab.desc) for (const [a, b] of LIGHT_WORDS) ab.desc = ab.desc.replace(a, b);
+for (const k of LIGHT) for (const ab of Object.values(CLASSES[k].abilities)) { ab.name0 = ab.name; ab.desc0 = ab.desc; }
+export function dress(ren, words) {
+  for (const [k, [name, blurb, abs]] of Object.entries(ren)) {
+    const c = CLASSES[k]; c.name = name; c.blurb = blurb;
+    for (const [a, ab] of Object.entries(c.abilities)) { if (ab.name0 === undefined) { ab.name0 = ab.name; ab.desc0 = ab.desc; } ab.name = abs[a] || ab.name0; ab.desc = ab.desc0; if (ab.desc) for (const [x, y] of words) ab.desc = ab.desc.replace(x, y); }
+  }
 }
+dress(REN, LIGHT_WORDS);
 const W = BASE_NAMES.weapon, O = BASE_NAMES.off;
 W.lampblade = ['Training Lamp Blade', 'Order Lamp Blade', 'Vigil Blade']; O.offblade = ['Off-hand Lamp Blade', 'Parrying Light']; W.lantern = ['Order Lantern', "Keeper's Lamp", 'Vigil Lantern']; O.censer = ['Oil Flask', 'Wick Case', 'Prayer Cord'];
 W.shortblade = ['Lamp Knife', 'Vigil Dirk', "Keeper's Edge"]; O.codex = ['Book of Hours', 'Order Codex'];
-WTYPE.wardancer = ['lampblade', 'offblade']; WTYPE.lifebinder = ['lantern', 'censer']; WTYPE.knifeshade = ['shortblade', 'knife']; WTYPE.warlock = ['lantern', 'codex'];
+const LIGHT_W = { wardancer: ['lampblade', 'offblade'], lifebinder: ['lantern', 'censer'], knifeshade: ['shortblade', 'knife'], warlock: ['lantern', 'codex'] };
+Object.assign(WTYPE, LIGHT_W);
+// the dark path dresses the same four classes its own way (dark5.js); this puts the light back
+export function dressLight() { dress(REN, LIGHT_WORDS); Object.assign(WTYPE, LIGHT_W); for (const k of LIGHT) CLASSES[k].models = [0, 1, 2].map(i => k + i); }
 const pal = (a, b, t, g) => ({ a, b, t, g }), HUM = [.6, .4, 1.6, .15];
 const LOOKS = {
   wardancer: [{ body: 'coat', head: 'bare', tail: true, r: 'lampblade', l: 'lampblade', scarf: '#e8e2d0' }, [pal('#e8e2d0', '#5a6a8a', '#d8b24a', '#ffe9a0'), pal('#d8dce4', '#3a5a6a', '#c8a25a', '#9fe6ff'), pal('#e0d8c8', '#6a5a4a', '#d8b24a', '#c8ffb0')]],
@@ -53,25 +60,25 @@ replaceKinds(defs);
 // a forged lamp blade burns in the colour its knight chose
 export const BLADE_COLS = { gold: ['Gold', '#ffe07a'], blue: ['Blue', '#7ad8ff'], green: ['Green', '#8aff9a'], white: ['White', '#ffffff'], violet: ['Violet', '#c8a0ff'] };
 for (const [k, [, c]] of Object.entries(BLADE_COLS)) addKinds({ ['lk_' + k]: [sfig(LOOKS.wardancer[0], pal('#e8e2d0', '#5a6a8a', '#d8b24a', c), 1), HUM, .05, .03] });
-X.zone.push(() => { const h = S.hero; if (h && S.heroCls === 'wardancer' && S.ext.blade && BLADE_COLS[S.ext.blade]) h.kind = 'lk_' + S.ext.blade; });
+X.zone.push(() => { const h = S.hero; if (h && X.path() === 'justice' && S.heroCls === 'wardancer' && S.ext.blade && BLADE_COLS[S.ext.blade]) h.kind = 'lk_' + S.ext.blade; });
 
 // ---------- lamp-powered kit: what the order grants a tech class at its first trial ----------
 const lit = e => e && e.isHero && S.flags?.lamp && !LIGHT.includes(e.cls);
-X_NAME.fn = (e, ab) => lit(e) && ab.kind !== 'buff' ? 'Lamplit ' + ab.name : ab.name;
+X_NAME.fn = (e, ab) => lit(e) && ab.kind !== 'buff' ? (X.path() === 'dark' ? 'Dusk ' : 'Lamplit ') + ab.name : ab.name;
 X.abName = (e, ab) => X_NAME.fn(e, ab);
 X.acct = a => { if (S.flags?.lamp) { a.powP = (a.powP || 0) + (LIGHT.includes(S.heroCls) ? .04 : .08); a.hpP = (a.hpP || 0) + .04; } };
 export function grantLamp() {
   if (S.flags.lamp) return; S.flags.lamp = 1;
-  const cls = S.heroCls, t = WTYPE[cls], L = S.hero.lvl, light = LIGHT.includes(cls);
-  const it = makeItem({ name: light ? `Novice's ${BASE_NAMES.weapon[t[0]][1] || BASE_NAMES.weapon[t[0]][0]}` : `Lamp-powered ${BASE_NAMES.weapon[t[0]][0]}`, slot: 'weapon', type: t[0], lvl: L, rarity: 2, stats: { pow: 6 + L * 2, sta: 2 + L }, value: 12 });
+  const cls = S.heroCls, t = WTYPE[cls], L = S.hero.lvl, light = LIGHT.includes(cls), dark = X.path() === 'dark';
+  const it = makeItem({ name: light ? `${dark ? "Acolyte's" : "Novice's"} ${BASE_NAMES.weapon[t[0]][1] || BASE_NAMES.weapon[t[0]][0]}` : `${dark ? 'Dusk-powered' : 'Lamp-powered'} ${BASE_NAMES.weapon[t[0]][0]}`, slot: 'weapon', type: t[0], lvl: L, rarity: 2, stats: { pow: 6 + L * 2, sta: 2 + L }, value: 12 });
   if (S.gear[cls]) { const old = S.gear[cls].weapon; S.gear[cls].weapon = it; if (old && S.bag.length < 30) S.bag.push(old); Game.applyGear(S.hero, S.gear[cls]); }
   Game.refreshAcct();
-  chat('loot', null, light ? `The order confirms you as a sworn novice. You receive ${it.name}.` : `The order lights a lamp core in your weapon. You receive ${it.name}, and your abilities burn with it.`);
+  chat('loot', null, dark ? (light ? `The Covenant names you acolyte. You receive ${it.name}.` : `The Covenant seats a dusk core in your weapon. You receive ${it.name}, and your abilities darken with it.`) : light ? `The order confirms you as a sworn novice. You receive ${it.name}.` : `The order lights a lamp core in your weapon. You receive ${it.name}, and your abilities burn with it.`);
   Game.save();
 }
 
 // ---------- where a justice hero begins, and what the map shows them ----------
-X.starts = { justice: { zone: 'fort', sys: 'cairn', gold: 8, scene: 'intro_j', hello: 'A transport sets you down at {town}. The cold has teeth.' } };
+X.starts = X.starts || {}; X.starts.justice = { zone: 'fort', sys: 'cairn', gold: 8, scene: 'intro_j', hello: 'A transport sets you down at {town}. The cold has teeth.' };
 Object.assign(SYSTEMS, {
   cairn: { name: 'Cairn', sub: 'Republic border world', path: 'justice', zone: 'fort', x: .22, y: .3, info: 'Ice, wind and one fort. Fort Lastlight has watched the border for three hundred years, and lately the border has started watching back.' },
   aurelis: { name: 'Aurelis', sub: 'Republic core world', path: 'justice', zone: 'city', x: .72, y: .72, info: "The Republic's capital and the seat of the lamp-keepers. A hundred million lights, and somebody is counting the ones that go out.", need: () => !!S.quests.jf_j11, why: 'You have no orders for the core worlds yet.' },
