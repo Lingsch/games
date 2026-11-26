@@ -266,7 +266,7 @@ function buffRow(u, max) {
 }
 function updateFrames() {
   const h = S.hero;
-  { const tt = Game.heroTitle(); const nm = tt ? (tt.startsWith('of ') || tt.startsWith('the ') ? `${h.name} ${tt}` : `${h.name} ${tt}`) : h.name; if ($('meName').textContent !== nm) $('meName').textContent = nm; } $('meLvl').textContent = `${h.lvl} ${CLASSES[h.cls].name}`;
+  { const tt = Game.heroTitle(); const nm = tt ? (tt.startsWith('of ') || tt.startsWith('the ') ? `${h.name} ${tt}` : `${h.name} ${tt}`) : h.name; if ($('meName').textContent !== nm) $('meName').textContent = nm; } $('meLvl').textContent = `${h.lvl} ${X.clsName ? X.clsName(h) : CLASSES[h.cls].name}`;
   $('meHp').style.width = pct(h.hp, h.maxHp) + '%'; $('meHpT').textContent = `${Math.ceil(h.hp)} / ${h.maxHp}`;
   $('meRes').style.width = pct(h.res, h.resMax) + '%'; $('meRes').style.background = RES_COL[h.resType]; $('meResT').textContent = frameRes(h);
   const bs = buffRow(h, 12) + (S.corpse ? '<span>🪦</span>' : '');
@@ -527,7 +527,7 @@ export function openFriendPick(afterUnlock, afterSwitch, newCls) {
 }
 function tabChar(body) {
   const h = S.hero, C = CLASSES[S.heroCls];
-  body.appendChild(el(`<div class="card"><h3 style="color:${C.color}">${esc(h.name)} · Level ${h.lvl} ${C.name}</h3><p>${C.family} · ${C.role}. ${esc(C.blurb)}</p>
+  body.appendChild(el(`<div class="card"><h3 style="color:${C.color}">${esc(h.name)} · Level ${h.lvl} ${X.clsName ? X.clsName(h) : C.name}</h3><p>${C.family} · ${C.role}. ${esc(C.blurb)}</p>
     <div class="grid2" style="margin-top:6px"><div><div class="stat"><span>Health</span><span>${h.maxHp}</span></div><div class="stat"><span>${h.resType}</span><span>${h.resMax}</span></div><div class="stat"><span>Power</span><span>${Math.round(h.power)}</span></div></div>
     <div><div class="stat"><span>Armor</span><span>${Math.round(h.armor)}</span></div><div class="stat"><span>Crit</span><span>${(h.crit * 100).toFixed(1)}%</span></div><div class="stat"><span>XP</span><span>${h.lvl >= MAX_LVL ? 'max' : Math.round(h.xp) + ' / ' + xpNeed(h.lvl)}</span></div></div></div>
     <p>Gold: ${S.gold}</p></div>`));
@@ -944,7 +944,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 8 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 9 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
@@ -966,10 +966,11 @@ export function showTitle(view = 'home') {
   }
   if (view === 'set') { T.onclick = null; T.innerHTML = head; const box = document.createElement('div'); T.appendChild(box); renderSettings(box, false, () => showTitle('home')); return; }
   // a new character starts with one weapon, and the weapon makes the class
-  let pick = null, fcls = [];
+  let pick = null, fcls = [], race = 'human';
   const draw = () => {
     T.innerHTML = `${head}<button data-a="back" style="margin:8px 0">← Back</button>
       <div class="card" style="text-align:left"><h3>Name your hero</h3><input type="text" id="heroName" maxlength="14" placeholder="Hero name" value="${esc(T.dataset.name || pickName())}"></div>
+      ${X.racePicker ? X.racePicker(race) : ''}
       <div class="card" style="text-align:left"><h3>Choose your weapon</h3>
       ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Cinzel;color:var(--acc)">${FAMILY_ICON[f]} ${f}s</p><div class="wpick">${CLASS_KEYS.filter(k => CLASSES[k].family === f).map(k => { const c = CLASSES[k]; return `<div class="card ${pick === k ? 'on' : ''}" data-k="${k}" style="border-color:${c.color}"><span class="wi">${wIcon(k)}</span><div><b style="color:${c.color}">${weaponOf(k)}</b><small>${c.name} · ${c.role}</small><p>${esc(c.blurb)}</p></div></div>`; }).join('')}</div>`).join('')}</div>
       ${pick ? `<div class="card" style="text-align:left"><h3>Your friends</h3>${fcls.map((k, i) => `<p class="setl" style="margin-top:6px">Friend ${i + 1}</p><select data-f="${i}" class="fsel">${FAMILIES.map(f => `<optgroup label="${f}s">${CLASS_KEYS.filter(c => CLASSES[c].family === f).map(c => `<option value="${c}" ${c === k ? 'selected' : ''}>${CLASSES[c].name} · ${c === 'illusionist' || c === 'bard' ? 'support' : CLASSES[c].role}</option>`).join('')}</optgroup>`).join('')}</select>`).join('')}</div>` : ''}
@@ -980,10 +981,11 @@ export function showTitle(view = 'home') {
   draw();
   T.onchange = ev => { const sel = ev.target.closest('select[data-f]'); if (sel) fcls[+sel.dataset.f] = sel.value; };
   T.onclick = ev => {
+    const rc = ev.target.closest('.rpick'); if (rc) { T.dataset.name = $('heroName').value; const y = $('title').scrollTop; race = rc.dataset.r; draw(); $('title').scrollTop = y; return; }
     const card = ev.target.closest('.wpick .card'), a = ev.target.closest('button')?.dataset.a;
     if (card) { T.dataset.name = $('heroName').value; const y = $('title').scrollTop; if (pick !== card.dataset.k) fcls = Game.defaultFriendCls(card.dataset.k); pick = card.dataset.k; draw(); $('title').scrollTop = y; return; }
     if (a === 'back') showTitle('home');
-    if (a === 'go' && pick) { const n = ($('heroName').value || 'Hero').trim().slice(0, 14) || 'Hero'; Game.newGame(pick, n, undefined, fcls.slice()); afterStart(); }
+    if (a === 'go' && pick) { const n = ($('heroName').value || 'Hero').trim().slice(0, 14) || 'Hero'; S.pendingRace = race; Game.newGame(pick, n, undefined, fcls.slice()); afterStart(); }
   };
 }
 let replArmed = 0;

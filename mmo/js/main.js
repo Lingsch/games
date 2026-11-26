@@ -22,6 +22,17 @@ import './wastesq.js';
 import * as Raid from './raid7.js';
 import './soul7.js';
 import './spell8.js';
+import './kit9.js';
+import './race9.js';
+import './start9.js';
+import './hi9.js';
+import './deep9.js';
+import './north9.js';
+import './crown9.js';
+import './talent9.js';
+import './wboss9.js';
+import './comp9.js';
+import './bg9.js';
 import * as P8 from './party8.js';
 import './heroic7.js';
 import './ach7.js';
@@ -134,7 +145,7 @@ function draw() {
     if (e.remove) continue;
     // druids in animal form wear the animal
     const kk = e.buffs.length && e.cls === 'druid' ? (e.buffs.some(b => b.id === 'bear') ? 'bear' : e.buffs.some(b => b.id === 'cat') ? 'wolf' : e.kind) : e.kind;
-    const K = R.kinds[kk]; if (!K || K.n >= 160) continue;
+    const K = R.kinds[kk] || (X.lazyKind && X.lazyKind(kk)); if (!K || K.n >= 160) continue;
     const ddx = e.x - camP.x, ddz = e.z - camP.z;
     if (ddx * ddx + ddz * ddz > 150 * 150) continue;
     let y = e.y, rotX = 0;

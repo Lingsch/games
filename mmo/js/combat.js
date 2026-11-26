@@ -1,5 +1,5 @@
 // Entities, stats, tab-target combat, threat, buffs, casting, death, experience and loot.
-import { S, clamp, dist, angTo, rnd, pick, chat, floatText, nextId } from './core.js';
+import { S, clamp, dist, angTo, rnd, pick, chat, floatText, nextId, X } from './core.js';
 import { CLASSES, MOBS, GCD, mobHp, mobDmg, mobXp, xpNeed, MAX_LVL, SCHOOL_COL, randomGear, NAMED_LOOT, makeItem, QUESTS, CHAT, RES, startRes, PETS, roleOf, rankOf, rankMul, costMul, cdMul, specialLoot } from './data.js';
 import { hgt, blocked, world } from './world.js';
 import * as R from './render.js';
@@ -40,7 +40,7 @@ export function recalc(e) {
     const C = CLASSES[e.cls], L = e.lvl;
     const frac = e.maxHp > 0 ? e.hp / e.maxHp : 1;
     // the hero's account-wide bonuses and slotted perks (Build 4)
-    const A = e.acct || NOACCT;
+    const A = X.acctOf ? X.acctOf(e) : e.acct || NOACCT;
     e.maxHp = Math.round((C.hp[0] + C.hp[1] * L + (e.gearSta + (A.sta || 0)) * 8) * (1 + buffSum(e, 'hp') + (A.hpP || 0)));
     if (!e.dead) e.hp = Math.min(e.maxHp, Math.max(1, Math.round(frac * e.maxHp)));
     e.power = (C.pow[0] + C.pow[1] * L + e.gearPow + (A.pow || 0)) * (1 + buffSum(e, 'pow') + (A.powP || 0));
@@ -65,9 +65,10 @@ export function recalcPet(e) {
   if (!D) { e.maxHp = Math.max(e.maxHp, 1); return; }
   const frac = e.maxHp > 0 ? e.hp / e.maxHp : 1;
   e.lvl = L;
-  e.maxHp = Math.round((40 + 22 * L) * D.hpM * (hasBuff(o, 'seal') ? 1.2 : 1));
+  const up = o.isHero && X.petRank ? 1 + .08 * X.petRank(e.pet.key) : 1;
+  e.maxHp = Math.round((40 + 22 * L) * D.hpM * (hasBuff(o, 'seal') ? 1.2 : 1) * up);
   e.hp = Math.min(e.maxHp, Math.max(1, Math.round(frac * e.maxHp)));
-  e.power = (8 + 3.6 * L + (o.gearPow || 0) * .5) * D.powM * (1 + buffSum(e, 'pow'));
+  e.power = (8 + 3.6 * L + (o.gearPow || 0) * .5) * D.powM * (1 + buffSum(e, 'pow')) * up;
   e.armor = L * (D.role === 'tank' ? 12 : 4); e.crit = .05; e.dodge = .03; e.parry = 0;
 }
 export const isEnemy = (a, b) => a && b && a.team !== 'npc' && b.team !== 'npc' && ((a.team === 'enemy') !== (b.team === 'enemy'));
@@ -316,6 +317,7 @@ export function summon(u, key, dur = 0) {
   const a = u.yaw + Math.PI + (Math.random() - .5) * 2;
   const e = makeEnt({ team: u.team, name: (u.isHero ? '' : u.name + "'s ") + D.name, kind: D.kind, x: u.x + Math.sin(a) * 2, z: u.z + Math.cos(a) * 2, spd: D.spd, r: D.r, scale: D.scale || 1,
     pet: { owner: u, key, role: D.role, ranged: D.ranged, school: D.school, until: dur ? S.time + dur : 0 } });
+  if (u.isHero && X.petLook) e.kind = X.petLook(key, e.kind);
   recalcPet(e); e.hp = e.maxHp;
   R.burst(e.x, e.y + 1, e.z, 24, key === 'firepet' ? [1, .5, .2] : key === 'waterpet' ? [.4, .7, 1] : key === 'stormpet' ? [.85, .8, 1] : [.7, .9, .5], 2.5, .8, .6);
   return e;
@@ -541,7 +543,7 @@ export function giveXp(p, amt) {
   if (amt <= 0) return;
   if (p.isHero && hooks.xpMod) amt = Math.round(hooks.xpMod(p, amt));
   const cap = p.isHero && hooks.lvlCap ? hooks.lvlCap(p) : MAX_LVL;
-  if (p.lvl >= MAX_LVL) { p.xp = 0; return; }
+  if (p.lvl >= MAX_LVL) { p.xp = 0; if (p.isHero && X.capXp) X.capXp(p, amt); return; }
   if (p.lvl >= cap) { const was = p.xp || 0; p.xp = Math.min(xpNeed(p.lvl) - 1, was + amt); if (hooks.onOverflow) hooks.onOverflow(p, was + amt - p.xp); if (p.xp >= xpNeed(p.lvl) - 1 && hooks.onCapped) hooks.onCapped(p); return; }
   p.xp = (p.xp || 0) + amt;
   if (p.isHero) floatText(p, `+${amt} xp`, '#c8a2ff');

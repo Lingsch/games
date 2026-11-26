@@ -206,7 +206,7 @@ addKinds({
 });
 
 // ---------- placing nodes, stations and trainers when a zone is built ----------
-const NODES = {
+export const NODES = {
   vale: [['copper', 'ore', 'orecopper', 1, [0, 1], 22], ['iron', 'ore', 'oreiron', 40, [2, 3], 18], ['meadowsweet', 'herb', 'herbmeadow', 1, [0, 1], 22], ['graveroot', 'herb', 'herbgrave', 40, [2, 3], 18]],
   coast: [['silver', 'ore', 'oresilver', 75, null, 18], ['iron', 'ore', 'oreiron', 40, null, 8], ['kelpbloom', 'herb', 'herbkelp', 75, null, 20]],
 };

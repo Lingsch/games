@@ -147,7 +147,7 @@ function needed() {
   return n;
 }
 function fillGroup(key, guildRun) {
-  const d = LFG_D[key], h = S.hero, need = needed(), L = clamp(Math.round((Math.max(h.lvl, d.lvl[0]) + Math.min(h.lvl + 1, d.lvl[1])) / 2), 1, 20), used = new Set([...S.party.map(p => p.name), ...S.fakes.map(f => f.name)]);
+  const d = LFG_D[key], h = S.hero, need = needed(), L = clamp(Math.round((Math.max(h.lvl, d.lvl[0]) + Math.min(h.lvl + 1, d.lvl[1])) / 2), 1, 25), used = new Set([...S.party.map(p => p.name), ...S.fakes.map(f => f.name)]);
   const joined = [];
   for (const role of ['tank', 'healer', 'dps']) for (let i = 0; i < need[role]; i++) {
     if (S.party.length >= Game.partyCap()) break;
@@ -158,7 +158,7 @@ function fillGroup(key, guildRun) {
     else {
       const name = pick(FAKE_NAMES.filter(n => !used.has(n))) || 'Wanderer' + irnd(10, 99); used.add(name);
       const pool = CLASS_KEYS.filter(k => roleOf6(k) === role), cls = pick(pool);
-      f = Game.addMate({ name, cls, lvl: clamp(L + irnd(-1, 1), 1, 20), pal: 1 + irnd(0, 1), persona: pick(PERSONAS), guild: guildRun && G() ? G().name : Math.random() < .5 ? pick(GUILDS) : null, mood: 0 }, h);
+      f = Game.addMate({ name, cls, lvl: clamp(L + irnd(-1, 1), 1, 25), pal: 1 + irnd(0, 1), persona: pick(PERSONAS), guild: guildRun && G() ? G().name : Math.random() < .5 ? pick(GUILDS) : null, mood: 0 }, h);
     }
     joined.push(f);
   }

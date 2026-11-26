@@ -833,6 +833,8 @@ export function fakeAI(e, dt) {
   // rest when hurt
   if (e.hp < e.maxHp * .6 || (e.resType === 'mana' && e.res < e.resMax * .4) || (e.sit && (e.hp < e.maxHp * .95 || (e.resType === 'mana' && e.res < e.resMax * .9)))) { if (e.moving < .1) { e.sit = true; return; } }
   e.sit = false;
+  // Build 9: a world boss or an invasion calls, and the fake players come running
+  if (f.rally) { const b = f.rally; if (b.dead || b.remove) { f.rally = null; f.state = 'home'; } else { const C0 = CLASSES[e.cls], ml = meleeClass(e), want = ml ? C0.range + (b.r || 1) : 20; if (dist(e, b) > want) goTo(e, b.x, b.z, dt, want - .5); else { e.target = b; e.autoOn = true; addThreat(b, e, 1); fight(e, b, group); } return; } }
   if (f.state === 'town') {
     if (!f.spot || goTo(e, f.spot.x, f.spot.z, dt, .5, .5)) {
       if (!f.idleT || f.idleT < S.time) { f.idleT = S.time + rnd(3, 12); const tw = world.town; const a = rnd(0, TAU), r = rnd(3, tw.R - 6); f.spot = { x: tw.x + Math.cos(a) * r, z: tw.z + Math.sin(a) * r }; }

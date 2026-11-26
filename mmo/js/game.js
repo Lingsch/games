@@ -40,7 +40,7 @@ export function applyGear(e, set) {
   Cb.recalc(e);
 }
 // fake players wear gear that keeps up with their level
-function fakeGear(e) { e.gearPow = Math.round(e.lvl * 2.2 + 2); e.gearSta = Math.round(e.lvl * 3 + 3); e.gearArm = Math.round(e.lvl * (CLASSES[e.cls].armor === 'plate' ? 9 : 4)) + (e.bonusArm || 0); e.gearPow += e.bonusPow || 0; e.gearSta += e.bonusSta || 0; Cb.recalc(e); }
+function fakeGear(e) { e.gearPow = Math.round(e.lvl * 2.2 + 2); e.gearSta = Math.round(e.lvl * 3 + 3); e.gearArm = Math.round(e.lvl * (CLASSES[e.cls].armor === 'plate' ? 9 : 4)) + (e.bonusArm || 0); e.gearPow += e.bonusPow || 0; e.gearSta += e.bonusSta || 0; if (X.dollGear) X.dollGear(e); Cb.recalc(e); }
 function starterGear(cls) {
   const t = WTYPE[cls], a = CLASSES[cls].armor, arm = a === 'plate' ? 4 : a === 'leather' ? 2 : 1;
   return {
@@ -57,10 +57,11 @@ export function newGame(cls, heroName, seed = (Math.random() * 1e9) | 0, friendC
   S.classes = {}; S.gear = {}; S.bar = {};
   for (const k of CLASS_KEYS) { S.classes[k] = { lvl: 1, xp: 0 }; S.gear[k] = starterGear(k); S.bar[k] = defaultBar(k); }
   S.heroCls = cls; S.heroName = heroName; S.owned = [cls]; S.unlockPicks = 0;
-  S.pops = {}; S.bind = null; S.zone = 'vale'; S.pole = false;
+  S.pops = {}; S.bind = null; S.zone = X.startZone ? X.startZone() : 'vale'; S.pole = false;
   S.flags = {}; S.lore = {}; S.perks = []; S.bank = []; S.used = {}; S.scenesSeen = {}; S.vetXp = 0; S.huntOn = false; S.prof = {}; S.mats = {}; S.recipes = []; S.cons = {}; S.collection = []; S.title = null; S.pet = null; S.campOrder = null; S.cmd = 'follow'; S.ext = {};
-  startWorld({ zone: 'vale' });
-  S.pendingScene = 'intro';
+  S.ext.race = S.pendingRace || 'human'; S.pendingRace = null; S.zone = X.startZone ? X.startZone() : 'vale';
+  startWorld({ zone: S.zone });
+  S.pendingScene = X.startScene ? X.startScene() : 'intro';
   makeFriends();
   chat('sys', null, `Welcome to ${world.names.town}.`);
 }
@@ -336,6 +337,7 @@ export function inspect(e) {
 export const levelOf = k => (k === S.heroCls && S.hero ? S.hero.lvl : S.classes[k]?.lvl || 1);
 export const famBest = f => Math.max(...CLASS_KEYS.filter(k => CLASSES[k].family === f).map(levelOf));
 export const lockedAt10 = () => FAMILIES.some(f => famBest(f) < 10);
+export const lockedAt20 = () => FAMILIES.some(f => famBest(f) < 20);
 export const raidReady = () => FAMILIES.every(f => famBest(f) >= 20);
 export const perksOpen = () => CLASS_KEYS.filter(k => levelOf(k) >= 10);
 export const xpBoost = () => Math.min(.6, .2 * CLASS_KEYS.filter(k => k !== S.heroCls && levelOf(k) >= 10).length);
@@ -405,7 +407,7 @@ function townsfolk(zone) {
     for (const [type, key, dx, dz] of t.npcs) {
       const x = t.x + dx, z = t.z + dz;
       if (type === 'giver') S.npcs[key] = npc({ name: GIVERS[key].name, title: GIVERS[key].title, kind: GIVERS[key].model, x, z, giver: key });
-      if (type === 'vendor') npc({ name: VEND[key], title: key === 'vill' ? 'Supplies and fishing poles' : 'Supplies', kind: key === 'light' ? 'villager2' : key === 'crook' || key === 'refuge' ? 'villager1' : key === 'ember' ? 'guard' : 'pirate1', x, z, vendor: key });
+      if (type === 'vendor') { const xv = X.VEND?.[key]; npc({ name: xv ? xv[0] : VEND[key], title: key === 'vill' ? 'Supplies and fishing poles' : 'Supplies', kind: xv ? xv[1] : key === 'light' ? 'villager2' : key === 'crook' || key === 'refuge' ? 'villager1' : key === 'ember' ? 'guard' : 'pirate1', x, z, vendor: key }); }
       if (type === 'bind') npc({ name: 'Bind Stone', title: 'Bind here', kind: 'corpse', x, z, bindstone: true, scale: 1.6 });
       if (type === 'armory') S.npcs.armorer = npc({ name: 'Mistress Hale', title: 'Armory · class trials', kind: 'guard', x, z, armory: true, giver: 'armorer' });
     }
@@ -417,7 +419,7 @@ function townsfolk(zone) {
   }
   storyFolk();   // the coast's own story people, trainers and gathering nodes (Build 6)
 }
-function guard(t, x, z, name) { return Cb.makeEnt({ team: 'ally', name, kind: 'guard', x, z, guard: true, lvl: 30, maxHp: 9000, hp: 9000, power: 260, armor: 900, spd: 7, home: { x, z }, townC: { x: t.x, z: t.z, R: t.R } }); }
+function guard(t, x, z, name) { return Cb.makeEnt({ team: 'ally', name, kind: t.guardKind || 'guard', x, z, guard: true, lvl: 30, maxHp: 9000, hp: 9000, power: 260, armor: 900, spd: 7, home: { x, z }, townC: { x: t.x, z: t.z, R: t.R } }); }
 // travelling between zones: your group comes with you, the zone you leave remembers its people
 export function travel(zone, arrive, force) {
   if (!force && S.party.some(p => !p.dead && Cb.inCombat(p) && dist(p, S.hero) < 40 && S.ents.some(m => m.mob && !m.dead && m.threat.has(p)))) { chat('sys', null, "You can't leave while your group is fighting."); return false; }
@@ -431,6 +433,7 @@ export function travel(zone, arrive, force) {
   return true;
 }
 function arrivalFor(zone, from) {
+  for (const f of X.arriveHooks || []) { const r = f(zone, from); if (r) return r; }
   if (zone === 'coast' && from === 'fleet') return { x: world.buoy.x + 3, z: world.buoy.z + 3 };
   if (INSTANCES[from]?.out && zone === INSTANCES[from].parent) return { ...INSTANCES[from].out };
   if (INSTANCES[zone] && zone !== 'fleet') return { x: 0, z: 64 };
@@ -492,7 +495,7 @@ function makeFakes(saved, zone = 'vale') {
     const sv = saved ? saved[i] : null;
     // roughly one tank and one and a half healers for every three damage dealers, across all sixteen classes
     const roll = Math.random(), cls = sv ? sv.cls : pick(byRole(roll < .22 ? 'tank' : roll < .48 ? 'healer' : 'dps'));
-    const lvl = sv ? sv.lvl : zone === 'coast' ? clamp(Math.round(9 + Math.random() ** 1.2 * 11), 9, 20) : clamp(Math.round(1 + Math.random() ** 1.4 * 9), 1, 10);
+    const lvl = sv ? sv.lvl : ((X.fakeLvlHooks || []).reduce((v, f) => v ?? f(zone), null) ?? (zone === 'coast' ? clamp(Math.round(9 + Math.random() ** 1.2 * 11), 9, 20) : clamp(Math.round(1 + Math.random() ** 1.4 * 9), 1, 10)));
     const pal = sv ? sv.pal : 1 + (i % 2);
     const inTown = i % 2 === 0;
     const e = Cb.makeHuman(cls, lvl, { name: sv ? sv.name : names[i % names.length], pal, x: tw.x + rnd(-12, 12), z: tw.z + rnd(-12, 12) });
@@ -609,7 +612,7 @@ export function askSuspect(q, key) {
 }
 // a raid holds 12; everything else holds 6
 export const partyCap = () => S.ext?.raid12 ? 12 : 6;
-export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.forCls && S.heroCls !== q.forCls) return 'locked'; if (q.when && !q.when()) return 'locked'; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
+export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.forCls && S.heroCls !== q.forCls) return 'locked'; if (q.when && !q.when()) return 'locked'; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned' && !(X.preAlt?.[q.pre] || []).some(id => S.quests[id]?.state === 'turned')) return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
 export function acceptQuest(q) {
   S.quests[q.id] = { state: q.obj.talk ? 'done' : 'active', n: 0 };
   if (S.declined) delete S.declined[q.id];
@@ -681,6 +684,7 @@ export function drinkPot(k) {
   return null;
 }
 // a looted item goes to someone in the party. Companions remember whether you were fair.
+export { fakeGear };
 export function assignLoot(mob, it, who) {
   mob.loot = mob.loot.filter(x => x !== it);
   if (it.recipe) { if (!Craft.learnRecipe(it.recipe)) chat('sys', null, 'You already know that recipe.'); save(); return; }
@@ -703,6 +707,7 @@ export function assignLoot(mob, it, who) {
     return;
   }
   // a companion wears it if it's an upgrade on what their level gives them
+  if (X.compTake && X.compTake(who, it)) { save(); return; }
   const s = it.stats; who.bonusPow = (who.bonusPow || 0) + (s.pow || 0) * .5; who.bonusSta = (who.bonusSta || 0) + (s.sta || 0) * .5; who.bonusArm = (who.bonusArm || 0) + (s.arm || 0) * .3;
   fakeGear(who); who.fake.mood += canWear(who.cls, it) ? 2 : 1;
   chat('loot', null, `${who.name} receives ${it.name}.`); chat('party', who.name, pick(CHAT.thanks));
@@ -719,7 +724,7 @@ Cb.setHooks({
     return a;
   },
   onOverflow(p, over) { if (over > 0) S.vetXp = Math.min(40000, (S.vetXp || 0) + Math.round(over)); },
-  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : MAX_LVL),
+  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : lockedAt20() && p.lvl >= 20 ? 20 : MAX_LVL),
   onCapped(p) { if (cappedSaid) return; cappedSaid = true; chat('sys', null, `You have learned all this weapon can teach you, for now.`); },
   onYield(m, src) {
     // he only surrenders to your group, and only while you're on his quest
@@ -777,6 +782,7 @@ Cb.setHooks({
 });
 export function release() {
   const h = S.hero; if (!h.dead) return;
+  if (X.bgRelease && X.bgRelease()) return;
   // the corpse keeps your gear; you wake at the bind stone without it
   const loss = Math.round(xpNeed(h.lvl) * .1); h.xp = Math.max(0, h.xp - loss);
   S.corpse = { zone: S.zone === 'fleet' ? 'coast' : S.zone, x: S.zone === 'fleet' ? world.names && 0 : h.x, z: h.z, cls: S.heroCls, gear: { ...S.gear[S.heroCls] } };

@@ -1,7 +1,7 @@
 // Game data: the four Milestone 1 classes, mobs, items, quests, fake-player names and chat.
 // Ability effects receive C (the combat API in combat.js), the user u, the target t and the ability.
 
-export const MAX_LVL = 20;
+export const MAX_LVL = 25;
 export const xpNeed = L => Math.round(80 * L ** 1.7 + 120);
 export const GCD = 1.5;
 
@@ -544,9 +544,9 @@ export const CHAT = {
 export const rankOf = (e, ab) => ab && e.lvl >= ab.lvl + 10 ? 2 : 1;
 // Build 8: spell books add two more ranks on top, Adept and Master. BOOK.rank is filled in by spell8.js.
 export const BOOK = { rank: () => 0, names: ['', 'Adept', 'Master'], pow: [1, 1.15, 1.3], cost: [1, .9, .8], cd: [1, 1, .85] };
-export const rankMul = (e, ab) => (rankOf(e, ab) > 1 ? 1.35 : 1) * BOOK.pow[BOOK.rank(e, ab)];
+export const rankMul = (e, ab) => (rankOf(e, ab) > 1 ? 1.35 : 1) * BOOK.pow[BOOK.rank(e, ab)] * (BOOK.tal ? BOOK.tal(e, ab) : 1);
 export const costMul = (e, ab) => BOOK.cost[BOOK.rank(e, ab)];
-export const cdMul = (e, ab) => BOOK.cd[BOOK.rank(e, ab)];
+export const cdMul = (e, ab) => BOOK.cd[BOOK.rank(e, ab)] * (BOOK.talCd ? BOOK.talCd(e, ab) : 1);
 export const rankName = (e, ab) => { const b = ab ? BOOK.rank(e, ab) : 0; return (b ? BOOK.names[b] + ' ' : '') + ab.name + (rankOf(e, ab) > 1 ? ' II' : ''); };
 const NEW_SPELLS = {
   bulwark: {

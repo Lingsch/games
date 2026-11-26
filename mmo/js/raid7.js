@@ -16,6 +16,7 @@ import * as Craft from './crafting.js';
 import { LFG_D } from './social6.js';
 import { W7 } from './wastes7.js';
 const RAID = 'between';
+export const inRaid = (z = S.zone) => z === RAID || !!X.RAIDS?.has(z);   // Build 9: three more raids use the same rules
 ZONE_SIZE.between = 300;
 
 // ---------- who may enter: level 20, and one class from each family at 20 ----------
@@ -153,7 +154,7 @@ function twins(m, dt, b) {
 }
 // run every engaged raid boss's script, move the marks with their targets, and steer the tanks on rails
 X.tick.push(dt => {
-  if (S.zone !== RAID) return;
+  if (!inRaid()) return;
   for (const g of S.dangers) if (g.follow) { if (g.follow.dead) g.t = 0; else { g.x = g.follow.x; g.z = g.follow.z; } }
   for (const m of S.ents) {
     if (!m.raidBoss && !MOBS[m.mob]?.raidBoss || m.dead || !m.engaged) { if (m.raidBoss || MOBS[m.mob]?.raidBoss) st.delete(m); continue; }
@@ -167,9 +168,9 @@ X.tick.push(dt => {
 // ---------- the corpse run ----------
 // dying Between Worlds leaves your body where it fell; the raid wakes at the rift and runs back
 X.release = () => {
-  if (S.zone !== RAID) return false;
+  if (!inRaid()) return false;
   const h = S.hero;
-  S.corpse.zone = RAID; S.corpse.x = h.x; S.corpse.z = h.z;
+  S.corpse.zone = S.zone; S.corpse.x = h.x; S.corpse.z = h.z;
   S.corpse.ent = Cb.makeEnt({ team: 'npc', name: `${h.name}'s corpse`, kind: 'corpse', x: h.x, z: h.z, corpse: true, maxHp: 1, hp: 1 });
   const wipe = S.party.every(p => p === h || p.dead);
   h.x = 0; h.z = 60; h.y = hgt(0, 60);
@@ -182,10 +183,10 @@ X.release = () => {
 
 // ---------- loot: need/greed, master looter, DKP or a loot council ----------
 export const LOOT_MODES = { needgreed: 'Need / Greed', master: 'Master looter', dkp: 'DKP', council: 'Loot council' };
-const lootMode = () => (S.zone === RAID || S.zone?.startsWith('h_') || S.party.length > 6) ? (S.ext.guild?.loot || 'needgreed') : 'master';
+const lootMode = () => (inRaid() || S.zone?.startsWith('h_') || S.party.length > 6) ? (S.ext.guild?.loot || 'needgreed') : 'master';
 const wants = (p, it) => it.book ? X.canStudy(p, it) : it.slot !== 'collect' && it.slot !== 'recipe' && Game.canWear(p.cls, it);
 X.kill.push(m => {
-  if (!(m.raidBoss || MOBS[m.mob]?.raidBoss) || S.zone !== RAID) return;
+  if (!(m.raidBoss || MOBS[m.mob]?.raidBoss) || !inRaid()) return;
   S.ext.dkp = S.ext.dkp || {}; for (const p of S.party) S.ext.dkp[p.name] = (S.ext.dkp[p.name] || 0) + 10;
   setTimeout(() => { const mode = lootMode(); if (mode === 'master' || !m.loot?.length) return; distribute(m, mode); }, 50);
 });
@@ -283,7 +284,7 @@ X.book.push(['raid', 'Raid', body => {
   const ints = S.ext.raidInterrupt || [];
   const ir = el(`<div style="display:flex;flex-wrap:wrap;gap:4px">${mem.map(p => `<button data-n="${esc(p.name)}" class="${ints.includes(p.name) ? 'on' : ''}">${esc(p.name)}</button>`).join('')}</div>`);
   ir.onclick = ev => { const n = ev.target.dataset?.n; if (!n) return; S.ext.raidInterrupt = ints.includes(n) ? ints.filter(x => x !== n) : [...ints, n]; refreshSheet(); }; body.appendChild(ir);
-}, () => S.party.length > 6 || S.zone === RAID]);
+}, () => S.party.length > 6 || inRaid()]);
 function clearOrders() { for (const p of S.party) { p.assignTgt = null; p.healFocus = null; p.forceTo = null; } S.raidFocus = null; }
 export function order(kind) {
   const h = S.hero, mem = S.party.filter(p => !p.isHero && !p.dead);
@@ -310,4 +311,4 @@ X.light.push(dt => {
 });
 
 // a raid holds 12 only while there's a raid
-X.zone.push(zone => { if (zone !== RAID && S.party.length <= 6) S.ext.raid12 = false; if (zone !== RAID) { st.clear(); for (const p of S.party) { p.forceTo = null; p.assignTgt = null; } S.raidFocus = null; } });
+X.zone.push(zone => { if (!inRaid(zone) && S.party.length <= 6) S.ext.raid12 = false; if (!inRaid(zone)) { st.clear(); for (const p of S.party) { p.forceTo = null; p.assignTgt = null; } S.raidFocus = null; } });

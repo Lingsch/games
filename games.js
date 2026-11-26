@@ -19,7 +19,7 @@ window.GAMES = [
   {
     title: "Single-Player MMO",
     folder: "mmo",
-    version: "Build 8",
+    version: "Build 9",
     updated: "November 2026",
     kind: "Tab-target MMO, solo",
     blurb: "The same world, a hundred years after the summoner wars. Uncover the Gravelord's plot in the Vale with your two friends, then sail the Saltreach Coast to the Sunken Fleet.",

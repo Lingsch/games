@@ -108,7 +108,7 @@ registerZone('wastes', seed => {
     // the road north from the Vale, through Emberwatch, to the Throne
     const roadX = Math.sin(z * .008) * 18; if (Math.abs(x - roadX) < 7) h = lerp(h, Math.min(h, 4 + N.fbm(x * .01, z * .01, 2) * 3), .6);
     const edge = Math.max(Math.abs(x), Math.abs(z)) - (WH - 26), southRoad = z > WH - 80 && Math.abs(x) < 12;
-    if (edge > 0 && !southRoad) h += edge * edge * .08;
+    if (edge > 0 && !southRoad && !(X.edgeOpen && X.edgeOpen('wastes', x, z))) h += edge * edge * .08;
     H[zi * HN + xi] = h;
   }
   const ASH = new THREE.Color('#8a8478'), DUST = new THREE.Color('#a8987a'), BLIGHT = new THREE.Color('#5a7a3a'), POOL = new THREE.Color('#4aff6a'), ROCK = new THREE.Color('#6a6058'), COB = new THREE.Color('#8a8070'), ROAD = new THREE.Color('#6a5e50'), SCORCH = new THREE.Color('#3a3430');

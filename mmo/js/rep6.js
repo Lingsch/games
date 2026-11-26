@@ -21,6 +21,7 @@ export const STANDINGS = [['Neutral', 0], ['Friendly', 1500], ['Honored', 4500],
 const repOf = f => (S.ext?.rep?.[f]) || 0;
 export const standing = f => { const r = repOf(f); let i = 0; for (let k = 0; k < STANDINGS.length; k++) if (r >= STANDINGS[k][1]) i = k; return i; };
 export function addRep(f, n, quiet) {
+  if (n > 0 && X.repMul) n = Math.round(n * (1 + X.repMul()));
   if (!FACTIONS[f] || !n) return;
   S.ext.rep = S.ext.rep || {}; const before = standing(f);
   if ((S.ext.guild?.lvl || 1) >= 3) n = Math.round(n * 1.1);
@@ -45,13 +46,13 @@ X.kill.push(m => {
 });
 
 // ---------- mounts ----------
-const horse = (coat, mane, tack = '#6b3a22', armored = false) => build([
+export const horse = (coat, mane, tack = '#6b3a22', armored = false) => build([
   P(T(Box(1.1, 1, 2.4), 0, 1.55), 0, O, coat), P(T(Box(.6, 1.2, .7), 0, 2.3, 1.2, -.6), 0, O, coat), P(T(Box(.5, .5, 1), 0, 2.85, 1.75, .25), 0, O, coat),
   P(T(Box(.14, .9, .7), 0, 2.6, 1.05, -.6), 0, O, mane), P(T(Box(.2, .9, .2), 0, 1.4, -1.35, .5), 0, O, mane), ...[-.25, .25].map(x => P(T(Cone(.1, .3, 4), x, 3.2, 1.55), 0, O, coat)),
   ...[[-.38, .9], [.38, .9], [-.38, -.9], [.38, -.9]].map(([x, z]) => P(T(Box(.26, 1.1, .26), x, .55, z), 0, O, coat)), ...[[-.38, .9], [.38, .9], [-.38, -.9], [.38, -.9]].map(([x, z]) => P(T(Box(.3, .2, .3), x, .1, z), 0, O, '#2a221a')),
   P(T(Box(1.2, .25, 1), 0, 2.1, -.1), 0, O, tack), P(T(Box(1.25, .5, .9), 0, 1.75, -.1), 0, O, tack),
   ...(armored ? [P(T(Box(1.25, .7, 1.2), 0, 1.6, .9), 0, O, '#8a8a95'), P(T(Box(.55, .55, .6), 0, 2.95, 1.9, .25), 0, O, '#8a8a95')] : [])]);
-const HORSE = [.75, 0, 0, .5];
+export const HORSE = [.75, 0, 0, .5];
 addKinds({
   horse_salt: [horse('#d8ccb0', '#8a7a5a', '#3a6a8a'), HORSE, .05, .03], horse_white: [horse('#f0ece0', '#c8c0b0', '#b83a32'), HORSE, .05, .03],
   horse_black: [horse('#2a2622', '#121010', '#5a4a3a'), HORSE, .05, .03], horse_bay: [horse('#8a5a3a', '#2a1a12'), HORSE, .05, .03],
