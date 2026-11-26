@@ -115,7 +115,7 @@ export function defineZone(key, spec) {
     for (const d of spec.doors || []) {
       const ry = d.ry || 0; put(doorGeo(d.col), d.x, d.z, ry);
       const fx = Math.sin(ry), fz = Math.cos(ry);
-      world.zoneLines.push({ x: d.x + fx * 3, z: d.z + fz * 3, r: 3, to: d.to, label: d.label }); zoneMarker(d.x + fx * 4, d.z + fz * 4, ry + Math.PI);
+      world.zoneLines.push({ x: d.x + fx * 3, z: d.z + fz * 3, r: 3, to: d.to, label: d.label, why: d.why }); zoneMarker(d.x + fx * 4, d.z + fz * 4, ry + Math.PI);
       world.places.push({ name: d.name, x: d.x, z: d.z, R: 10, kind: 'dungeon' });
       INSTANCES[d.to] = INSTANCES[d.to] || { parent: key, name: d.name }; INSTANCES[d.to].out = { x: d.x + fx * 9, z: d.z + fz * 9 }; INSTANCES[d.to].parent = key;
     }

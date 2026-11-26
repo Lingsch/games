@@ -3,7 +3,7 @@ import * as THREE from './three.js';
 import { S, WH, TAU, clamp, dist, fct, chat, X } from './core.js';
 import { cam } from './render.js';
 import { world, hgt, regionAt, REGION_NAMES } from './world.js';
-import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, WTYPE, BASE_NAMES, SETS } from './data.js';
+import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, WTYPE, BASE_NAMES, SETS, STAT_NAMES, PCT_STATS, mainsOf } from './data.js';
 import * as Sea from './sea.js';
 import { LORE, PERKS } from './story.js';
 import { TALK, VILLAGER_LINES, MOB_LORE } from './dialogue.js';
@@ -446,8 +446,9 @@ function el(html) { const d = document.createElement('div'); d.innerHTML = html;
 Object.assign(X.ui, { el, esc, toast, openSheet, refreshSheet, closeSheet, openBook: t => openBook(t), openTalk: n => openTalk(n), refreshKeys: f => refreshKeys(f) });
 function itemHtml(it, cmp) {
   const rc = RARITY[it.rarity].c, s = it.stats;
-  const st = Object.entries(s).map(([k, v]) => { const dlt = cmp ? v - (cmp.stats[k] || 0) : 0; return `<span>${{ sta: 'Stamina', pow: 'Power', crit: 'Crit %', arm: 'Armor' }[k]} ${v}${cmp && dlt ? ` <i class="${dlt > 0 ? 'up' : 'down'}">${dlt > 0 ? '+' : ''}${Math.round(dlt * 10) / 10}</i>` : ''}</span>`; }).join('');
-  if (cmp) for (const k in cmp.stats) if (!(k in s)) { }
+  if (s?.pow && it.slot !== 'recipe') Game.splitStats?.(it);
+  const ks = [...Object.keys(s)]; if (cmp) for (const k in cmp.stats) if (!(k in s) && cmp.stats[k]) ks.push(k);
+  const st = ks.map(k => { const v = s[k] || 0, dlt = cmp ? v - (cmp.stats[k] || 0) : 0; return `<span${v ? '' : ' class="dim"'}>${STAT_NAMES[k] || k} ${v}${PCT_STATS.has(k) ? '%' : ''}${cmp && dlt ? ` <i class="${dlt > 0 ? 'up' : 'down'}">${dlt > 0 ? '+' : ''}${Math.round(dlt * 10) / 10}</i>` : ''}</span>`; }).join('');
   return `<b>${esc(it.name)}</b> <span class="dim">· ${SLOT_NAMES[it.slot]}${it.armorType ? ' · ' + it.armorType : it.type && it.type !== it.slot ? ' · ' + it.type : ''} · L${it.lvl}${it.crafted ? ' · crafted' : ''}</span><div class="st">${st}</div>${it.desc ? `<div style="font-size:12px;color:#d8c890">${esc(it.desc)}</div>` : ''}${it.ench ? `<div class="dim" style="font-size:11.5px;color:#8affff">✨ ${esc(it.ench.name)}</div>` : ''}${it.set && SETS[it.set] ? `<div style="font-size:11.5px;color:#d8b24a">Set: ${esc(SETS[it.set].name)}. ${esc(SETS[it.set].desc)}</div>` : ''}`;
 }
 let bookTab = 'char';
@@ -636,7 +637,7 @@ function objText(q) {
 // ---------- professions, materials, food and the collection ----------
 function tabTrade(body) {
   const P = Craft.PROFS;
-  body.appendChild(el(`<div class="card"><h3>Professions</h3><div class="profs">${Object.entries(P).map(([k, p]) => { const v = Craft.skill(k); return `<div class="prof ${v === null ? 'off' : ''}"><span>${p.icon}</span><b>${p.name}</b><small>${v === null ? 'not learned' : Craft.shown(v) + ' / 60'}</small>${v === null ? '' : `<i style="width:${v / 1.5}%"></i>`}</div>`; }).join('')}</div></div>`));
+  body.appendChild(el(`<div class="card"><h3>Professions</h3><div class="profs">${Object.entries(P).map(([k, p]) => { const v = Craft.skill(k); return `<div class="prof ${v === null ? 'off' : ''}"><span>${p.icon}</span><b>${p.name}</b><small>${v === null ? 'not learned' : Craft.shown(v) + ' / ' + Craft.shown(Craft.SKILL_CAP)}</small>${v === null ? '' : `<i style="width:${v / Craft.SKILL_CAP * 100}%"></i>`}</div>`; }).join('')}</div></div>`));
   const jobs = (S.friends || []).filter(fr => fr.craft && (fr.craft.gather || fr.craft.make));
   if (jobs.length) body.appendChild(el(`<div class="card"><h3>Friends' jobs</h3>${jobs.map(fr => `<p style="margin:2px 0">${esc(fr.name)}: ${[fr.craft.gather, fr.craft.make].filter(Boolean).map(p => `${P[p].icon} ${P[p].name} ${Craft.skill(p, fr)}`).join(' · ')}</p>`).join('')}</div>`));
   const mats = Object.entries(S.mats || {}).filter(([, n]) => n > 0);
@@ -664,7 +665,7 @@ export function openCraft(st) {
     if (all.length > 1) { const tabs = el(`<div class="seg">${all.map((c, i) => `<button data-i="${i}" class="${i === craftPick ? 'on' : ''}">${Craft.PROFS[c.p].icon} ${c.who ? esc(c.who.name) : 'You'} · ${Craft.shown(Craft.skill(c.p, c.who))}</button>`).join('')}</div>`); tabs.onclick = ev => { const i = ev.target.closest('button')?.dataset.i; if (i !== undefined) { craftPick = +i; refreshSheet(); } }; body.appendChild(tabs); }
     for (const { who, p } of [all[craftPick]]) {
       const v = Craft.skill(p, who), P = Craft.PROFS[p];
-      body.appendChild(el(`<h3 style="font:700 14px Cinzel;margin:8px 0 4px">${P.icon} ${P.name}${who ? ' · ' + esc(who.name) : ''} <span class="dim" style="font:500 12px Alegreya Sans">· ${Craft.shown(v)} / 50</span></h3>`));
+      body.appendChild(el(`<h3 style="font:700 14px Cinzel;margin:8px 0 4px">${P.icon} ${P.name}${who ? ' · ' + esc(who.name) : ''} <span class="dim" style="font:500 12px Alegreya Sans">· ${Craft.shown(v)} / ${Craft.shown(Craft.SKILL_CAP)}</span></h3>`));
       const list = Object.values(Craft.RECIPES).filter(r => r.prof === p && Craft.knows(r, who)).sort((a, b) => a.req - b.req);
       for (const r of list) {
         const can = v >= r.req, has = Craft.haveMats(r), col = v < r.req ? '#888' : v < r.req + 15 ? '#ff9a3a' : v < r.req + 30 ? '#ffd34d' : v < r.req + 45 ? '#7fd35a' : '#9a9a9a';
@@ -684,7 +685,7 @@ function tabBags(body) {
   if (vend && S.bag.some(it => it.junk)) { const b = el(`<div class="acts" style="margin:0 0 6px"><button>Sell all trade goods (${S.bag.filter(it => it.junk).reduce((a, it) => a + it.value, 0)}g)</button></div>`); b.querySelector('button').onclick = () => { P8.sellJunk(); refreshSheet(); }; body.appendChild(b); }
   // Build 13: a gear focus to auto-equip by, and a sort
   const G = Game.gearPrefs(), ups = new Set(S.bag.filter(it => Game.isUpgrade(it, G.focus)));
-  const gc = el(`<div class="card"><h3 style="margin:0 0 4px">Gear focus</h3><div class="seg" style="flex-wrap:wrap">${Game.FOCI.map(([k, n]) => `<button data-f="${k}" style="flex:1 0 auto;padding:0 8px" class="${G.focus === k ? 'on' : ''}">${n}</button>`).join('')}</div><p class="dim" style="font-size:12px;margin:4px 0">Power is strength and magic both: every attack and spell scales off it. Health comes from Stamina.</p><div class="acts"><button class="pri" data-a="auto">Equip best ${ups.size ? `(${ups.size} upgrade${ups.size > 1 ? 's' : ''})` : ''}</button><button data-a="tog">Auto-equip loot: ${G.auto ? 'on' : 'off'}</button></div><h3 style="margin:8px 0 4px">Sort</h3><div class="seg" style="flex-wrap:wrap">${[['new', 'Newest'], ['up', 'Upgrades'], ['rarity', 'Rarity'], ['lvl', 'Level'], ['slot', 'Slot'], ['value', 'Value']].map(([k, n]) => `<button data-s="${k}" style="flex:1 0 auto;padding:0 8px" class="${G.sort === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>`);
+  const gc = el(`<div class="card"><h3 style="margin:0 0 4px">Gear focus</h3><div class="seg" style="flex-wrap:wrap">${Game.FOCI.map(([k, n]) => `<button data-f="${k}" style="flex:1 0 auto;padding:0 8px" class="${G.focus === k ? 'on' : ''}">${n}</button>`).join('')}</div><p class="dim" style="font-size:12px;margin:4px 0">A ${esc(X.clsName ? X.clsName(S.hero) : CLASSES[S.heroCls].name)} draws power from ${mainsOf(S.heroCls).map(k => STAT_NAMES[k]).join(' and ')}. Health comes from Stamina.</p><div class="acts"><button class="pri" data-a="auto">Equip best ${ups.size ? `(${ups.size} upgrade${ups.size > 1 ? 's' : ''})` : ''}</button><button data-a="tog">Auto-equip loot: ${G.auto ? 'on' : 'off'}</button></div><h3 style="margin:8px 0 4px">Sort</h3><div class="seg" style="flex-wrap:wrap">${[['new', 'Newest'], ['up', 'Upgrades'], ['rarity', 'Rarity'], ['lvl', 'Level'], ['slot', 'Slot'], ['value', 'Value']].map(([k, n]) => `<button data-s="${k}" style="flex:1 0 auto;padding:0 8px" class="${G.sort === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>`);
   gc.onclick = ev => { const b = ev.target.closest('button'); if (!b) return;
     if (b.dataset.f) G.focus = b.dataset.f; if (b.dataset.s) G.sort = b.dataset.s; if (b.dataset.a === 'tog') G.auto = !G.auto;
     if (b.dataset.a === 'auto') { const put = Game.autoEquip(G.focus); toast(put.length ? `You put on ${put.length > 2 ? put.length + ' pieces' : put.join(' and ')}.` : 'You are already wearing your best for that.'); }
@@ -963,7 +964,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 12.1 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

@@ -46,7 +46,7 @@ X.restock.push(a => {
   newsTick();
   const e = E(); for (const k in BASE_PRICE) { const h = e.hist[k] = e.hist[k] || []; h.push(+(a.price[k] ?? 1).toFixed(2)); if (h.length > 12) h.shift(); }
   // fake crafters list what they make
-  for (let i = 0; i < 3; i++) { const c = crafter(); if (!c) break; const it = craftFor(c, clamp(L() + irnd(-2, 1), 1, 30), Math.random() < .6 ? S.heroCls : pick(Object.keys(CLASSES))); if (it) a.list.push({ item: it, price: Math.round(fairGear(it) * rnd(1, 1.3)), by: c.name + ' (crafter)', t: S.time }); }
+  for (let i = 0; i < 3; i++) { const c = crafter(); if (!c) break; const it = craftFor(c, clamp(L() + irnd(-2, 1), 1, 35), Math.random() < .6 ? S.heroCls : pick(Object.keys(CLASSES))); if (it) a.list.push({ item: it, price: Math.round(fairGear(it) * rnd(1, 1.3)), by: c.name + ' (crafter)', t: S.time }); }
 });
 // ---------- fake crafters and commissions ----------
 const MAKERS = ['smithing', 'leatherworking', 'tailoring', 'jewelcrafting'];

@@ -302,7 +302,7 @@ X.light.push(dt => {
   if (show && !q) { q = document.createElement('div'); q.id = 'raidq'; q.style.cssText = 'display:flex;gap:2px;margin-top:2px'; q.innerHTML = ['stack', 'spread', 'move', 'focus'].map(k => `<button data-r="${k}">${{ stack: 'Stack', spread: 'Spread', move: 'To me', focus: 'Focus' }[k]}</button>`).join(''); q.onclick = ev => { const k = ev.target.closest('button')?.dataset.r; if (k) order(k); }; cmds.after(q); }
   if (q) q.style.display = show ? 'flex' : 'none';
   const box = document.getElementById('party'); if (!box) return;
-  const raid = S.party.length > 6, lay = S.ext.raidFrames || 'grid'; box.classList.toggle('raid', raid); box.dataset.lay = raid ? lay : '';
+  const raid = S.party.length > 6, lay = S.ext.raidFrames || 'grid'; box.classList.toggle('raid', raid); box.classList.toggle('r24', S.party.length > 12); box.dataset.lay = raid ? lay : '';
   box.querySelectorAll('.pf').forEach((d, i) => d.classList.toggle('mini', raid && lay === 'group' && i >= 5));
   let tog = document.getElementById('raidTog');
   if (raid && !tog) { tog = document.createElement('button'); tog.id = 'raidTog'; tog.onclick = () => box.classList.toggle('shut'); box.prepend(tog); }

@@ -2,7 +2,7 @@
 // open them, which puts the good things up for need/greed rolls, and they pick herbs, ore, fish and wrecks
 // within a few steps of where they stand. Plus a stats page for you and everyone with you.
 import { S, pick, irnd, dist, chat, X } from './core.js';
-import { CLASSES, RARITY, SLOT_NAMES, BOOK, rankOf, roleOf, MAX_LVL, xpNeed } from './data.js';
+import { CLASSES, RARITY, SLOT_NAMES, BOOK, rankOf, roleOf, MAX_LVL, xpNeed, statText, mainsOf, STAT_NAMES } from './data.js';
 import * as Cb from './combat.js';
 import * as Craft from './crafting.js';
 import * as Game from './game.js';
@@ -87,12 +87,12 @@ function tickRolls(dt) {
   for (const r of [...rolls]) { r.t -= dt; if (r.t <= 0) resolve(r, 'pass'); }
   if (box) for (const d of box.children) { const r = rolls.find(x => x.id === +d.dataset.id); const b = d.querySelector('.rt'); if (r && b) b.style.width = Math.max(0, r.t / ROLL_T * 100) + '%'; }
 }
-const statLine = it => it.book ? (it.desc || '') : Object.entries(it.stats || {}).map(([k, v]) => `${{ sta: 'Stamina', pow: 'Power', crit: 'Crit %', arm: 'Armor' }[k]} ${v}`).join(' · ');
+const statLine = it => it.book ? (it.desc || '') : Object.entries(it.stats || {}).map(([k, v]) => statText(k, v)).join(' · ');
 function drawRolls() {
   if (!box) { box = document.getElementById('rolls'); if (!box) return; box.onclick = ev => { const b = ev.target.closest('button'); if (!b) return; const r = rolls.find(x => x.id === +b.closest('.roll').dataset.id); if (r) resolve(r, b.dataset.k); }; }
   const esc = X.ui.esc || (s => s);
   box.innerHTML = rolls.slice(0, 3).map(r => { const it = r.it, can = wants(S.hero, it), cmp = !it.book && can ? S.gear[S.heroCls][it.slot] : null;
-    const up = cmp ? Object.entries(it.stats).reduce((a, [k, v]) => a + (v - (cmp.stats[k] || 0)) * (k === 'crit' ? 4 : k === 'arm' ? .3 : 1), 0) : 0;
+    const up = cmp ? Game.itemScore(it, Game.focusW(Game.gearPrefs().focus)) - Game.itemScore(cmp, Game.focusW(Game.gearPrefs().focus)) : 0;
     return `<div class="roll" data-id="${r.id}" style="--c:${RARITY[it.rarity].c}"><b>${esc(it.name)}</b><small>${SLOT_NAMES[it.slot] || it.slot} · L${it.lvl}${can ? (it.book ? '' : !cmp || up > 0 ? ' · <i class="up">upgrade</i>' : ' · <i class="down">sidegrade</i>') : ' · ' + esc(it.book && it.book.cls === S.heroCls ? (X.whyNot(S.hero, it.book.cls, it.book.key, it.book.rank) || '').replace(/\.$/, '').toLowerCase() : 'not for you')}</small><small class="dim">${esc(statLine(it))}</small>
       <div class="rb"><button data-k="need" ${can ? '' : 'disabled'}>🎲 Need</button><button data-k="greed">💰 Greed</button><button data-k="pass">Pass</button></div><i class="rt"></i></div>`; }).join('') + (rolls.length > 3 ? `<div class="dim" style="font-size:11px;text-align:center">+${rolls.length - 3} more</div>` : '');
 }
@@ -109,7 +109,13 @@ function statCard(e) {
   const ilvl = gear.length ? (gear.reduce((a, it) => a + it.lvl * (1 + it.rarity * .15), 0) / gear.length).toFixed(1) : null;
   const rows = [['Level', e.lvl + (e.lvl < MAX_LVL && e.isHero ? ` · ${Math.round(e.xp)} / ${xpNeed(e.lvl)} xp` : '')], ['Role', cap(roleOf(e) || '')], ['Health', `${Math.round(e.hp)} / ${e.maxHp}`], [e.resType[0].toUpperCase() + e.resType.slice(1), `${Math.round(e.res)} / ${e.resMax}`],
     ['Power', Math.round(e.power)], ['Armor', `${Math.round(e.armor)} (${pctS(dr)} less physical damage)`], ['Critical chance', pctS(e.crit)], ['Dodge', pctS(e.dodge)], ['Parry', pctS(e.parry || 0)],
-    ['From gear', `${Math.round(e.gearPow || 0)} power · ${Math.round(e.gearSta || 0)} stamina · ${Math.round(e.gearArm || 0)} armor${e.gearCrit ? ' · ' + e.gearCrit.toFixed(1) + '% crit' : ''}`]];
+    ['From gear', `${Math.round(e.gearPow || 0)} power (${mainsOf(e.cls).map(k => STAT_NAMES[k]).join(' + ')}) · ${Math.round(e.gearSta || 0)} stamina · ${Math.round(e.gearArm || 0)} armor${e.gearCrit ? ' · ' + e.gearCrit.toFixed(1) + '% crit' : ''}`]];
+  // Build 13: the secondaries, shown only when you have some
+  if (e.haste) rows.push(['Haste', pctS(e.haste)]);
+  if (e.block) rows.push(['Block', pctS(e.block)]);
+  if (e.spi) rows.push(['Spirit', `${e.spi} (+${e.spi}% ${e.resType === 'mana' ? 'mana and ' : ''}health regen)`]);
+  if (e.mreg) rows.push(['Mana regen', `${e.mreg} every 5 seconds`]);
+  const rs = Object.entries(e.resist || {}).filter(([, v]) => v > 0); if (rs.length) rows.push(['Resists', rs.map(([k, v]) => `${STAT_NAMES[k].replace(' resist', '')} ${v} (${pctS(Math.min(.75, v / (v + e.lvl * 2 + 15)))})`).join(' · ')]);
   if (ilvl) rows.push(['Average item level', ilvl]);
   if (!e.isHero && e.fake) rows.push(['Mood', e.fake.mood >= 4 ? 'Happy with you' : e.fake.mood >= 0 ? 'Content' : e.fake.mood > -3 ? 'Grumbling' : 'Thinking about leaving']);
   const buffs = (e.buffs || []).filter(b => b.dur > 0 && b.dur < 1e6).map(b => b.id), uniq = [...new Set(buffs)];

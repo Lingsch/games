@@ -1,7 +1,8 @@
 // Game data: the four Milestone 1 classes, mobs, items, quests, fake-player names and chat.
 // Ability effects receive C (the combat API in combat.js), the user u, the target t and the ability.
 
-export const MAX_LVL = 30;
+import { S as _S } from './core.js';
+export const MAX_LVL = 35;
 export const xpNeed = L => Math.round(80 * L ** 1.7 + 120);
 export const GCD = 1.5;
 
@@ -373,6 +374,16 @@ export const PETS = {
   treant: { name: 'Treant', kind: 'treant', role: 'dps', hpM: .9, powM: .6, spd: 6, r: .6, scale: .8 },
 };
 // default 12-key bars: actives first, then buffs, then the ultimate
+// Build 13: one new spell for each role at level 33, from the light of the Last Lamp
+for (const [k, C0] of Object.entries(CLASSES)) {
+  const mana = C0.res === 'mana';
+  if (C0.role === 'tank') C0.abilities.lampward = { name: 'Lamplit Bulwark', icon: '🏮', lvl: 33, kind: 'buff', cost: 0, cd: 90, tgt: 'self', desc: 'Group defensive: you and everyone in your group within 40 m take 25% less damage for 8 seconds.',
+    fx: (C, u) => { C.partyBuff(u, 'lampward', 8, { dr: .25 }); C.fxRing(u, 6, [1, .85, .4]); } };
+  else if (C0.role === 'healer') C0.abilities.lamplight = { name: 'Light Everlasting', icon: '🕯️', lvl: 33, kind: 'heal', cost: 22, cd: 60, cast: 1.5, tgt: 'self', desc: 'Heals everyone in your group within 40 m, then keeps healing them for 10 seconds.',
+    fx: (C, u) => { for (const p of C.partyOf(u)) if (!p.dead && C.d(u, p) < 40) { C.heal(u, p, C.pw(u) * 1.6 + 30); C.hot(u, p, 'lamplight', C.pw(u) * 1.6, 10); } C.fxRing(u, 8, [1, .95, .6]); } };
+  else C0.abilities.lampfall = { name: 'Lampfall', icon: '🌠', lvl: 33, kind: 'attack', cost: mana ? 14 : 35, cd: 45, range: C0.melee && C0.range < 6 ? 5 : 30, tgt: 'enemy', school: 'holy', desc: 'Calls down the light of the Last Lamp: heavy holy damage to the target and half as much to enemies within 6 m of it.',
+    fx: (C, u, t) => { C.damage(u, t, C.pw(u) * 3.4 + 20, 'holy'); for (const e of C.enemiesNear(u, t, 6)) if (e !== t) C.damage(u, e, C.pw(u) * 1.7 + 10, 'holy'); C.fxRing(t, 6, [1, .9, .5]); } };
+}
 export function defaultBar(cls) {
   const ab = CLASSES[cls].abilities, keys = Object.keys(ab);
   const act = keys.filter(k => ab[k].kind !== 'buff' && ab[k].kind !== 'ult'), buf = keys.filter(k => ab[k].kind === 'buff'), ult = keys.filter(k => ab[k].kind === 'ult');
@@ -428,13 +439,54 @@ export const BASE_NAMES = {
   feet: { plate: ['Sabatons', 'Warboots'], leather: ['Boots', 'Treads'], cloth: ['Slippers', 'Sandals'] },
 };
 const PREFIX = ['Worn', 'Sturdy', 'Fine', 'Polished', 'Militia', 'Wayfarer\'s', 'Harrow', 'Veteran\'s'];
-const SUFFIX = [['of the Bear', 'sta'], ['of Might', 'pow'], ['of the Eagle', 'crit'], ['of Fortitude', 'sta'], ['of Power', 'pow'], ['of Precision', 'crit']];
+const SUFFIX = [['of the Bear', 'sta'], ['of Might', 'main'], ['of the Eagle', 'crit'], ['of Fortitude', 'sta'], ['of Power', 'main'], ['of Precision', 'crit'], ['of Swiftness', 'haste'], ['of the Gale', 'haste'],
+  ['of the Spirit', 'spi'], ['of the Wellspring', 'mreg'], ['of Evasion', 'dodge'], ['of the Guardian', 'parry'], ['of the Bulwark', 'block']];
+const RSUFFIX = [['of the Hearth', 'rfire'], ['of the Thaw', 'rfrost'], ['of the Dawn', 'rshadow'], ['of the Grove', 'rnature'], ['of the Lightning-Rod', 'rstorm'], ['of the Heretic', 'rholy']];
 // weapon and off-hand types per class
 export const WTYPE = { bulwark: ['mace', 'shield'], cleric: ['staff', 'tome'], longwatch: ['bow', 'quiver'], elementalist: ['staff', 'orb'],
   wardancer: ['blade', 'sabre'], bladewarden: ['greatsword', 'charm'], monk: ['wraps', 'charm'], aegis: ['wand', 'relic'], lifebinder: ['staff', 'totem'], druid: ['staff', 'totem'],
   knifeshade: ['dagger', 'knife'], blightblade: ['dagger', 'vial'], bard: ['rapier', 'lute'], warlock: ['staff', 'grimoire'], binder: ['wand', 'bond'], illusionist: ['wand', 'orb'] };
 let itemSeq = 1;
-export function makeItem(o) { return { uid: itemSeq++, ...o }; }
+export function makeItem(o) { const it = { uid: itemSeq++, ...o }; if (o.stats) it.stats = { ...o.stats }; if (it.stats?.pow) splitPow(it, o.forCls); delete it.forCls; return it; }
+// ---------- Build 13: the stat split. Power on gear became Strength, Agility or Intellect ----------
+// Each class counts its own main stats toward power; hybrids count two, both at full value.
+export const MAINS = { bulwark: ['str'], bladewarden: ['str'], wardancer: ['str', 'agi'], monk: ['agi', 'str'], longwatch: ['agi'], knifeshade: ['agi'], blightblade: ['agi', 'int'], bard: ['agi', 'int'],
+  druid: ['int', 'agi'], cleric: ['int'], aegis: ['int'], lifebinder: ['int'], elementalist: ['int'], warlock: ['int'], binder: ['int'], illusionist: ['int'] };
+export const MAIN_KEYS = ['str', 'agi', 'int'];
+export const SEC_KEYS = ['haste', 'spi', 'mreg', 'dodge', 'parry', 'block', 'rfire', 'rfrost', 'rshadow', 'rnature', 'rstorm', 'rholy'];
+export const RES_KEYS = ['rfire', 'rfrost', 'rshadow', 'rnature', 'rstorm', 'rholy'];
+export const SCHOOL_RES = { fire: 'rfire', frost: 'rfrost', shadow: 'rshadow', nature: 'rnature', poison: 'rnature', earth: 'rnature', storm: 'rstorm', holy: 'rholy' };
+export const STAT_NAMES = { sta: 'Stamina', str: 'Strength', agi: 'Agility', int: 'Intellect', pow: 'Power', crit: 'Crit', haste: 'Haste', spi: 'Spirit', mreg: 'Mana regen', dodge: 'Dodge', parry: 'Parry', block: 'Block', arm: 'Armor',
+  rfire: 'Fire resist', rfrost: 'Frost resist', rshadow: 'Shadow resist', rnature: 'Nature resist', rstorm: 'Storm resist', rholy: 'Holy resist' };
+export const PCT_STATS = new Set(['crit', 'haste', 'dodge', 'parry', 'block']);
+export const statText = (k, v) => `${STAT_NAMES[k] || k} ${v}${PCT_STATS.has(k) ? '%' : ''}`;
+export const mainsOf = cls => MAINS[cls] || ['str'];
+// how much of a piece's stats turn into power for this class (any main stat counts for a class-less guess)
+export function mainVal(st, cls) { if (!st) return 0; let v = st.pow || 0; if (cls) { for (const k of mainsOf(cls)) v += st[k] || 0; } else v += Math.max(st.str || 0, st.agi || 0, st.int || 0); return v; }
+const ARMOR_MAIN = { plate: 'str', leather: 'agi', cloth: 'int' };
+const fitsCls = (cls, it) => it.slot === 'ring' || it.slot === 'neck' ? true : it.slot === 'weapon' ? WTYPE[cls]?.[0] === it.type : it.slot === 'off' ? WTYPE[cls]?.[1] === it.type : !!it.armorType && !!CLASSES[cls] && WEAR[CLASSES[cls].armor].includes(it.armorType);
+const pickA = a => a[(Math.random() * a.length) | 0];
+// old Power on a piece becomes a main stat: the wearer's own if a class is given, otherwise a good guess
+export function splitPow(it, cls, bias = .65) {
+  const st = it?.stats; if (!st || !st.pow) return it;
+  let k; const hc = _S.heroCls;
+  if (cls && fitsCls(cls, it)) k = pickA(mainsOf(cls));
+  else if (hc && fitsCls(hc, it) && Math.random() < bias) k = pickA(mainsOf(hc));
+  else if (it.slot === 'weapon' || it.slot === 'off') { const own = CLASS_KEYS.filter(c => fitsCls(c, it)); k = own.length ? pickA(mainsOf(pickA(own))) : 'str'; }
+  else k = ARMOR_MAIN[it.armorType] || pickA(MAIN_KEYS);
+  st[k] = (st[k] || 0) + st.pow; delete st.pow; return it;
+}
+// a secondary stat sized for a piece's level and budget
+export function secondary(st, k, L, rarity, budget, it) {
+  if (k === 'block' && it && it.type !== 'shield') k = 'parry';
+  if (k === 'main') st.pow = (st.pow || 0) + Math.round(budget * .4);
+  else if (k === 'sta') st.sta = (st.sta || 0) + Math.round(budget * .4);
+  else if (PCT_STATS.has(k)) st[k] = +((st[k] || 0) + (1 + rarity + L * .15) * (k === 'crit' || k === 'haste' ? 1 : .8)).toFixed(1);
+  else if (k === 'spi') st.spi = (st.spi || 0) + Math.round(budget * .4);
+  else if (k === 'mreg') st.mreg = (st.mreg || 0) + Math.max(1, Math.round(budget * .15));
+  else if (RES_KEYS.includes(k)) st[k] = (st[k] || 0) + Math.round(budget * .6 + L * .5);
+  return st;
+}
 // a random piece of gear for a level; cls biases it toward something that class can use
 export function randomGear(L, cls, rarityBoost = 0) {
   const r = Math.random() + rarityBoost, rarity = r > .985 ? 2 : r > .82 ? 1 : 0;
@@ -448,13 +500,13 @@ export function randomGear(L, cls, rarityBoost = 0) {
   const armorType = slot === 'weapon' ? null : slot === 'off' ? (type === 'shield' ? 'plate' : null) : type;
   if (armorType) stats.arm = Math.round((armorType === 'plate' ? 3 : armorType === 'leather' ? 2 : 1) * (1 + L * .8) * (1 + rarity * .3));
   let name = base, suf = null;
-  if (rarity > 0) { suf = SUFFIX[(Math.random() * SUFFIX.length) | 0]; name = `${base} ${suf[0]}`; }
+  if (rarity > 0) { const SL = L >= 15 && Math.random() < .2 ? RSUFFIX : SUFFIX; suf = SL[(Math.random() * SL.length) | 0]; name = `${base} ${suf[0]}`; }
   else name = `${PREFIX[(Math.random() * PREFIX.length) | 0]} ${base}`;
   if (slot === 'weapon') { stats.pow = Math.round(budget * .7); stats.sta = Math.round(budget * .3); }
   else { stats.sta = Math.round(budget * .55); stats.pow = Math.round(budget * .35); }
-  if (suf) { stats[suf[1]] += suf[1] === 'crit' ? 0 : Math.round(budget * .4); if (suf[1] === 'crit') stats.crit = +(1 + rarity + L * .15).toFixed(1); }
+  if (suf) secondary(stats, suf[1], L, rarity, budget, { type });
   for (const k in stats) if (!stats[k]) delete stats[k];
-  return makeItem({ name, slot, type, armorType, lvl: L, rarity, stats, value: Math.round((3 + L * 4) * (1 + rarity * 2)) });
+  return makeItem({ name, slot, type, armorType, lvl: L, rarity, stats, value: Math.round((3 + L * 4) * (1 + rarity * 2)), forCls: cls && Math.random() < .7 ? cls : null });
 }
 // named mobs always drop from their own list
 export const NAMED_LOOT = {

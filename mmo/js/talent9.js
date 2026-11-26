@@ -92,8 +92,8 @@ for (const cls of CLASS_KEYS) for (const [sk, , , , , sigs] of SUBS[cls] || []) 
 
 // ---------- the talent trees ----------
 const ROLE_STATS = { tank: [['hpP', .03, 'Hardened'], ['armorP', .04, 'Iron'], ['parry', .01, 'Steady']], healer: [['powP', .03, 'Devoted'], ['crit', .01, 'Blessed'], ['hpP', .02, 'Enduring']], dps: [['powP', .03, 'Ruthless'], ['crit', .01, 'Keen'], ['dodge', .01, 'Quick']], support: [['powP', .02, 'Inspired'], ['hpP', .02, 'Hearty'], ['crit', .01, 'Clever']] };
-const STAT_NAME = { hpP: 'Toughness', armorP: 'Armor', parry: 'Guard', powP: 'Power', crit: 'Precision', dodge: 'Footwork' };
-const STAT_DESC = { hpP: v => `+${v * 100}% health`, armorP: v => `+${v * 100}% armor`, parry: v => `+${v * 100}% parry`, powP: v => `+${v * 100}% power`, crit: v => `+${v * 100}% critical chance`, dodge: v => `+${v * 100}% dodge` };
+const STAT_NAME = { hpP: 'Toughness', armorP: 'Armor', parry: 'Guard', powP: 'Power', crit: 'Precision', dodge: 'Footwork', haste: 'Celerity', resAll: 'Warding' };
+const STAT_DESC = { hpP: v => `+${v * 100}% health`, armorP: v => `+${v * 100}% armor`, parry: v => `+${v * 100}% parry`, powP: v => `+${v * 100}% power`, crit: v => `+${v * 100}% critical chance`, dodge: v => `+${v * 100}% dodge`, haste: v => `+${+(v * 100).toFixed(1)}% haste`, resAll: v => `+${v} to every resistance` };
 const trees = {};
 export function treeOf(cls, sk) {
   const id = cls + ':' + sk; if (trees[id]) return trees[id];
@@ -115,10 +115,15 @@ export function treeOf(cls, sk) {
   t.push({ id: 'asc2', tier: 4, max: 3, name: `Sky-Touched ${s[5][0].name}`, desc: r => `${s[5][0].name} is ${r * 10}% stronger.`, ab: [`sig_${sk}1`, .1] });
   t.push({ id: 'asc3', tier: 4, max: 2, name: 'Starward Resolve', desc: r => STAT_DESC.hpP(+(.03 * r).toFixed(2)), stat: ['hpP', .03] });
   t.push({ id: 'asc4', tier: 4, max: 1, name: `The ${s[1]} Ascendant`, desc: () => `${s[5][1].name} is 15% stronger, and you have +2% critical chance.`, ab: [`sig_${sk}2`, .15], stat: ['crit', .02] });
+  // Build 13: a sixth tier, Lamplight, for levels 31-35
+  t.push({ id: 'lam1', tier: 5, max: 3, name: `Lamplit ${STAT_NAME[cap[0]]}`, desc: r => STAT_DESC[cap[0]](+(.03 * r).toFixed(2)), stat: [cap[0], .03] });
+  t.push({ id: 'lam2', tier: 5, max: 3, name: 'Undimmed', desc: r => STAT_DESC.haste(+(.02 * r).toFixed(2)), stat: ['haste', .02] });
+  t.push({ id: 'lam3', tier: 5, max: 2, name: 'Warded by Light', desc: r => STAT_DESC.resAll(12 * r), stat: ['resAll', 12] });
+  t.push({ id: 'lam4', tier: 5, max: 1, name: `The ${s[1]} Undying`, desc: () => `${s[5][0].name} and ${s[5][1].name} are 15% stronger, and you have +4% power.`, ab: [`sig_${sk}1`, .15], stat: ['powP', .04] });
   while (t.filter(x => x.tier === 2).length < 3) t.push({ id: 'pad' + t.length, tier: 2, max: 2, name: `${adj} Resolve`, desc: r => STAT_DESC.hpP(+(.02 * r).toFixed(2)), stat: ['hpP', .02] });
   return (trees[id] = t);
 }
-const TIER_NEED = [0, 3, 7, 11, 20];
+const TIER_NEED = [0, 3, 7, 11, 20, 30];
 export const ptsTotal = cls => { const L = (CLASS_KEYS.includes(cls) && (cls === S.heroCls ? S.hero?.lvl : S.classes[cls]?.lvl)) || 0; if (L < 20 || !chosen(cls)) return 0; return 1 + (Math.min(L, 25) - 20) * 3 + Math.max(0, L - 25) * 2 + Math.min(11, T()[cls].aa || 0); };
 export const ptsSpent = cls => Object.values(T()[cls]?.pts || {}).reduce((a, b) => a + b, 0);
 export function canTake(cls, tal) {
@@ -168,7 +173,7 @@ X.book.push(['talents', 'Talents', body => {
   }
   const s = subOf(cls, st.sub), tree = treeOf(cls, st.sub), left = ptsTotal(cls) - ptsSpent(cls);
   body.appendChild(el(`<div class="card" style="text-align:left"><h3 style="color:${C.color}">${esc(s[1])}</h3><p style="margin:2px 0">${left} point${left === 1 ? '' : 's'} to spend · ${ptsSpent(cls)} spent</p></div>`));
-  ['Foundations', 'Specialty', 'Discipline', 'Mastery', 'Ascendancy'].forEach((tn, ti) => {
+  ['Foundations', 'Specialty', 'Discipline', 'Mastery', 'Ascendancy', 'Lamplight'].forEach((tn, ti) => {
     body.appendChild(el(`<p style="margin:10px 0 4px;font:700 13px Cinzel;color:var(--acc)">${tn}${TIER_NEED[ti] ? ` <small class="dim">(${TIER_NEED[ti]} points in the tree)</small>` : ''}</p>`));
     for (const tal of tree.filter(x => x.tier === ti)) {
       const r = st.pts[tal.id] || 0, why = canTake(cls, tal);

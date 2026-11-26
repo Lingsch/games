@@ -1,7 +1,7 @@
 // Build 5: what the new dungeon bosses drop. Role set pieces (tank, healer, dps, mage, support) in two tiers,
 // rare crafting recipes, and collectibles: vanity pets, titles and trophies.
 import { S, pick, chat, X } from './core.js';
-import { CLASSES, SETS, makeItem, RARITY } from './data.js';
+import { CLASSES, SETS, makeItem, RARITY, secondary } from './data.js';
 import { DBOSSES, FINALS, dungeonOf } from './dungeons.js';
 import { rareFrom, gearBudget } from './crafting.js';
 
@@ -9,7 +9,7 @@ import { rareFrom, gearBudget } from './crafting.js';
 export const SET_ROLE = { bulwark: 'tank', wardancer: 'tank', bladewarden: 'tank', cleric: 'healer', aegis: 'healer', lifebinder: 'healer',
   longwatch: 'dps', knifeshade: 'dps', blightblade: 'dps', elementalist: 'mage', warlock: 'mage', binder: 'mage', monk: 'support', druid: 'support', bard: 'support', illusionist: 'support' };
 export const TIER = { keep: 0, grove: 0, catacombs: 1, mines: 1, teeth: 2, shrine: 2, brinevaults: 3, bonewhale: 3, barrows: 4, foundry: 4, witchroot: 4, cathedral: 4, gaol: 5, ossuary: 5, between: 6 };
-export const TIER_LVL = [6, 10, 12, 15, 18, 20, 20, 22, 25, 25, 27, 30, 30], TIER_K = [.5, 1, 1.25, 1.6, 1.9, 2.2, 2.8, 2.6, 3, 3.5, 3.6, 4.1, 4.6], TIER_BUDGET = [1, 1, 1, 1, 1, 1.1, 1.35, 1.1, 1.2, 1.45, 1.1, 1.2, 1.45];
+export const TIER_LVL = [6, 10, 12, 15, 18, 20, 20, 22, 25, 25, 27, 30, 30, 32, 35, 35, 35], TIER_K = [.5, 1, 1.25, 1.6, 1.9, 2.2, 2.8, 2.6, 3, 3.5, 3.6, 4.1, 4.6, 4.4, 5, 5.5, 6.2], TIER_BUDGET = [1, 1, 1, 1, 1, 1.1, 1.35, 1.1, 1.2, 1.45, 1.1, 1.2, 1.45, 1.1, 1.2, 1.45, 1.7];
 const SETNAME = [{ tank: 'Gatewarden', healer: 'Mercyward', dps: 'Cutpurse', mage: 'Hedge-Witch', support: 'Wayfarer' }, { tank: 'Bonewall', healer: 'Lantern-Keeper', dps: 'Gravecutter', mage: 'Dirge-Weaver', support: 'Deepsong' },
   { tank: 'Saltbreaker', healer: 'Lamplight', dps: "Wrecker's", mage: 'Tidecaller', support: 'Driftwood' }, { tank: 'Admiralty', healer: 'Lightkeeper', dps: 'Riptide', mage: 'Abyssal', support: 'Shanty' },
   { tank: 'Emberguard', healer: 'Orrinite', dps: 'Ashstalker', mage: 'Blightbane', support: 'Barrowsong' }, { tank: 'Gaolbreaker', healer: "Pilgrim's", dps: 'Legionbane', mage: 'Hollowfire', support: 'Throne-Herald' },
@@ -17,11 +17,14 @@ const SETNAME = [{ tank: 'Gatewarden', healer: 'Mercyward', dps: 'Cutpurse', mag
   { tank: 'Deepwarden', healer: 'Rimelight', dps: 'Crownsworn', mage: 'Starless', support: 'Wanderer' }, { tank: 'Bulwark-Royal', healer: 'Hearthmother', dps: 'Frostfang', mage: 'Undermage', support: 'Far-Traveller' },
   { tank: 'Kingsguard Eternal', healer: 'Dawnmantle', dps: 'Nightreaver', mage: 'Worldwright', support: 'Firstsong' },
   { tank: 'Skyward Aegis', healer: 'Cloudmender', dps: 'Galecutter', mage: 'Stormglass', support: 'Windsinger' }, { tank: 'Spire-Warden', healer: 'Starmantle', dps: 'Skyreaver', mage: 'Astral', support: 'Zenith' },
-  { tank: 'Heavenbreaker', healer: 'Firmament', dps: 'Starfall', mage: 'Celestine', support: 'Empyrean' }];
+  { tank: 'Heavenbreaker', healer: 'Firmament', dps: 'Starfall', mage: 'Celestine', support: 'Empyrean' },
+  // Build 13: the lands Vhorun broke, the Frost-King's halls, and the 24-person raids
+  { tank: 'Woundwarden', healer: 'Emberlamp', dps: 'Cinderstalk', mage: 'Riftwoven', support: 'Lightless' }, { tank: 'Rimebound', healer: 'Thawmother', dps: 'Hoarfang', mage: 'Glacial', support: 'Snowsong' },
+  { tank: 'Frost-King\'s Bane', healer: 'Hearthbringer', dps: 'Kingslayer', mage: 'Winterbreaker', support: 'Homecoming' }, { tank: 'Lampbearer', healer: 'Last Light', dps: 'Godbreaker', mage: 'Unmaker', support: 'Worldsong' }];
 const BONUS = { tank: [{ sta: 8 }, { sta: 20, pow: 4 }], healer: [{ pow: 6 }, { pow: 10, crit: 3 }], dps: [{ crit: 3 }, { pow: 14 }], mage: [{ pow: 8 }, { pow: 8, crit: 3 }], support: [{ sta: 6, pow: 4 }, { sta: 8, pow: 8 }] };
 for (const t of SETNAME.keys()) for (const [role, nm] of Object.entries(SETNAME[t])) {
   const b = BONUS[role], k = TIER_K[t], sc = o => Object.fromEntries(Object.entries(o).map(([s, v]) => [s, Math.round(v * k * 10) / 10]));
-  const two = sc(b[0]), four = sc(b[1]), fmt = o => Object.entries(o).map(([s, v]) => `+${v}${s === 'crit' ? '% crit' : ' ' + { pow: 'power', sta: 'stamina' }[s]}`).join(', ');
+  const two = sc(b[0]), four = sc(b[1]), fmt = o => Object.entries(o).map(([s, v]) => `+${v}${s === 'crit' ? '% crit' : ' ' + ({ pow: 'to your main stat', sta: 'stamina' }[s] || s)}`).join(', ');
   SETS[`s${t}_${role}`] = { name: nm, bonus: { 2: two, 4: four }, desc: `2 pieces: ${fmt(two)}. 4 pieces: ${fmt(four)}.` };
 }
 const PIECE = { head: { plate: 'Helm', leather: 'Hood', cloth: 'Circlet' }, chest: { plate: 'Breastplate', leather: 'Jerkin', cloth: 'Robe' }, legs: { plate: 'Greaves', leather: 'Leggings', cloth: 'Trousers' }, feet: { plate: 'Sabatons', leather: 'Boots', cloth: 'Slippers' } };
@@ -30,7 +33,9 @@ export function setPieceFor(cls, tier) {
   const lean = { tank: [.65, .25], healer: [.4, .5], dps: [.3, .6], mage: [.3, .6], support: [.5, .45] }[role];
   const stats = { sta: Math.round(budget * lean[0]), pow: Math.round(budget * lean[1]), arm: Math.round((at === 'plate' ? 3 : at === 'leather' ? 2 : 1) * (1 + L * .8) * (role === 'tank' ? 2.3 : 1.9)) };
   if (role === 'dps' || role === 'mage') stats.crit = +(1 + L * .1).toFixed(1);
-  return makeItem({ name: `${SETNAME[tier][role]} ${PIECE[slot][at]}`, slot, type: at, armorType: at, lvl: L, rarity: tier === 6 || tier === 9 || tier === 12 ? 4 : 3, set: `s${tier}_${role}`, stats, value: Math.round((3 + L * 4) * 6) });
+  // Build 13: the new tiers carry secondaries, and the raid tiers the resistance the next raid asks for
+  if (tier >= 13) { const sec = { tank: pick(['dodge', 'parry']), healer: pick(['haste', 'spi', 'mreg']), dps: 'haste', mage: 'haste', support: pick(['haste', 'spi']) }[role]; secondary(stats, sec, L, 3, budget); if (tier >= 14) secondary(stats, tier === 14 ? 'rfrost' : 'rshadow', L, 3, budget * .7); }
+  return makeItem({ forCls: cls, name: `${SETNAME[tier][role]} ${PIECE[slot][at]}`, slot, type: at, armorType: at, lvl: L, rarity: tier === 6 || tier === 9 || tier === 12 || tier === 15 || tier === 16 ? 4 : 3, set: `s${tier}_${role}`, stats, value: Math.round((3 + L * 4) * 6) });
 }
 
 // ---------- collectibles ----------

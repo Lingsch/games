@@ -5,7 +5,7 @@
 import { S, TAU, chat, pick, rnd, irnd, clamp, floatText, X } from './core.js';
 import { world, hgt, valeHooks } from './world.js';
 import { coastHooks } from './zones.js';
-import { CLASSES, CLASS_KEYS, GIVERS, GUILDS, FAKE_NAMES, PERSONAS, RARITY, randomGear, makeItem } from './data.js';
+import { CLASSES, CLASS_KEYS, GIVERS, GUILDS, FAKE_NAMES, PERSONAS, RARITY, randomGear, makeItem, statText, MAX_LVL } from './data.js';
 import { TALK } from './dialogue.js';
 import { INSTANCES } from './dungeons.js';
 import { DSITES } from './dungeons.js';
@@ -132,7 +132,7 @@ const HELLO = {
 };
 export function queue(key, guildRun = false) {
   const d = LFG_D[key]; if (!d) return 'Unknown dungeon.';
-  if (d.raid) { const why = d.raid(); if (why) return why; S.ext.raid12 = true; } else if (S.party.length > 6) return 'Your group is too big for a dungeon.';
+  if (d.raid) { const why = d.raid(); if (why) return why; S.ext.raid12 = true; S.ext.raid24 = !!d.raid24; } else if (S.party.length > 6) return 'Your group is too big for a dungeon.';
   if (S.party.length >= Game.partyCap()) return 'Your group is already full.';
   const need = needed(), waits = need.tank * 9 + need.healer * 7 + need.dps * 3;
   S.ext.lfg = { key, guild: guildRun, t: S.time + clamp((guildRun ? 4 : 6) + waits * rnd(.6, 1.2) * (guildRun ? .5 : 1), 4, 50) };
@@ -142,12 +142,12 @@ export function queue(key, guildRun = false) {
 export const cancelQueue = () => { if (S.ext.lfg) chat('sys', null, 'You leave the queue.'); S.ext.lfg = null; };
 function needed() {
   const have = { tank: 0, healer: 0, dps: 0 }; for (const p of S.party) have[roleOf6(p.cls)]++;
-  const N = Game.partyCap(), n = { tank: Math.max(0, (N > 6 ? 2 : 1) - have.tank), healer: Math.max(0, (N > 6 ? 3 : 2) - have.healer), dps: 0 };
+  const N = Game.partyCap(), n = { tank: Math.max(0, (N > 12 ? 4 : N > 6 ? 2 : 1) - have.tank), healer: Math.max(0, (N > 12 ? 6 : N > 6 ? 3 : 2) - have.healer), dps: 0 };
   n.dps = Math.max(0, N - S.party.length - n.tank - n.healer);
   return n;
 }
 function fillGroup(key, guildRun) {
-  const d = LFG_D[key], h = S.hero, need = needed(), L = clamp(Math.round((Math.max(h.lvl, d.lvl[0]) + Math.min(h.lvl + 1, d.lvl[1])) / 2), 1, 30), used = new Set([...S.party.map(p => p.name), ...S.fakes.map(f => f.name)]);
+  const d = LFG_D[key], h = S.hero, need = needed(), L = clamp(Math.round((Math.max(h.lvl, d.lvl[0]) + Math.min(h.lvl + 1, d.lvl[1])) / 2), 1, MAX_LVL), used = new Set([...S.party.map(p => p.name), ...S.fakes.map(f => f.name)]);
   const joined = [];
   for (const role of ['tank', 'healer', 'dps']) for (let i = 0; i < need[role]; i++) {
     if (S.party.length >= Game.partyCap()) break;
@@ -158,7 +158,7 @@ function fillGroup(key, guildRun) {
     else {
       const name = pick(FAKE_NAMES.filter(n => !used.has(n))) || 'Wanderer' + irnd(10, 99); used.add(name);
       const pool = CLASS_KEYS.filter(k => roleOf6(k) === role), cls = pick(pool);
-      f = Game.addMate({ name, cls, lvl: clamp(L + irnd(-1, 1), 1, 30), pal: 1 + irnd(0, 1), persona: pick(PERSONAS), guild: guildRun && G() ? G().name : Math.random() < .5 ? pick(GUILDS) : null, mood: 0 }, h);
+      f = Game.addMate({ name, cls, lvl: clamp(L + irnd(-1, 1), 1, MAX_LVL), pal: 1 + irnd(0, 1), persona: pick(PERSONAS), guild: guildRun && G() ? G().name : Math.random() < .5 ? pick(GUILDS) : null, mood: 0 }, h);
     }
     joined.push(f);
   }
@@ -189,7 +189,7 @@ export const matPrice = k => { const a = AH(); return Math.max(1, Math.round((a.
 export const fairGear = it => Math.round(it.value * (2.2 + it.rarity * .8) * (it.crafted || it.set ? 1.5 : 1));
 function restock() {
   const a = AH(), L = S.hero?.lvl || 1; a.list = a.list.filter(l => S.time - l.t < 1800);
-  while (a.list.length < 10) { const it = randomGear(clamp(L + irnd(-2, 2), 1, 30), Math.random() < .6 ? S.heroCls : null, .55); a.list.push({ item: it, price: Math.round(fairGear(it) * rnd(.8, 1.4)), by: pick(S.fakes.length ? S.fakes : [{ name: 'Someone' }]).name, t: S.time }); }
+  while (a.list.length < 10) { const it = randomGear(clamp(L + irnd(-2, 2), 1, MAX_LVL), Math.random() < .6 ? S.heroCls : null, .55); a.list.push({ item: it, price: Math.round(fairGear(it) * rnd(.8, 1.4)), by: pick(S.fakes.length ? S.fakes : [{ name: 'Someone' }]).name, t: S.time }); }
   for (const k in BASE_PRICE) a.price[k] = clamp(((a.price[k] ?? 1) * 4 + (X.priceTarget?.(k) ?? 1)) / 5 * rnd(.95, 1.05), .3, 3.5);   // prices drift back toward normal (Build 11: or toward what the market's news says)
   for (const f of X.restock || []) f(a);
 }
@@ -233,7 +233,7 @@ export function openAH(n) {
     body.appendChild(el(`<div class="tabs">${[['browse', 'Gear'], ['mats', 'Materials'], ['sell', 'Sell'], ['mine', `My auctions (${a.mine.length})`]].map(([k, t]) => `<button data-t="${k}" class="${ahTab === k ? 'on' : ''}">${t}</button>`).join('')}</div>`)).onclick = ev => { const t = ev.target.dataset?.t; if (t) { ahTab = t; refreshSheet(); } };
     body.appendChild(el(`<p style="margin:4px 0">Gold: <b style="color:var(--acc)">${S.gold}</b></p>`));
     if (ahTab === 'browse') for (const l of a.list.slice().sort((x, y) => y.item.lvl - x.item.lvl)) {
-      const it = l.item, stats = Object.entries(it.stats).map(([k, v]) => `${k === 'crit' ? v + '% crit' : '+' + v + ' ' + ({ pow: 'pow', sta: 'sta', arm: 'armor' }[k] || k)}`).join(', ');
+      const it = l.item, stats = Object.entries(it.stats).map(([k, v]) => statText(k, v)).join(', ');
       const c = el(`<div class="card sp"><div style="flex:1"><b style="color:${RARITY[it.rarity].c}">${esc(it.name)}</b> <span class="dim">· L${it.lvl} ${it.slot}${Game.canWear(S.heroCls, it) ? '' : ' · not for you'}</span><p style="margin:2px 0;font-size:12px">${stats}</p><div class="acts"><button ${S.gold < l.price ? 'disabled' : ''}>Buy for ${l.price}g</button> <span class="dim" style="font-size:12px">from ${esc(l.by)}</span></div></div></div>`);
       c.querySelector('button').onclick = () => { const m = buyListing(l); if (m) toast(m); refreshSheet(); }; body.appendChild(c);
     }

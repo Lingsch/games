@@ -41,7 +41,7 @@ function makeHard(k) {
     for (const s of world.spawns) { s.lvl = [L, L]; s.elite = true; s.hard = true; if (raid) s.raid12 = true; }
     for (const z of world.zoneLines) { z.to = INSTANCES[xk].parent; z.label = 'Leave the hard run'; }
     return w; });
-  LFG_D[xk] = { name: `Hard: ${HARD[k].name}${raid ? ' (12-person raid)' : ''}`, lvl: [30, 50], zone: xk, raid: raid ? hardWhy : undefined, hard: true };
+  const r24 = !!X.RAID24?.has(k); LFG_D[xk] = { name: `Hard: ${HARD[k].name}${raid ? (r24 ? ' (24-person raid)' : ' (12-person raid)') : ''}`, lvl: [30, 50], zone: xk, raid: raid ? hardWhy : undefined, raid24: r24, hard: true };
   X.gate[xk] = hardWhy; if (raid) { X.RAIDS.add(xk); }
   DBOSSES[xk] = DBOSSES[k];
 }

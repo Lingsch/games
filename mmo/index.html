@@ -52,6 +52,7 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 #party{position:fixed;top:calc(var(--st) + 56px);left:var(--sl);width:112px;display:flex;flex-direction:column;gap:2px}
 #party.raid[data-lay=grid]{width:224px;display:grid;grid-template-columns:1fr 1fr;gap:2px}
 #party.raid #cmds,#party.raid #raidq,#party.raid #raidTog{grid-column:1/-1}
+#party.raid.r24[data-lay=grid]{width:300px;grid-template-columns:1fr 1fr 1fr}#party.raid.r24 .pf .fname{font-size:8.5px;white-space:nowrap;overflow:hidden}#party.raid.r24[data-lay=grid] .pf .pbuffs{display:none}
 #party.raid .pf .fname small{display:none}
 #party.raid[data-lay=grid] .pf:not(.sel) .pbuffs,#party.raid[data-lay=grid] .pf .bar.thin{display:none}
 #party.raid[data-lay=group] .pf.mini{min-height:0;padding-top:1px;padding-bottom:1px}
@@ -296,6 +297,7 @@ await import("./js/main.js");
 if (window.RodSync) RodSync.arm();
 </script>
 </body></html>
+
 
 
 

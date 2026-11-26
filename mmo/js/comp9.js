@@ -5,7 +5,7 @@
 //   Pets: Binders and Druids choose how their pets look, and pay to make them stronger.
 import * as THREE from './three.js';
 import { S, X, chat, pick } from './core.js';
-import { CLASSES, SLOTS, SLOT_NAMES, RARITY, PETS } from './data.js';
+import { CLASSES, SLOTS, SLOT_NAMES, RARITY, PETS, mainVal, SEC_KEYS } from './data.js';
 import * as R from './render.js';
 import * as Game from './game.js';
 import * as Cb from './combat.js';
@@ -13,13 +13,13 @@ import * as Cb from './combat.js';
 const DOLL = ['weapon', 'off', 'head', 'chest', 'legs', 'feet', 'ring', 'neck'];
 const doll = name => { S.ext.cgear = S.ext.cgear || {}; return (S.ext.cgear[name] = S.ext.cgear[name] || {}); };
 const isFriend = e => e?.fake && (S.friends || []).some(f => f.name === e.name);
-const score = it => it ? (it.stats.pow || 0) * 1.2 + (it.stats.sta || 0) + (it.stats.arm || 0) * .25 + (it.stats.crit || 0) * 4 : 0;
+const score = (it, cls) => it ? mainVal(it.stats, cls) * 1.2 + (it.stats.sta || 0) + (it.stats.arm || 0) * .25 + ((it.stats.crit || 0) + (it.stats.haste || 0)) * 4 + ((it.stats.dodge || 0) + (it.stats.parry || 0) + (it.stats.block || 0)) * (CLASSES[cls]?.role === 'tank' ? 4 : 0) : 0;
 // what a companion's level gives them in an empty slot (the old fixed allowance, spread across the slots)
 const share = (e, k) => k === 'pow' ? (e.lvl * 2.2 + 2) / DOLL.length : k === 'sta' ? (e.lvl * 3 + 3) / DOLL.length : 0;
 X.dollGear = e => {
   if (!isFriend(e)) return;
   const d = doll(e.name); e.gearCrit = 0;
-  for (const s of DOLL) { const it = d[s]; if (!it) continue; e.gearPow += (it.stats.pow || 0) - share(e, 'pow'); e.gearSta += (it.stats.sta || 0) - share(e, 'sta'); e.gearArm += (it.stats.arm || 0) * .9; e.gearCrit = (e.gearCrit || 0) + (it.stats.crit || 0); }
+  const g = e.g13 = e.g13 || {}; for (const s of DOLL) { const it = d[s]; if (!it) continue; for (const q of SEC_KEYS) if (it.stats[q]) g[q] = (g[q] || 0) + it.stats[q]; if (s === 'off') e.hasShield = it.type === 'shield'; e.gearPow += mainVal(it.stats, e.cls) - share(e, 'pow'); e.gearSta += (it.stats.sta || 0) - share(e, 'sta'); e.gearArm += (it.stats.arm || 0) * .9; e.gearCrit = (e.gearCrit || 0) + (it.stats.crit || 0); }
   e.gearPow = Math.max(1, Math.round(e.gearPow)); e.gearSta = Math.max(1, Math.round(e.gearSta));
 };
 const refit = e => Game.fakeGear(e);
@@ -28,7 +28,7 @@ X.compTake = (who, it) => {
   if (!isFriend(who) || !SLOTS.includes(it.slot) && !['ring', 'neck'].includes(it.slot)) return false;
   if (!Game.canWear(who.cls, it)) { S.gold += it.value; chat('party', who.name, `can't wear that one, sold it, ${it.value}g is yours`); return true; }
   const d = doll(who.name), old = d[it.slot];
-  if (old && score(old) >= score(it)) { S.gold += it.value; chat('party', who.name, `mine's better, sold it for ${it.value}g`); return true; }
+  if (old && score(old, who.cls) >= score(it, who.cls)) { S.gold += it.value; chat('party', who.name, `mine's better, sold it for ${it.value}g`); return true; }
   d[it.slot] = it; refit(who); who.fake.mood += 2;
   if (old && !Game.addToBag(old, true)) S.gold += old.value;
   chat('loot', null, `${who.name} puts on ${it.name}.`); chat('party', who.name, pick(['ty!! that\'s an upgrade', 'ooh shiny, thanks', 'putting it on now', 'nice, much better than what I had']));

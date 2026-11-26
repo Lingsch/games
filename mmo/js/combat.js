@@ -1,6 +1,6 @@
 // Entities, stats, tab-target combat, threat, buffs, casting, death, experience and loot.
 import { S, clamp, dist, angTo, rnd, pick, chat, floatText, nextId, X } from './core.js';
-import { CLASSES, MOBS, GCD, mobHp, mobDmg, mobXp, xpNeed, MAX_LVL, SCHOOL_COL, randomGear, NAMED_LOOT, makeItem, QUESTS, CHAT, RES, startRes, PETS, roleOf, rankOf, rankMul, costMul, cdMul, specialLoot } from './data.js';
+import { CLASSES, MOBS, GCD, mobHp, mobDmg, mobXp, xpNeed, MAX_LVL, SCHOOL_COL, randomGear, NAMED_LOOT, makeItem, QUESTS, CHAT, RES, startRes, PETS, roleOf, rankOf, rankMul, costMul, cdMul, specialLoot, SCHOOL_RES } from './data.js';
 import { hgt, blocked, world } from './world.js';
 import * as R from './render.js';
 
@@ -48,6 +48,14 @@ export function recalc(e) {
     e.crit = .05 + e.gearCrit / 100 + buffSum(e, 'crit') + (A.crit || 0);
     e.dodge = .03 + (C.dodge ? C.dodge + L * .006 : 0) + buffSum(e, 'dodge') + (A.dodge || 0);
     e.parry = (C.parry ? C.parry + L * .006 : 0) + buffSum(e, 'parry') + (A.parry || 0);
+    // Build 13: the secondary stats on gear
+    const g = e.g13 || {};
+    e.dodge += (g.dodge || 0) / 100; e.parry += (g.parry || 0) / 100;
+    e.haste = (g.haste || 0) / 100 + (A.haste || 0);
+    e.block = e.hasShield ? .05 + (g.block || 0) / 100 + (A.block || 0) : 0;
+    e.spi = g.spi || 0; e.mreg = g.mreg || 0;
+    e.resist = { rfire: g.rfire || 0, rfrost: g.rfrost || 0, rshadow: g.rshadow || 0, rnature: g.rnature || 0, rstorm: g.rstorm || 0, rholy: g.rholy || 0 };
+    if (A.resAll) for (const k in e.resist) e.resist[k] += A.resAll;
     if (C.res === 'mana') { const mf = e.resMax > 0 ? e.res / e.resMax : 1; e.resMax = Math.round((C.mana[0] + C.mana[1] * L) * (1 + buffSum(e, 'mana'))); e.res = Math.min(e.resMax, mf * e.resMax); }
     else e.resMax = 100;
   } else if (e.mob) {
@@ -157,6 +165,9 @@ export function damage(src, tgt, amt, school = 'phys', opts = {}) {
       return 0;
     }
   }
+  // Build 13: a shield blocks half of a monster's blow; resistances turn aside magic of their school
+  if (school === 'phys' && !opts.noMiss && src.mob && !src.charmed && tgt.block && Math.random() < Math.min(.6, tgt.block)) { mult *= .5; if (src.isHero || tgt.isHero) floatText(tgt, 'Block', '#cfe8ff'); if (tgt.resType === 'rage') gain(tgt, 6); }
+  if (school !== 'phys' && src.mob && tgt.resist) { const R = tgt.resist[SCHOOL_RES[school]] || 0; if (R > 0) mult *= 1 - Math.min(.75, R / (R + tgt.lvl * 2 + 15)); }
   // level matters: higher-level enemies hit much harder, and shrug off more of what you throw at them
   if (src.mob && !src.charmed && tgt.cls) { const dL = src.lvl - tgt.lvl; mult *= dL > 0 ? 1 + .18 * dL : Math.max(.55, 1 + .09 * dL); }
   if (tgt.mob && (src.cls || src.pet)) { const dL = tgt.lvl - (src.lvl || 1); if (dL > 0) { mult *= Math.max(.45, 1 - .08 * dL); if (!opts.noMiss && Math.random() < .05 * dL) { if (src.isHero) floatText(tgt, 'Miss', '#cfcfcf'); return 0; } } }
@@ -424,7 +435,8 @@ export function useAbility(e, key, t) {
   if (tt && tt !== e) e.yaw = angTo(e, tt);
   let cast = ab.cast || 0;
   if (key === 'aimed' && hasBuff(e, 'deadeye')) cast = 0;
-  if (ab.gcd !== false) e.gcdT = GCD;
+  if (ab.gcd !== false) e.gcdT = Math.max(.9, GCD / (1 + (e.haste || 0)));
+  if (cast > 0) cast /= 1 + (e.haste || 0);
   if (cast > 0) { e.casting = { key, t: 0, total: cast, tgt: tt }; e.sit = false; return null; }
   finish(e, key, tt);
   return null;
@@ -472,7 +484,7 @@ export function updateAuto(e, dt) {
   if (dist(e, t) > range) return;
   if (!C0.melee && e.moving > .2) return;
   if (blocked(e.x, e.z, t.x, t.z)) return;
-  e.swingT = C0.swing / (1 + buffSum(e, 'haste')); e.anim.atk = 1; e.yaw = angTo(e, t);
+  e.swingT = C0.swing / (1 + buffSum(e, 'haste') + (e.haste || 0)); e.anim.atk = 1; e.yaw = angTo(e, t);
   const form = hasBuff(e, 'cat') ? 1.8 : hasBuff(e, 'bear') ? 1.3 : 1;
   const amt = (e.power * C0.swingMult + e.lvl * 1.5 + 3) * form;
   if (C0.melee) {
@@ -485,12 +497,12 @@ export function updateAuto(e, dt) {
 export function regen(e, dt) {
   if (e.dead) return;
   const ooc = !inCombat(e), sit = e.sit && ooc;
-  const hpR = (ooc ? (sit ? .06 : .012) : 0) * (1 + (e.acct?.regenP || 0)), inner = 1 + buffSum(e, 'regen') + (e.acct?.resP || 0);
+  const hpR = (ooc ? (sit ? .06 : .012) : 0) * (1 + (e.acct?.regenP || 0) + (e.spi || 0) * .005), inner = 1 + buffSum(e, 'regen') + (e.acct?.resP || 0) + (e.spi || 0) * .01;
   if (hpR && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * hpR * dt);
   if (e.resType === 'mana') {
     const five = S.time - e.lastCast > 5;
     const r = (sit ? .06 : five ? (ooc ? .015 : .01) : .004) * inner;
-    e.res = Math.min(e.resMax, e.res + e.resMax * r * dt);
+    e.res = Math.min(e.resMax, e.res + e.resMax * r * dt + (e.mreg || 0) / 5 * dt);
   } else if (RES[e.resType]?.kind === 'regen') e.res = Math.min(100, e.res + RES[e.resType].rate * (hasBuff(e, 'moon') ? 2 : 1) * (1 + (e.acct?.resP || 0)) * dt);
   else if (RES[e.resType]?.kind === 'build' && ooc) e.res = Math.max(0, e.res - RES[e.resType].decay * dt);
   if (e.mob && !e.engaged && e.hp < e.maxHp) e.hp = Math.min(e.maxHp, e.hp + e.maxHp * .05 * dt);

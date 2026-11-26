@@ -1,6 +1,6 @@
 // The game: starting a world, the town's people, fake players, spawns, quests, loot, death, saving.
 import { S, rnd, irnd, pick, dist, chat, floatText, clamp, TAU, fct, X } from './core.js';
-import { CLASSES, CLASS_KEYS, MOBS, QUESTS, GIVERS, FAKE_NAMES, PERSONAS, GUILDS, CHAT, xpNeed, defaultBar, randomGear, makeItem, WTYPE, WEAR, POTIONS, NAMED_NAMES, MAX_LVL, roleOf, startRes, BASE_NAMES, SETS, SIGNATURE } from './data.js';
+import { CLASSES, CLASS_KEYS, MOBS, QUESTS, GIVERS, FAKE_NAMES, PERSONAS, GUILDS, CHAT, xpNeed, defaultBar, randomGear, makeItem, WTYPE, WEAR, POTIONS, NAMED_NAMES, MAX_LVL, roleOf, startRes, BASE_NAMES, SETS, SIGNATURE, mainVal, splitPow, mainsOf, SEC_KEYS, MAIN_KEYS, RES_KEYS } from './data.js';
 import * as Sea from './sea.js';
 import { LORE, SCENES, PERKS } from './story.js';
 import './valeplus.js';
@@ -31,16 +31,17 @@ export function canWear(cls, it) {
   return WEAR[CLASSES[cls].armor].includes(it.armorType);
 }
 export function applyGear(e, set) {
-  e.gearPow = e.gearSta = e.gearArm = e.gearCrit = 0;
+  e.gearPow = e.gearSta = e.gearArm = e.gearCrit = 0; const g = e.g13 = {};
   const sets = {};
-  for (const k in set) { const it = set[k]; if (!it) continue; const s = it.stats; e.gearPow += s.pow || 0; e.gearSta += s.sta || 0; e.gearArm += s.arm || 0; e.gearCrit += s.crit || 0; if (it.set) sets[it.set] = (sets[it.set] || 0) + 1; }
-  // armour sets: bonuses at 2 and 4 pieces
-  for (const [id, n] of Object.entries(sets)) for (const [need, b] of Object.entries(SETS[id]?.bonus || {})) if (n >= +need) { e.gearPow += b.pow || 0; e.gearSta += b.sta || 0; e.gearCrit += b.crit || 0; }
+  for (const k in set) { const it = set[k]; if (!it) continue; if (it.stats?.pow) splitPow(it, e.cls, 1); const s = it.stats; e.gearPow += mainVal(s, e.cls); e.gearSta += s.sta || 0; e.gearArm += s.arm || 0; e.gearCrit += s.crit || 0; for (const q of SEC_KEYS) if (s[q]) g[q] = (g[q] || 0) + s[q]; if (it.set) sets[it.set] = (sets[it.set] || 0) + 1; }
+  // armour sets: bonuses at 2 and 4 pieces (a set's Power counts as your main stat)
+  for (const [id, n] of Object.entries(sets)) for (const [need, b] of Object.entries(SETS[id]?.bonus || {})) if (n >= +need) { e.gearPow += mainVal(b, e.cls); e.gearSta += b.sta || 0; e.gearCrit += b.crit || 0; for (const q of SEC_KEYS) if (b[q]) g[q] = (g[q] || 0) + b[q]; }
+  e.hasShield = set.off?.type === 'shield';
   e.setCount = sets;
   Cb.recalc(e);
 }
 // fake players wear gear that keeps up with their level
-function fakeGear(e) { e.gearPow = Math.round(e.lvl * 2.2 + 2); e.gearSta = Math.round(e.lvl * 3 + 3); e.gearArm = Math.round(e.lvl * (CLASSES[e.cls].armor === 'plate' ? 9 : 4)) + (e.bonusArm || 0); e.gearPow += e.bonusPow || 0; e.gearSta += e.bonusSta || 0; if (X.dollGear) X.dollGear(e); Cb.recalc(e); }
+function fakeGear(e) { e.g13 = {}; e.hasShield = WTYPE[e.cls]?.[1] === 'shield'; e.gearPow = Math.round(e.lvl * 2.2 + 2); e.gearSta = Math.round(e.lvl * 3 + 3); e.gearArm = Math.round(e.lvl * (CLASSES[e.cls].armor === 'plate' ? 9 : 4)) + (e.bonusArm || 0); e.gearPow += e.bonusPow || 0; e.gearSta += e.bonusSta || 0; if (X.dollGear) X.dollGear(e); Cb.recalc(e); }
 function starterGear(cls) {
   const t = WTYPE[cls], a = CLASSES[cls].armor, arm = a === 'plate' ? 4 : a === 'leather' ? 2 : 1;
   return {
@@ -309,7 +310,7 @@ export function spawnProp(p) {
   e.yaw = p.yaw; e.y = p.y ?? hgt(e.x, e.z); return e;
 }
 const OBJ_VERB = { clue1: 'Examine', clue2: 'Examine', grave: 'Examine the grave', headstone: 'Set the headstone upright', bell: 'Ring the bell', wardstone: 'Touch the ward stone', journal: "Read Corwin's journal" };
-function needFor(p) { return QUESTS.find(q => q.obj.inspect === p.tag && S.quests[q.id]?.state === 'active' && !(S.used[q.id] || []).includes(p.id)); }
+function needFor(p) { return p.tag && QUESTS.find(q => q.obj.inspect === p.tag && S.quests[q.id]?.state === 'active' && !(S.used[q.id] || []).includes(p.id)); }
 // what the action button says for a prop, or null if there's nothing to do with it
 export function inspectLabel(e) {
   const p = e.prop; if (!p) return null;
@@ -348,6 +349,7 @@ export const famBest = f => Math.max(...CLASS_KEYS.filter(k => CLASSES[k].family
 export const lockedAt10 = () => FAMILIES.some(f => famBest(f) < 10);
 export const lockedAt20 = () => FAMILIES.some(f => famBest(f) < 20);
 export const lockedAt25 = () => FAMILIES.some(f => famBest(f) < 25);
+export const lockedAt30 = () => FAMILIES.some(f => famBest(f) < 30);
 export const raidReady = () => FAMILIES.every(f => famBest(f) >= 20);
 export const perksOpen = () => CLASS_KEYS.filter(k => levelOf(k) >= 10);
 export const xpBoost = () => Math.min(.6, .2 * CLASS_KEYS.filter(k => k !== S.heroCls && levelOf(k) >= 10).length);
@@ -623,7 +625,7 @@ export function askSuspect(q, key) {
   save();
 }
 // a raid holds 12; everything else holds 6
-export const partyCap = () => S.ext?.raid12 ? 12 : 6;
+export const partyCap = () => S.ext?.raid12 ? (S.ext.raid24 ? 24 : 12) : 6;
 export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.forCls && S.heroCls !== q.forCls) return 'locked'; if (q.when && !q.when()) return 'locked'; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned' && !(X.preAlt?.[q.pre] || []).some(id => S.quests[id]?.state === 'turned')) return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.pre3 && S.quests[q.pre3]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
 export function acceptQuest(q) {
   S.quests[q.id] = { state: q.obj.talk ? 'done' : 'active', n: 0 };
@@ -678,15 +680,24 @@ function questProgress(mob, near) {
 }
 
 // ---------- bags and loot ----------
-export function addToBag(it, back) { if (S.bag.length >= 30) { chat('sys', null, 'Your bags are full.'); return false; } S.bag.push(it); if (!back) autoOnLoot(it); return true; }
+export function addToBag(it, back) { if (S.bag.length >= 30) { chat('sys', null, 'Your bags are full.'); return false; } if (it?.stats?.pow) splitPow(it, null); S.bag.push(it); if (!back) autoOnLoot(it); return true; }
 // ---------- gear focus: sorting and auto-equip (Build 13) ----------
 // The game has four gear stats. Power is both strength and magic: every class's attacks and spells scale off it.
+export const splitStats = it => splitPow(it, null);
 export const GEAR_SLOTS = ['weapon', 'off', 'head', 'chest', 'legs', 'feet', 'neck', 'ring'];
-export const FOCI = [['role', 'Best for my role'], ['sta', 'Health'], ['pow', 'Power'], ['crit', 'Crit'], ['arm', 'Armor']];
-const ROLE_W = { tank: { sta: 1, arm: .35, pow: .4, crit: 1 }, healer: { pow: 1, crit: 2.5, sta: .45, arm: .05 }, dps: { pow: 1, crit: 3, sta: .3, arm: .05 } };
-const FOCUS_W = { sta: { sta: 1, arm: .1, crit: .1, pow: .05 }, pow: { pow: 1, crit: .5, sta: .05 }, crit: { crit: 1, pow: .05, sta: .02 }, arm: { arm: 1, sta: .3, pow: .02 } };
-export const gearPrefs = () => (S.ext.gear13 = S.ext.gear13 || { focus: 'role', sort: 'new', auto: false });
-export const focusW = f => FOCUS_W[f] || ROLE_W[CLASSES[S.heroCls]?.role] || ROLE_W.dps;
+export const FOCI = [['role', 'Best for my class'], ['sta', 'Health'], ['str', 'Strength'], ['agi', 'Agility'], ['int', 'Intellect'], ['crit', 'Crit'], ['haste', 'Haste'], ['spi', 'Spirit'], ['avoid', 'Avoidance'], ['arm', 'Armor'], ['res', 'Resist']];
+// weights per point: the class's own main stats count, the others are worth nothing to it
+const ROLE_W = { tank: { main: .45, sta: 1, arm: .35, crit: 1, haste: 1, dodge: 3, parry: 3, block: 2.5 }, healer: { main: 1, crit: 2.5, haste: 2.5, spi: .5, mreg: 1.2, sta: .45, arm: .05 }, dps: { main: 1, crit: 3, haste: 3, sta: .3, arm: .05 } };
+const FOCUS_W = { sta: { sta: 1, arm: .1, main: .05 }, crit: { crit: 1, main: .03 }, haste: { haste: 1, main: .03 }, spi: { spi: 1, mreg: 1.5, main: .03 }, avoid: { dodge: 1, parry: 1, block: 1, sta: .02 }, arm: { arm: 1, sta: .3 }, res: { rfire: 1, rfrost: 1, rshadow: 1, rnature: 1, rstorm: 1, rholy: 1, sta: .02 } };
+export const gearPrefs = () => { const g = (S.ext.gear13 = S.ext.gear13 || { focus: 'role', sort: 'new', auto: false }); if (g.focus === 'pow') g.focus = 'role'; return g; };
+export const focusW = f => {
+  const mains = mainsOf(S.heroCls), out = {};
+  if (MAIN_KEYS.includes(f)) { out[f] = 1; out.sta = .05; return out; }
+  const W = FOCUS_W[f] || ROLE_W[CLASSES[S.heroCls]?.role] || ROLE_W.dps;
+  for (const [k, v] of Object.entries(W)) if (k === 'main') for (const m of mains) out[m] = v; else out[k] = v;
+  if (CLASSES[S.heroCls]?.res !== 'mana') { delete out.spi; delete out.mreg; }
+  return out;
+};
 export const itemScore = (it, W) => it && it.stats ? Object.entries(it.stats).reduce((a, [k, v]) => a + (W[k] || 0) * v, 0) : 0;
 const wearable = it => it && it.stats && GEAR_SLOTS.includes(it.slot) && !it.book && !it.junk && canWear(S.heroCls, it);
 function loadScore(set, W) {
@@ -761,7 +772,7 @@ export function assignLoot(mob, it, who) {
   }
   // a companion wears it if it's an upgrade on what their level gives them
   if (X.compTake && X.compTake(who, it)) { save(); return; }
-  const s = it.stats; who.bonusPow = (who.bonusPow || 0) + (s.pow || 0) * .5; who.bonusSta = (who.bonusSta || 0) + (s.sta || 0) * .5; who.bonusArm = (who.bonusArm || 0) + (s.arm || 0) * .3;
+  const s = it.stats; who.bonusPow = (who.bonusPow || 0) + mainVal(s, who.cls) * .5; who.bonusSta = (who.bonusSta || 0) + (s.sta || 0) * .5; who.bonusArm = (who.bonusArm || 0) + (s.arm || 0) * .3;
   fakeGear(who); who.fake.mood += canWear(who.cls, it) ? 2 : 1;
   chat('loot', null, `${who.name} receives ${it.name}.`); chat('party', who.name, pick(CHAT.thanks));
 }
@@ -778,7 +789,7 @@ Cb.setHooks({
     return a;
   },
   onOverflow(p, over) { if (over > 0) S.vetXp = Math.min(40000, (S.vetXp || 0) + Math.round(over)); },
-  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : lockedAt20() && p.lvl >= 20 ? 20 : lockedAt25() && p.lvl >= 25 ? 25 : MAX_LVL),
+  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : lockedAt20() && p.lvl >= 20 ? 20 : lockedAt25() && p.lvl >= 25 ? 25 : lockedAt30() && p.lvl >= 30 ? 30 : MAX_LVL),
   onCapped(p) { if (cappedSaid) return; cappedSaid = true; chat('sys', null, `You have learned all this weapon can teach you, for now.`); },
   onYield(m, src) {
     // he only surrenders to your group, and only while you're on his quest
@@ -1037,6 +1048,11 @@ export function loadSave(data) {
   for (const k of CLASS_KEYS) { if (!S.classes[k]) S.classes[k] = { lvl: 1, xp: 0 }; if (!S.gear[k]) S.gear[k] = starterGear(k); if (!S.bar[k]) S.bar[k] = defaultBar(k); }
   // Build 3 added spells: slot any new ones you've learned into empty bar keys
   for (const k of CLASS_KEYS) { const bar = S.bar[k], all = defaultBar(k); for (const key of all) if (key && !bar.includes(key)) { const i = bar.indexOf(null); if (i >= 0) bar[i] = key; } }
+  // Build 13: Power on old gear becomes the main stat of the class that wears it (or yours, for bags and the bank)
+  for (const k of CLASS_KEYS) for (const sl in S.gear[k]) if (S.gear[k][sl]) splitPow(S.gear[k][sl], k, 1);
+  for (const it of [...S.bag, ...S.bank]) splitPow(it, S.heroCls, 1);
+  if (sv.corpse?.gear) for (const sl in sv.corpse.gear) if (sv.corpse.gear[sl]) splitPow(sv.corpse.gear[sl], sv.corpse.cls, 1);
+  if (S.ext?.cgear) for (const [nm, d] of Object.entries(S.ext.cgear)) { const fr = (S.friends || []).find(f => f.name === nm); for (const sl in d) if (d[sl]) splitPow(d[sl], fr?.cls, 1); }
   S.pops = sv.pops || { vale: sv.fakes || null };
   S.bind = sv.bind && sv.bind.x !== undefined ? { zone: sv.bind.zone || 'vale', ...sv.bind } : null;
   S.corpse = sv.corpse ? { ...sv.corpse, zone: sv.corpse.zone || 'vale' } : null;

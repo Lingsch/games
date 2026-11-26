@@ -143,6 +143,8 @@ function mechAI(m, t, dt) {
   const D = MOBS[m.mob], has = k => D.mechs.includes(k);
   const b = bstate(m, { cleave: rnd(6, 8), slam: rnd(9, 11), pool: rnd(7, 9), volley: 10, charge: 12, spawn: 14, heal: 16, fear: 15, web: 11, knock: 13 }); b.time += dt;
   if (has('enrage')) { enrageAt(m, b, 240); if (m.hp < m.maxHp * .3 && !b.said.rage) { b.said.rage = 1; Cb.buff(m, 'frenzy', 999, { pow: .5 }); floatText(m, 'FRENZY', '#ff3a1a', true); chat('sys', null, `${m.name} flies into a rage!`); } }
+  // Build 13: an aura that hurts everyone nearby with the boss's school, every few seconds; resistances blunt it
+  if (has('aura')) { b.aura = (b.aura ?? 4) - dt; if (b.aura <= 0) { b.aura = 3; for (const e of partyIn(m)) damage(m, e, m.power * (D.auraK || .18), D.school || 'shadow', { noMiss: true }); } }
   if (!b.said.start) { b.said.start = 1; if (D.lines?.start) chat('say', m.name, D.lines.start); if (has('hounds')) addWave(m, 2, Math.max(1, m.lvl - 1), D.adds, [{ x: m.x + 3, z: m.z }, { x: m.x - 3, z: m.z }]); }
   if (m.hp < m.maxHp * .5 && !b.said.half) {
     b.said.half = 1; if (D.lines?.half) chat('say', m.name, D.lines.half);
