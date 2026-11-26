@@ -58,7 +58,7 @@ export function defineZone(key, spec) {
     const rng = mulberry32(seed + spec.seed), N = makeNoise(seed + spec.seed), pk = a => a[(rng() * a.length) | 0];
     world.water = null;
     world.names = { zone: spec.name, town: spec.towns[0].name, boss: spec.bossName || '' };
-    const towns = spec.towns, roads = spec.roads || [], opens = spec.open || [], flats = [...towns.map(t => ({ ...t, base: t.base ?? 3 })), ...opens.map(o => ({ ...o, base: 3 })), ...(spec.flats || [])];
+    const towns = spec.towns, roads = spec.roads || [], opens = spec.open || [], flats = [...towns.map(t => ({ ...t, base: t.base ?? 3 })), ...opens.map(o => ({ ...o, base: o.base ?? 3 })), ...(spec.flats || [])];
     for (let zi = 0; zi < HN; zi++) for (let xi = 0; xi < HN; xi++) {
       const x = xi - WH, z = zi - WH; let h = spec.land(x, z, N);
       for (const t of flats) h = lerp(t.base, h, sm((Math.hypot(x - t.x, z - t.z) - t.R - 3) / 22));
@@ -121,7 +121,7 @@ export function defineZone(key, spec) {
     }
     meshWithOutline(mergeBuilt(items), .05);
     linkDoors();
-    for (const l of spec.lines || []) { world.zoneLines.push({ x: l.x, z: l.z, r: 9, to: l.to, label: l.label }); zoneMarker(l.x, l.z, l.ry || 0); }
+    for (const l of spec.lines || []) { world.zoneLines.push({ x: l.x, z: l.z, r: 9, to: l.to, label: l.label, why: l.why }); zoneMarker(l.x, l.z, l.ry || 0); }
     world.mapLabels = spec.labels || [];
     world.spots = Object.assign(world.spots || {}, spec.spots || {});
     for (const t of towns) world.spots[t.key] = world.spots[t.key] || { x: t.x, z: t.z };

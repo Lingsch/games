@@ -183,7 +183,7 @@ function zoneLines() {
   if (!near) { sea.armed = true; return; }
   if (!sea.armed || near.to === 'fleet') return; // the fleet needs a deliberate dive
   sea.armed = false;
-  const why = X.gate?.[near.to]?.(); if (why) { chat('sys', null, why); return; }   // Build 7: the raid's door checks who you are
+  const why = near.why?.() || X.gate?.[near.to]?.(); if (why) { chat('sys', null, why); return; }   // Build 7: the raid's door checks who you are
   G.travel(near.to);
 }
 export const fleetLine = () => { const h = S.hero; return world.zoneLines.find(z => z.to === 'fleet' && Math.hypot(h.x - z.x, h.z - z.z) < z.r + 2); };

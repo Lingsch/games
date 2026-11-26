@@ -636,7 +636,7 @@ function objText(q) {
 // ---------- professions, materials, food and the collection ----------
 function tabTrade(body) {
   const P = Craft.PROFS;
-  body.appendChild(el(`<div class="card"><h3>Professions</h3><div class="profs">${Object.entries(P).map(([k, p]) => { const v = Craft.skill(k); return `<div class="prof ${v === null ? 'off' : ''}"><span>${p.icon}</span><b>${p.name}</b><small>${v === null ? 'not learned' : Craft.shown(v) + ' / 50'}</small>${v === null ? '' : `<i style="width:${v / 1.25}%"></i>`}</div>`; }).join('')}</div></div>`));
+  body.appendChild(el(`<div class="card"><h3>Professions</h3><div class="profs">${Object.entries(P).map(([k, p]) => { const v = Craft.skill(k); return `<div class="prof ${v === null ? 'off' : ''}"><span>${p.icon}</span><b>${p.name}</b><small>${v === null ? 'not learned' : Craft.shown(v) + ' / 60'}</small>${v === null ? '' : `<i style="width:${v / 1.5}%"></i>`}</div>`; }).join('')}</div></div>`));
   const jobs = (S.friends || []).filter(fr => fr.craft && (fr.craft.gather || fr.craft.make));
   if (jobs.length) body.appendChild(el(`<div class="card"><h3>Friends' jobs</h3>${jobs.map(fr => `<p style="margin:2px 0">${esc(fr.name)}: ${[fr.craft.gather, fr.craft.make].filter(Boolean).map(p => `${P[p].icon} ${P[p].name} ${Craft.skill(p, fr)}`).join(' · ')}</p>`).join('')}</div>`));
   const mats = Object.entries(S.mats || {}).filter(([, n]) => n > 0);
@@ -944,7 +944,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 10 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 11 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

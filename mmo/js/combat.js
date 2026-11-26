@@ -53,8 +53,8 @@ export function recalc(e) {
   } else if (e.mob) {
     const M = MOBS[e.mob], L = e.lvl;
     let hpM = M.hpM * (e.elite ? 3.5 : 1) * (e.named && !e.boss ? (e.boss2 ? 14 : 5) : 1) * (e.boss ? 80 : 1);
-    e.maxHp = Math.round(mobHp(L) * hpM);
-    e.power = mobDmg(L) * M.dmgM * (e.elite ? 1.35 : 1) * (e.named ? 1.5 : 1) * (e.boss ? 1.6 : 1) * (1 + buffSum(e, 'pow'));
+    e.maxHp = Math.round(mobHp(L) * hpM * (e.hpMul || 1));
+    e.power = mobDmg(L) * M.dmgM * (e.elite ? 1.35 : 1) * (e.named ? 1.5 : 1) * (e.boss ? 1.6 : 1) * (1 + buffSum(e, 'pow')) * (e.dmgMul || 1);
     e.armor = L * 5; e.crit = .05; e.dodge = .03; e.parry = 0;
     if (e.pet && e.charmed) e.power *= 1.1;
   } else if (e.pet) recalcPet(e);

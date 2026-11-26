@@ -102,7 +102,7 @@ export function addRecipe(id, prof, name, req, mats, out, rare = null) { rec(id,
 
 // ---------- state ----------
 // Build 10: skill shows at two points per level of what it makes: 50 makes level-25 gear
-export const SKILL_CAP = 125, shown = v => v == null ? v : Math.max(1, Math.round(v * .4));
+export const SKILL_CAP = 150, shown = v => v == null ? v : Math.max(1, Math.round(v * .4));
 export function initState() { S.prof = S.prof || {}; S.mats = S.mats || {}; S.recipes = S.recipes || []; S.cons = S.cons || {}; }
 export const skill = (p, who) => who ? (who.craft && (who.craft.gather === p || who.craft.make === p) ? (who.craft.skill?.[p] ?? 1) : null) : S.prof?.[p] ?? null;      // null: not learned
 // friends can be given one gathering job and one crafting job; they level those skills themselves
@@ -124,7 +124,7 @@ export const learnRecipe = id => { initState(); if (S.recipes.includes(id)) retu
 // ---------- gear you craft: as strong as dungeon set pieces of the same level ----------
 const JEWEL_NAMES = { ring: 'Ring', neck: 'Pendant' };
 export function gearBudget(L, slot, rar = 3) { return (2 + L * 1.6) * (1 + 3 * .45) * (slot === 'weapon' ? 1.6 : slot === 'chest' ? 1.2 : slot === 'ring' || slot === 'neck' ? .7 : 1) * (rar > 3 ? 1.15 : 1); }
-function makeGear(r) {
+export function makeGear(r) {
   const o = r.out, cls = S.heroCls, L = o.lvl, rar = o.rar || 2, budget = gearBudget(L, o.slot) * (o.rar ? 1.12 : 1);
   const stats = {};
   if (o.slot === 'weapon') { stats.pow = Math.round(budget * .7); stats.sta = Math.round(budget * .3); }
@@ -178,17 +178,17 @@ export function useCons(k) {
 // ---------- gathering from what enemies leave behind ----------
 export function mobMats(m) {
   initState();
-  const D = MOBS[m.mob] || {}, L = m.lvl, tier = L < 6 ? 0 : L < 11 ? 1 : L < 20 ? 2 : 3, got = [];
+  const D = MOBS[m.mob] || {}, L = m.lvl, tier = L < 6 ? 0 : L < 11 ? 1 : L < 20 ? 2 : L < 26 ? 3 : 4, got = [];
   if (D.beast) {
     if (Math.random() < .45) got.push([m.mob === 'crab' || m.mob === 'crabbig' ? 'crabmeat' : 'meat', 1]);
     const sk = skill('skinning') !== null ? null : friendWith('gather', 'skinning'), sv = skill('skinning', sk);
-    if (sv !== null) { const h = ['lighthide', 'thickhide', 'scalehide', 'wyrmhide'][tier], req = [1, 40, 75, 100][tier]; if (sv >= req) { got.push([h, irnd(1, 2)]); skillUp('skinning', req, sk); } }
+    if (sv !== null) { const h = ['lighthide', 'thickhide', 'scalehide', 'wyrmhide', 'stormhide'][tier], req = [1, 40, 75, 100, 125][tier]; if (sv >= req) { got.push([h, irnd(1, 2)]); skillUp('skinning', req, sk); } }
   }
   if (m.mob === 'crab' || m.mob === 'crabbig') { if (Math.random() < .5) got.push(['crabmeat', 1]); }
-  if (D.human && Math.random() < .35) got.push([['linen', 'wool', 'seasilk', 'moonweave'][tier], irnd(1, 2)]);
+  if (D.human && Math.random() < .35) got.push([['linen', 'wool', 'seasilk', 'moonweave', 'starweave'][tier], irnd(1, 2)]);
   if (D.undead && Math.random() < .3) got.push(['bonedust', 1]);
-  if (D.ore && Math.random() < .6) got.push([tier < 2 ? 'iron' : tier < 3 ? 'silver' : 'starsteel', irnd(1, 2)]);
-  if (m.named && Math.random() < .5) got.push([['garnet', 'moonstone', 'pearl', 'starstone'][tier], 1]);
+  if (D.ore && Math.random() < .6) got.push([tier < 2 ? 'iron' : tier < 3 ? 'silver' : tier < 4 ? 'starsteel' : 'skysilver', irnd(1, 2)]);
+  if (m.named && Math.random() < .5) got.push([['garnet', 'moonstone', 'pearl', 'starstone', 'heartstar'][tier], 1]);
   for (const [k, n] of got) addMat(k, n, true);
   if (got.length) chat('loot', null, `You gather ${got.map(([k, n]) => `${n} ${MATS[k].name}`).join(', ')}.`);
 }

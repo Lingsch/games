@@ -110,16 +110,21 @@ export function treeOf(cls, sk) {
   const cap = { tank: ['hpP', .08], healer: ['powP', .06], dps: ['powP', .06], support: ['powP', .05] }[focus];
   t.push({ id: 'cap1', tier: 3, max: 1, name: `Heart of the ${s[1]}`, desc: () => STAT_DESC[cap[0]](cap[1]), stat: cap });
   t.push({ id: 'cap2', tier: 3, max: 1, name: `${s[1]}'s Instinct`, desc: () => STAT_DESC.crit(.03), stat: ['crit', .03] });
+  // Build 11: a fifth tier for the sky, levels 25-30
+  t.push({ id: 'asc1', tier: 4, max: 3, name: `Ascendant ${STAT_NAME[cap[0]]}`, desc: r => STAT_DESC[cap[0]](+(.03 * r).toFixed(2)), stat: [cap[0], .03] });
+  t.push({ id: 'asc2', tier: 4, max: 3, name: `Sky-Touched ${s[5][0].name}`, desc: r => `${s[5][0].name} is ${r * 10}% stronger.`, ab: [`sig_${sk}1`, .1] });
+  t.push({ id: 'asc3', tier: 4, max: 2, name: 'Starward Resolve', desc: r => STAT_DESC.hpP(+(.03 * r).toFixed(2)), stat: ['hpP', .03] });
+  t.push({ id: 'asc4', tier: 4, max: 1, name: `The ${s[1]} Ascendant`, desc: () => `${s[5][1].name} is 15% stronger, and you have +2% critical chance.`, ab: [`sig_${sk}2`, .15], stat: ['crit', .02] });
   while (t.filter(x => x.tier === 2).length < 3) t.push({ id: 'pad' + t.length, tier: 2, max: 2, name: `${adj} Resolve`, desc: r => STAT_DESC.hpP(+(.02 * r).toFixed(2)), stat: ['hpP', .02] });
   return (trees[id] = t);
 }
-const TIER_NEED = [0, 3, 7, 11];
-export const ptsTotal = cls => { const L = (CLASS_KEYS.includes(cls) && (cls === S.heroCls ? S.hero?.lvl : S.classes[cls]?.lvl)) || 0; if (L < 20 || !chosen(cls)) return 0; return 1 + (L - 20) * 3 + Math.min(11, T()[cls].aa || 0); };
+const TIER_NEED = [0, 3, 7, 11, 20];
+export const ptsTotal = cls => { const L = (CLASS_KEYS.includes(cls) && (cls === S.heroCls ? S.hero?.lvl : S.classes[cls]?.lvl)) || 0; if (L < 20 || !chosen(cls)) return 0; return 1 + (Math.min(L, 25) - 20) * 3 + Math.max(0, L - 25) * 2 + Math.min(11, T()[cls].aa || 0); };
 export const ptsSpent = cls => Object.values(T()[cls]?.pts || {}).reduce((a, b) => a + b, 0);
 export function canTake(cls, tal) {
   const st = T()[cls]; if (!st?.sub) return 'Choose your new class first.';
   if ((st.pts[tal.id] || 0) >= tal.max) return 'Already at its highest rank.';
-  if (ptsSpent(cls) >= ptsTotal(cls)) return 'No points left. Points come from levels past 20, and from experience at 25.';
+  if (ptsSpent(cls) >= ptsTotal(cls)) return 'No points left. Points come from levels past 20, and from experience at the level cap.';
   if (ptsSpent(cls) < TIER_NEED[tal.tier]) return `Spend ${TIER_NEED[tal.tier]} points in this tree first.`;
   return null;
 }
@@ -130,7 +135,7 @@ export function choose(cls, sk) {
   if (S.hero) Cb.recalc(S.hero);
 }
 export function respec(cls) { const st = T()[cls]; if (!st) return; st.pts = {}; bumpCache(); if (S.hero) Cb.recalc(S.hero); }
-// experience past 25 turns into points, one for every level's worth
+// experience past the cap turns into points, one for every level's worth
 X.capXp = (p, amt) => { const st = T()[p.cls]; if (!st?.sub || (st.aa || 0) >= 11) return; st.aaXp = (st.aaXp || 0) + amt; const need = xpNeed(MAX_LVL - 1); while (st.aaXp >= need && st.aa < 11) { st.aaXp -= need; st.aa = (st.aa || 0) + 1; chat('sys', null, 'You feel your craft deepen. A talent point is waiting for you.'); } };
 
 // ---------- folding talents into the numbers ----------
@@ -163,7 +168,7 @@ X.book.push(['talents', 'Talents', body => {
   }
   const s = subOf(cls, st.sub), tree = treeOf(cls, st.sub), left = ptsTotal(cls) - ptsSpent(cls);
   body.appendChild(el(`<div class="card" style="text-align:left"><h3 style="color:${C.color}">${esc(s[1])}</h3><p style="margin:2px 0">${left} point${left === 1 ? '' : 's'} to spend · ${ptsSpent(cls)} spent</p></div>`));
-  ['Foundations', 'Specialty', 'Discipline', 'Mastery'].forEach((tn, ti) => {
+  ['Foundations', 'Specialty', 'Discipline', 'Mastery', 'Ascendancy'].forEach((tn, ti) => {
     body.appendChild(el(`<p style="margin:10px 0 4px;font:700 13px Cinzel;color:var(--acc)">${tn}${TIER_NEED[ti] ? ` <small class="dim">(${TIER_NEED[ti]} points in the tree)</small>` : ''}</p>`));
     for (const tal of tree.filter(x => x.tier === ti)) {
       const r = st.pts[tal.id] || 0, why = canTake(cls, tal);

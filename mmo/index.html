@@ -117,7 +117,7 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 /* bottom: chat, utility buttons, the bar */
 #chat{position:fixed;right:var(--sr);bottom:calc(var(--sb) + var(--barH) + 46px);width:min(220px,54vw);display:flex;flex-direction:column;gap:1px;pointer-events:none;font-size:10.5px;line-height:1.25;text-shadow:0 1px 2px #000,0 0 3px #000}
 #chat div{transition:opacity 1s}#chat .old{opacity:0}
-.ch-sys{color:#ffe08a}.ch-party{color:#8fd0ff}.ch-gen{color:#e8d8c0}.ch-loot{color:#9be36b}.ch-say{color:#ffb0a0}.ch-whisper{color:#ff9ae6}.ch-guild{color:#7fe8a0}
+.ch-sys{color:#ffe08a}.ch-party{color:#8fd0ff}.ch-gen{color:#e8d8c0}.ch-loot{color:#9be36b}.ch-trade{color:#e8c46a}.ch-say{color:#ffb0a0}.ch-whisper{color:#ff9ae6}.ch-guild{color:#7fe8a0}
 #chat b{font-weight:700}
 #util{position:fixed;right:var(--sr);bottom:calc(var(--sb) + var(--barH) + 8px);display:flex;gap:5px}
 #util button{min-height:30px;min-width:34px;padding:0 6px;font-size:13px;background:var(--plate);position:relative}
@@ -296,4 +296,5 @@ await import("./js/main.js");
 if (window.RodSync) RodSync.arm();
 </script>
 </body></html>
+
 

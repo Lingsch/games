@@ -135,6 +135,7 @@ export function makeFriends() {
 // older characters started with two friends: a third (for crowd control and buffs) catches up with them
 export function topUpFriends() {
   if (!S.friendsMade || (S.friends || []).length >= 3 || S.party.length >= 6) return;
+  if (S.ext?.left && Object.keys(S.ext.left).length) return;   // Build 11: a friend who walked out is missed, not replaced
   const used = new Set([...S.fakes.map(f => f.name), S.heroName, ...S.friends.map(f => f.name)]);
   const name = ['Wren', 'Pip', 'Lark', 'Sable', 'Quill', 'Juniper'].find(n => !used.has(n)) || 'Friend 3';
   const have = new Set([SLOT_OF(S.heroCls), ...S.friends.map(f => SLOT_OF(f.cls))]);
@@ -340,6 +341,7 @@ export const levelOf = k => (k === S.heroCls && S.hero ? S.hero.lvl : S.classes[
 export const famBest = f => Math.max(...CLASS_KEYS.filter(k => CLASSES[k].family === f).map(levelOf));
 export const lockedAt10 = () => FAMILIES.some(f => famBest(f) < 10);
 export const lockedAt20 = () => FAMILIES.some(f => famBest(f) < 20);
+export const lockedAt25 = () => FAMILIES.some(f => famBest(f) < 25);
 export const raidReady = () => FAMILIES.every(f => famBest(f) >= 20);
 export const perksOpen = () => CLASS_KEYS.filter(k => levelOf(k) >= 10);
 export const xpBoost = () => Math.min(.6, .2 * CLASS_KEYS.filter(k => k !== S.heroCls && levelOf(k) >= 10).length);
@@ -482,6 +484,7 @@ function spawn(sp) {
   }
   if (e.boss && (named === 'admiral' || named === 'boss') && world.names.boss) e.name = world.names.boss;   // only the zone's own boss takes the zone's boss name
   e.y = hgt(e.x, e.z);
+  for (const f of X.spawned || []) f(e, sp);
   sp.alive = e; sp.timer = 0;
   return e;
 }
@@ -526,6 +529,7 @@ export function invite(f) {
 }
 export function kick(f) {
   if (!f.inParty || f.isHero) return;
+  X.kickHook?.(f);
   f.inParty = false; f.fake.state = 'home'; S.party = S.party.filter(p => p !== f);
   if (f.dead) Cb.revive(f, 1);
   chat('sys', null, `${f.name} leaves the group.`);
@@ -727,7 +731,7 @@ Cb.setHooks({
     return a;
   },
   onOverflow(p, over) { if (over > 0) S.vetXp = Math.min(40000, (S.vetXp || 0) + Math.round(over)); },
-  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : lockedAt20() && p.lvl >= 20 ? 20 : MAX_LVL),
+  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : lockedAt20() && p.lvl >= 20 ? 20 : lockedAt25() && p.lvl >= 25 ? 25 : MAX_LVL),
   onCapped(p) { if (cappedSaid) return; cappedSaid = true; chat('sys', null, `You have learned all this weapon can teach you, for now.`); },
   onYield(m, src) {
     // he only surrenders to your group, and only while you're on his quest

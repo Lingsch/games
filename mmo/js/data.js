@@ -1,7 +1,7 @@
 // Game data: the four Milestone 1 classes, mobs, items, quests, fake-player names and chat.
 // Ability effects receive C (the combat API in combat.js), the user u, the target t and the ability.
 
-export const MAX_LVL = 25;
+export const MAX_LVL = 30;
 export const xpNeed = L => Math.round(80 * L ** 1.7 + 120);
 export const GCD = 1.5;
 
