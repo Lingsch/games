@@ -130,6 +130,17 @@ function buildSystem(sys) {
     if (!S.ext.aceDown || S.time - S.ext.aceDown > 1200) pack(330, -250, ['ace', 'pirate', 'pirate']);
     for (let i = 0; i < 3; i++) { const a = rng() * TAU; const e = spawn('bait', Math.cos(a) * 120, 70 + Math.sin(a) * 120, { team: 'neutral', name: 'Free hauler', lane: a }); e.hull = e.max = 9999; }
   }
+  if (sys === 'sunder') {
+    const pl = new THREE.Mesh(new THREE.SphereGeometry(520, 40, 24), new THREE.MeshLambertMaterial({ color: '#e8d8b0', fog: false })); addObj({ type: 'decor', x: 0, y: -560, z: 60, mesh: pl });
+    const sun = new THREE.Mesh(new THREE.SphereGeometry(70, 20, 14), new THREE.MeshBasicMaterial({ color: '#fff4d8', fog: false })); addObj({ type: 'decor', x: 420, y: 120, z: -760, mesh: sun });
+    addObj({ type: 'dock', name: 'Saltmarket', label: 'Land at Saltmarket', x: 0, z: 0, r: 13, mesh: mk(ringGeo(12, '#9be36b'), .1) });
+    addObj({ type: 'buoy', name: 'Jump buoy', label: 'Open the star map', x: 90, z: -330, r: 13, mesh: mk(ringGeo(12, '#6ad8ff'), .1) });
+    rocksAt(-240, -90, 130, 40); rocksAt(250, 150, 110, 30);
+    for (const [x, z] of [[-260, -110], [270, 170], [150, -280], [-180, 250]]) addObj({ type: 'wreck', name: 'Drifting wreck', x: x + rnd(-30, 30), z: z + rnd(-30, 30), r: 15, prog: 0, mesh: mk(wreckGeo(), .1) });
+    for (const [x, z] of [[-230, -70], [240, 130], [120, -260]]) pack(x, z, ['pirate', 'pirate', 'raider']).forEach(e => { e.name = e.kind === 'raider' ? 'Syndicate Gunship' : 'Syndicate Interceptor'; });
+    pack(-200, 270, ['raider', 'raider', 'pirate']).forEach(e => { e.name = e.kind === 'raider' ? 'Syndicate Gunship' : 'Syndicate Interceptor'; });
+    for (let i = 0; i < 4; i++) { const a = rng() * TAU; const e = spawn('bait', Math.cos(a) * 110, 40 + Math.sin(a) * 110, { team: 'neutral', name: 'Free hauler', lane: a }); e.hull = e.max = 9999; }
+  }
   const w = S.ext.wreck; if (w && w.sys === sys) F.wreck = addObj({ type: 'wreck', mine: true, name: 'Your lost cargo', x: w.x, z: w.z, r: 15, prog: 0, mesh: mk(wreckGeo(), .1) });
 }
 function rocksAt(cx, cz, rad, n) { for (let i = 0; i < n; i++) { const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * rad, s = 2 + Math.random() * 5, m = mk(rockGeo(), .05); m.scale.setScalar(s); m.rotation.set(rnd(0, 6), rnd(0, 6), rnd(0, 6)); const o = { x: cx + Math.cos(a) * d, z: cz + Math.sin(a) * d, r: s * 1.1, mesh: m, spin: rnd(-.3, .3) }; m.position.set(o.x, rnd(-2, 2), o.z); G.add(m); F.rocks.push(o); } }
@@ -197,12 +208,12 @@ function end() {
 export function launch() {
   if (S.zone !== 'ship' || F.on) return;
   const sys = Ship.here(); begin('system', sys);
-  F.obj = ''; say(sys === 'moon' ? 'Dustfall falls away beneath you' : 'Clear of lock six', 3);
+  F.obj = ''; say(sys === 'moon' ? 'Dustfall falls away beneath you' : sys === 'sunder' ? 'Sunder falls away, white and gold' : 'Clear of lock six', 3);
   chat('sys', null, `You take the helm. ${Ship.SYSTEMS[sys].name} drops away behind the Second Chance.`);
   const crew = (S.friends || [])[0]; if (crew && !S.ext.flown) setTimeout(() => chat('party', crew.name, "I'll be in the engine room keeping her in one piece. Try not to make that difficult, Captain."), 1800);
   S.ext.flown = (S.ext.flown || 0) + 1;
 }
-function dock() { const sys = F.sys, name = Ship.SYSTEMS[sys].name; end(); chat('sys', null, sys === 'moon' ? 'The Second Chance settles onto the pad at Dustfall Port.' : `The Second Chance noses into lock six at ${name}.`); }
+function dock() { const sys = F.sys, name = Ship.SYSTEMS[sys].name; end(); chat('sys', null, sys === 'moon' ? 'The Second Chance settles onto the pad at Dustfall Port.' : sys === 'sunder' ? 'The Second Chance settles onto the Saltmarket landing field.' : `The Second Chance noses into lock six at ${name}.`); }
 
 // ---------- fighting ----------
 function fire(e, isP) {
@@ -289,7 +300,7 @@ export function frame(dt, inp) {
     shots(dt, p);
     objects(dt, p);
     if (F.ev) F.ev.tick?.(dt);
-    else if (F.mode === 'system') { F.spawnT -= dt; if (F.spawnT <= 0 && hostiles().length < 9) { F.spawnT = rnd(45, 80); const a = Math.random() * TAU; const d = 330; const x = Math.cos(a) * d, z = Math.sin(a) * d; if (Math.hypot(x - p.x, z - p.z) > 160) pack(x, z, F.sys === 'moon' ? ['skiff', pick(['skiff', 'drone'])] : ['pirate', pick(['pirate', 'skiff', 'raider'])]); } }
+    else if (F.mode === 'system') { F.spawnT -= dt; if (F.spawnT <= 0 && hostiles().length < 9) { F.spawnT = rnd(45, 80); const a = Math.random() * TAU; const d = 330; const x = Math.cos(a) * d, z = Math.sin(a) * d; if (Math.hypot(x - p.x, z - p.z) > 160) pack(x, z, F.sys === 'moon' ? ['skiff', pick(['skiff', 'drone'])] : ['pirate', pick(['pirate', 'skiff', 'raider'])]).forEach(e => { if (F.sys === 'sunder') e.name = e.kind === 'raider' ? 'Syndicate Gunship' : 'Syndicate Interceptor'; }); } }
   }
   // drawing
   p.mesh.position.set(p.x, 0, p.z); p.mesh.rotation.set(0, p.yaw, p.bank, 'YXZ');

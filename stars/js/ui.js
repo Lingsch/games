@@ -350,7 +350,7 @@ function updateFrames() {
   const qn = QUESTS.filter(q => S.quests[q.id]?.state === 'done').length;
   if (qn) $('bookBtn').dataset.n = qn; else delete $('bookBtn').dataset.n;
 }
-const BUFF_ICON = { scroll: '📜', mounted: '🐎', guildbanner: '🏳️', fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
+const BUFF_ICON = { scroll: '📜', mounted: '🏍️', guildbanner: '🏳️', fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
   focusmind: '🎯', wolfspirit: '🐺', markwild: '🐾', poisonblades: '🗡️', restsong: '🎼', hastesong: '🥁', haste: '⏩', ward: '🛡️', shelter: '🔯', renew: '🌱', rejuv: '🍃', wild: '🌳', regrowth: '🍀',
   bear: '🐻', cat: '🐆', chain: '🤺', untouch: '🌪️', crescendo: '🎺', empower: '💪', unbound: '🌋', treeoflife: '🌲', guard: '🛡️', evade: '💨', shadowstep: '🌑', fists: '👐', crescendo2: '🎶' };
 for (const c in CLASSES) for (const [k, a] of Object.entries(CLASSES[c].abilities)) if (!BUFF_ICON[k]) BUFF_ICON[k] = a.icon;
@@ -945,7 +945,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Stars Beneath</h1><div class="sub">Build 2 · two thousand years after the Gravelord fell</div>`;
+  const head = `<h1>Stars Beneath</h1><div class="sub">Build 3 · two thousand years after the Gravelord fell</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

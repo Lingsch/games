@@ -31,6 +31,7 @@ import './moon1.js';
 import './moonq.js';
 import './models3.js';
 import * as Ship from './ship1.js';
+import './sunder3.js';
 import * as Flight from './flight2.js';
 
 UI.init();

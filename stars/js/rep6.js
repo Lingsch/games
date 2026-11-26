@@ -91,7 +91,7 @@ export function mount() {
   if (Cb.inCombat(h)) return "You can't mount in combat.";
   const c = Loot5.COLLECT[k]; S.ext.mount = k;
   mountUp(h, c.kind, c.scale, c.ride, c.spd);
-  S.party.forEach((p, i) => { if (p !== h && !p.dead) mountUp(p, MOUNT_FOR_FRIENDS[i % 4], 1, 1, c.spd); });
+  S.party.forEach((p, i) => { if (p !== h && !p.dead) mountUp(p, X.crewMount || MOUNT_FOR_FRIENDS[i % 4], 1, X.crewMount ? c.ride : 1, c.spd); });
   return null;
 }
 export function dismountAll() { for (const p of S.party) getOff(p); if (S.hero) getOff(S.hero); }
@@ -162,19 +162,19 @@ X.book.push(['rep', 'Rep', body => {
   if (!ms.length) body.appendChild(el('<p class="dim" style="margin:0">None yet.</p>'));
   for (const k of ms) {
     const c = Loot5.COLLECT[k], on = S.ext.mount === k;
-    const row = el(`<div class="who"><div><b>🐎 ${esc(c.name)}</b> <small>${Math.round(c.spd * 100)}% faster</small></div><button>${on ? (riding() ? 'Get off' : 'Ride') : 'Choose'}</button></div>`);
+    const row = el(`<div class="who"><div><b>🏍️ ${esc(c.name)}</b> <small>${Math.round(c.spd * 100)}% faster</small></div><button>${on ? (riding() ? 'Get off' : 'Ride') : 'Choose'}</button></div>`);
     row.querySelector('button').onclick = () => { if (!on) { S.ext.mount = k; if (riding()) { dismountAll(); } refreshSheet(); return; } const m = mount(); if (m) toast(m); refreshSheet(); };
     body.appendChild(row);
   }
 }]);
 
-// the 🐎 button sits beside the chair once you own a mount
+// the 🏍️ button sits beside the chair once you own a mount
 let mbT = 0;
 X.light.push(dt => {
   if ((mbT -= dt) > 0) return; mbT = .25;
   const b = document.getElementById('mountBtn'); if (!b) return;
   if (!b.onclick) b.onclick = () => { const m = mount(); if (m) X.ui.toast(m); };
-  b.classList.toggle('hide', !mounts().length); b.classList.toggle('on', riding()); b.textContent = riding() ? '🚶' : '🐎';
+  b.classList.toggle('hide', !mounts().length); b.classList.toggle('on', riding()); b.textContent = riding() ? '🚶' : '🏍️';
 });
 // the coast dungeons' collectibles: a pet, a title and a trophy each
 Object.assign(Loot5.COLLECT, {

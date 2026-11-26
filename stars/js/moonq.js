@@ -6,6 +6,7 @@ import { TALK } from './dialogue.js';
 import { LORE, SCENES } from './story.js';
 import * as Game from './game.js';
 import { LFG_D } from './social6.js';
+import { DEEDS } from './ach7.js';
 import { D1 } from './moon1.js';
 
 X.vend = { dust: 'Old Pell', half: 'Quartermaster Bix' };
@@ -134,6 +135,7 @@ Object.assign(LFG_D, {
   marrow: { name: 'The Wreck of the Marrow', lvl: [4, 5], zone: 'moon', at: () => ({ x: D1.marrow.x, z: D1.marrow.z + 52 }) },
 });
 X.hideTabs = ['trade', 'rep', 'deeds', 'raid'];
+DEEDS.length = 0;   // the old world's deeds do not count out here
 TALK.guard.bio = 'One of the constables who keep the peace out here, such as it is.';
 TALK.guard.greet = ['Move along, spacer. There is nothing to see here, and I intend to keep it that way.', "Stay out of trouble. If you can't manage that, at least stay out of my section."];
 

@@ -23,14 +23,16 @@ export const SYSTEMS = {
   core1: { name: 'Republic space', sub: 'Lanes closed to unregistered ships', x: .7, y: .78, locked: true, info: 'The Republic checks papers at every lane. The Second Chance has none.' },
   core2: { name: 'Imperial space', sub: 'Lanes closed to unregistered ships', x: .3, y: .16, locked: true, info: 'The Empire does not check papers. It checks ships, and keeps the ones it likes.' },
 };
-const LANES = [['moon', 'halfway'], ['halfway', 'core1'], ['halfway', 'core2'], ['halfway', 'sarn']];
+export const LANES = [['moon', 'halfway'], ['halfway', 'sunder'], ['halfway', 'core1'], ['halfway', 'core2'], ['halfway', 'sarn']];
+export const PADS = { moon: { x: D1.pad.x, z: D1.pad.z + 17 } };   // where you stand after walking down the ramp
+const open = s => s && s.zone && (!s.need || s.need());
 export const here = () => SYSTEMS[S.ext?.sys] ? S.ext.sys : 'moon';
 X.noFakes = ['ship', 'halfway'];
 X.gate = X.gate || {};
 X.gate.ship = () => S.flags.ship ? null : 'The ramp is locked. A port impound seal blinks on the hatch.';
 X.arrive = (zone, from) => {
   if (zone === 'ship') return { x: 0, z: 60 };
-  if (zone === 'moon' && from === 'ship') return { x: D1.pad.x, z: D1.pad.z + 17 };
+  if (from === 'ship' && PADS[zone]) return { ...PADS[zone] };
   if (zone === 'halfway') return { x: 0, z: 60 };
   return null;
 };
@@ -116,11 +118,11 @@ function mapCanvas(sel) {
   const g = c.getContext('2d'), px = s => [s.x * 600, s.y * 380];
   for (let i = 0; i < 140; i++) { g.fillStyle = `rgba(255,255,255,${.15 + ((i * 37) % 10) / 22})`; g.fillRect((i * 7919) % 600, (i * 104729) % 380, 1.5, 1.5); }
   g.lineWidth = 1.5;
-  for (const [a, b] of LANES) { const A = SYSTEMS[a], B = SYSTEMS[b], open = !A.locked && !B.locked && !A.dark && !B.dark; g.strokeStyle = open ? 'rgba(106,216,255,.7)' : 'rgba(160,170,190,.25)'; g.setLineDash(open ? [] : [5, 6]); g.beginPath(); g.moveTo(...px(A)); g.lineTo(...px(B)); g.stroke(); }
+  for (const [a, b] of LANES) { const A = SYSTEMS[a], B = SYSTEMS[b]; if (!A || !B) continue; const open = !A.locked && !B.locked && !A.dark && !B.dark && (!A.need || A.need()) && (!B.need || B.need()); g.strokeStyle = open ? 'rgba(106,216,255,.7)' : 'rgba(160,170,190,.25)'; g.setLineDash(open ? [] : [5, 6]); g.beginPath(); g.moveTo(...px(A)); g.lineTo(...px(B)); g.stroke(); }
   g.setLineDash([]);
   for (const [k, s] of Object.entries(SYSTEMS)) { const [x, y] = px(s);
     if (s.dark) { g.strokeStyle = '#ff3a2a'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 9, 0, TAU); g.stroke(); g.fillStyle = '#070b14'; g.beginPath(); g.arc(x, y, 7, 0, TAU); g.fill(); }
-    else { g.fillStyle = s.locked ? '#7a8496' : '#ffe0a0'; g.beginPath(); g.arc(x, y, s.locked ? 5 : 7, 0, TAU); g.fill(); }
+    else { g.fillStyle = s.locked || (s.need && !s.need()) ? '#7a8496' : '#ffe0a0'; g.beginPath(); g.arc(x, y, s.locked ? 5 : 7, 0, TAU); g.fill(); }
     if (k === here()) { g.strokeStyle = '#9be36b'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 13, 0, TAU); g.stroke(); }
     if (k === sel) { g.strokeStyle = '#ffffff'; g.lineWidth = 1.5; g.strokeRect(x - 17, y - 17, 34, 34); }
     g.fillStyle = s.dark ? '#ff8a7a' : s.locked ? '#9aa4b6' : '#eee4cc'; g.font = '600 15px sans-serif'; g.textAlign = 'center'; g.fillText(s.name, x, y + 31); }
@@ -134,12 +136,13 @@ export function openStarMap() {
     const s = SYSTEMS[sel], card = document.createElement('div'); card.className = 'card'; card.style.textAlign = 'left';
     card.innerHTML = `<h3 style="margin:0">${s.name}</h3><p class="dim" style="margin:2px 0 6px">${s.sub}${sel === here() ? ' · you are here' : ''}</p><p style="margin:0 0 8px">${s.info}</p>`;
     const linked = LANES.some(([a, b]) => (a === here() && b === sel) || (b === here() && a === sel));
-    if (sel !== here() && s.zone && linked) { const b = document.createElement('button'); b.className = 'pri'; b.textContent = `Jump to ${s.name}`; b.style.width = '100%'; b.onclick = () => { UI.closeSheet(); jump(sel); }; card.appendChild(b); }
+    if (sel !== here() && s.zone && linked && s.need && !s.need()) { const p = document.createElement('p'); p.className = 'dim'; p.style.margin = '0'; p.textContent = s.why || 'The core has no fix for this lane yet.'; card.appendChild(p); }
+    else if (sel !== here() && s.zone && linked) { const b = document.createElement('button'); b.className = 'pri'; b.textContent = `Jump to ${s.name}`; b.style.width = '100%'; b.onclick = () => { UI.closeSheet(); jump(sel); }; card.appendChild(b); }
     body.appendChild(card);
   });
 }
 export function jump(to) {
-  if (S.zone !== 'ship' || !SYSTEMS[to]?.zone || to === here()) return;
+  if (S.zone !== 'ship' || !open(SYSTEMS[to]) || to === here()) return;
   if (X.jumpEvent && X.jumpEvent(to, () => arrive(to))) return;     // Build 2: a jump can be broken on the way
   arrive(to);
 }
@@ -161,7 +164,7 @@ function arrive(to) {
 export const CREW = { juno: { name: 'Juno Tak', pal: 1, flag: 'crew1', hi: "Juno Tak, signing on. Point me at whatever's broken, Captain, and that includes people." } };
 X.recruit = key => {
   const c = CREW[key]; if (!c || S.flags[c.flag]) return;
-  const role = CLASSES[S.heroCls].role, cls = role === 'healer' ? 'bulwark' : 'cleric';   // she fills the job the captain does not
+  const role = CLASSES[S.heroCls].role, cls = c.pick ? c.pick(role) : role === 'healer' ? 'bulwark' : 'cleric';   // each fills a job the captain does not
   S.flags[c.flag] = key; S.friends = S.friends || []; S.friends.push({ name: c.name, pal: c.pal, persona: 'friendly', cls });
   const f = Game.addMate({ name: c.name, cls, lvl: S.hero.lvl, pal: c.pal, persona: 'friendly', guild: null, friend: true, bff: true }, S.hero);
   chat('sys', null, `${c.name} joins your crew.`); chat('party', f.name, c.hi);
