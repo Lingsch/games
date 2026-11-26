@@ -173,5 +173,5 @@ X.turnin.push(q => { if (q.daily) { S.ext.daily = S.ext.daily || {}; S.ext.daily
 let dayT = 0;
 X.tick.push(dt => {
   if ((dayT -= dt) > 0) return; dayT = 20; const t = today();
-  for (const q of QUESTS) if (q.daily && S.quests[q.id]?.state === 'turned' && S.ext.daily?.[q.id] !== t) delete S.quests[q.id];
+  for (const q of QUESTS) if (q.daily && S.quests[q.id]?.state === 'turned' && S.ext.daily?.[q.id] !== t) { delete S.quests[q.id]; if (S.used) delete S.used[q.id]; }
 });

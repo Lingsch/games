@@ -1,5 +1,5 @@
 // Build 5: professions. Gather from nodes in the world and from what enemies leave behind; craft at stations in town.
-// One hero can learn every profession. Skills run 1-100; recipes come from the trainers or, the rare ones, from dungeon bosses.
+// One hero can learn every profession. Skills run 1-125 inside and show as 1-50 (Build 10: two points of skill for every level of gear); recipes come from the trainers or, the rare ones, from dungeon bosses.
 import { S, TAU, rnd, irnd, pick, chat, floatText, mulberry32, clamp, X, WH } from './core.js';
 import { world, hgt, regionAt, depthAt } from './world.js';
 import { CLASSES, MOBS, WTYPE, BASE_NAMES, makeItem, GIVERS } from './data.js';
@@ -101,6 +101,8 @@ export const rareFrom = d => R.filter(r => r.rare === d);
 export function addRecipe(id, prof, name, req, mats, out, rare = null) { rec(id, prof, name, req, mats, out, rare); RECIPES[id] = R[R.length - 1]; }
 
 // ---------- state ----------
+// Build 10: skill shows at two points per level of what it makes: 50 makes level-25 gear
+export const SKILL_CAP = 125, shown = v => v == null ? v : Math.max(1, Math.round(v * .4));
 export function initState() { S.prof = S.prof || {}; S.mats = S.mats || {}; S.recipes = S.recipes || []; S.cons = S.cons || {}; }
 export const skill = (p, who) => who ? (who.craft && (who.craft.gather === p || who.craft.make === p) ? (who.craft.skill?.[p] ?? 1) : null) : S.prof?.[p] ?? null;      // null: not learned
 // friends can be given one gathering job and one crafting job; they level those skills themselves
@@ -113,9 +115,9 @@ export const knows = (r, who) => skill(r.prof, who) !== null && (!r.rare || S.re
 export function learn(p) { initState(); if (S.prof[p] != null) return false; S.prof[p] = 1; chat('sys', null, `You learn ${PROFS[p].name}.`); return true; }
 export function addMat(k, n = 1, quiet) { initState(); S.mats[k] = (S.mats[k] || 0) + n; if (!quiet) chat('loot', null, `You gather ${n} ${MATS[k].name}.`); }
 export function skillUp(p, req, who) {
-  const s = skill(p, who); if (s == null || s >= 100) return;
+  const s = skill(p, who); if (s == null || s >= SKILL_CAP) return;
   const ch = s < req + 15 ? 1 : s < req + 30 ? .5 : s < req + 45 ? .2 : 0;
-  if (Math.random() < ch) { if (who) who.craft.skill[p] = s + 1; else S.prof[p] = s + 1; const ent = who ? S.party.find(x => x.name === who.name) : S.hero; if (ent) floatText(ent, `${PROFS[p].name} ${s + 1}`, '#8fe8ff'); }
+  if (Math.random() < ch) { if (who) who.craft.skill[p] = s + 1; else S.prof[p] = s + 1; const ent = who ? S.party.find(x => x.name === who.name) : S.hero; if (ent) { if (shown(s + 1) !== shown(s)) floatText(ent, `${PROFS[p].name} ${shown(s + 1)}`, '#8fe8ff'); } }
 }
 export const learnRecipe = id => { initState(); if (S.recipes.includes(id)) return false; S.recipes.push(id); chat('sys', null, `You learn a rare recipe: ${RECIPES[id].name}.`); return true; };
 
@@ -141,18 +143,20 @@ export function haveMats(r, n = 1) { return Object.entries(r.mats).every(([k, v]
 export function craft(id, G, who = null) {
   initState();
   const r = RECIPES[id]; if (!r || !knows(r, who)) return "You don't know that recipe.";
-  if (skill(r.prof, who) < r.req) return `${who ? who.name + ' needs' : 'You need'} ${PROFS[r.prof].name} ${r.req}.`;
+  if (skill(r.prof, who) < r.req) return `${who ? who.name + ' needs' : 'You need'} ${PROFS[r.prof].name} ${shown(r.req)}.`;
   if (!haveMats(r)) return "You don't have the materials.";
   const o = r.out;
   if (o.ench) { const it = S.gear[S.heroCls][o.slot]; if (!it) return `You have no ${o.slot} equipped to enchant.`; }
   if ((o.slot || o.tome) && !o.ench && S.bag.length >= 30) return 'Your bags are full.';
+  if (o.need && !o.need()) return o.needWhy || "You can't make that here.";
   for (const [k, v] of Object.entries(r.mats)) S.mats[k] -= v;
   if (o.pot) { S.pots[o.pot] = (S.pots[o.pot] || 0) + o.n; chat('loot', null, `You make ${r.name}.`); }
   else if (o.cons) { S.cons[o.cons] = (S.cons[o.cons] || 0) + o.n; chat('loot', null, `You make ${o.n} ${CONS[o.cons].name}.`); }
   else if (o.mat) { craftHooks.mat(o.mat, o.n); chat('loot', null, `${who ? who.name + ' makes' : 'You make'} ${r.name}.`); }
   else if (o.tome) { const it = craftHooks.tome(o.tome); G.addToBag(it); chat('loot', null, `${who ? who.name + ' writes' : 'You write'} a ${it.name}.`); }
   else if (o.ench) { const it = S.gear[S.heroCls][o.slot]; if (it.ench) it.stats[it.ench.stat] = Math.max(0, (it.stats[it.ench.stat] || 0) - it.ench.n); it.ench = { stat: o.ench, n: o.n, name: r.name.replace(/^Enchant \w+: /, '') }; it.stats[o.ench] = +((it.stats[o.ench] || 0) + o.n).toFixed(1); G.applyGear(S.hero, S.gear[S.heroCls]); chat('loot', null, `${it.name} glows: ${it.ench.name}.`); }
-  else { const it = makeGear(r); G.addToBag(it); chat('loot', null, `${who ? who.name + ' makes' : 'You make'} ${it.name}.`); }
+  else if (o.furn && craftHooks.furn) { craftHooks.furn(o.furn, o.n || 1); chat('loot', null, `${who ? who.name + ' makes' : 'You make'} ${r.name}.`); }
+  else { const it = makeGear(r); if (craftHooks.gear) craftHooks.gear(it, r, who); G.addToBag(it); chat('loot', null, `${who ? who.name + ' makes' : 'You make'} ${it.name}.`); }
   skillUp(r.prof, r.req, who);
   G.save();
   return null;
@@ -174,17 +178,17 @@ export function useCons(k) {
 // ---------- gathering from what enemies leave behind ----------
 export function mobMats(m) {
   initState();
-  const D = MOBS[m.mob] || {}, L = m.lvl, tier = L < 6 ? 0 : L < 11 ? 1 : 2, got = [];
+  const D = MOBS[m.mob] || {}, L = m.lvl, tier = L < 6 ? 0 : L < 11 ? 1 : L < 20 ? 2 : 3, got = [];
   if (D.beast) {
     if (Math.random() < .45) got.push([m.mob === 'crab' || m.mob === 'crabbig' ? 'crabmeat' : 'meat', 1]);
     const sk = skill('skinning') !== null ? null : friendWith('gather', 'skinning'), sv = skill('skinning', sk);
-    if (sv !== null) { const h = ['lighthide', 'thickhide', 'scalehide'][tier], req = [1, 40, 75][tier]; if (sv >= req) { got.push([h, irnd(1, 2)]); skillUp('skinning', req, sk); } }
+    if (sv !== null) { const h = ['lighthide', 'thickhide', 'scalehide', 'wyrmhide'][tier], req = [1, 40, 75, 100][tier]; if (sv >= req) { got.push([h, irnd(1, 2)]); skillUp('skinning', req, sk); } }
   }
   if (m.mob === 'crab' || m.mob === 'crabbig') { if (Math.random() < .5) got.push(['crabmeat', 1]); }
-  if (D.human && Math.random() < .35) got.push([['linen', 'wool', 'seasilk'][tier], irnd(1, 2)]);
+  if (D.human && Math.random() < .35) got.push([['linen', 'wool', 'seasilk', 'moonweave'][tier], irnd(1, 2)]);
   if (D.undead && Math.random() < .3) got.push(['bonedust', 1]);
-  if (D.ore && Math.random() < .6) got.push([tier < 2 ? 'iron' : 'silver', irnd(1, 2)]);
-  if (m.named && Math.random() < .5) got.push([['garnet', 'moonstone', 'pearl'][tier], 1]);
+  if (D.ore && Math.random() < .6) got.push([tier < 2 ? 'iron' : tier < 3 ? 'silver' : 'starsteel', irnd(1, 2)]);
+  if (m.named && Math.random() < .5) got.push([['garnet', 'moonstone', 'pearl', 'starstone'][tier], 1]);
   for (const [k, n] of got) addMat(k, n, true);
   if (got.length) chat('loot', null, `You gather ${got.map(([k, n]) => `${n} ${MATS[k].name}`).join(', ')}.`);
 }
@@ -280,13 +284,13 @@ const lootLine = got => got.map(([k, n]) => `${n} ${MATS[k].name}`).join(' and '
 export function nodeLabel(p) {
   const n = p.node; if (!n || p.depleted) return null;
   const prof = NODE_PROF[n.type];
-  return `${NODE_VERB[n.type]}: ${p.name}${skill(prof) === null ? ' (needs ' + PROFS[prof].name + ')' : S.prof[prof] < n.req ? ` (needs ${n.req})` : ''}`;
+  return `${NODE_VERB[n.type]}: ${p.name}${skill(prof) === null ? ' (needs ' + PROFS[prof].name + ')' : S.prof[prof] < n.req ? ` (needs ${shown(n.req)})` : ''}`;
 }
 export function gather(e) {
   initState();
   const p = e.prop, n = p.node, prof = NODE_PROF[n.type];
   if (skill(prof) === null) { chat('sys', null, `You need to learn ${PROFS[prof].name}. A trainer can teach you.`); return false; }
-  if (S.prof[prof] < n.req) { chat('sys', null, `You need ${PROFS[prof].name} ${n.req} to gather this.`); return false; }
+  if (S.prof[prof] < n.req) { chat('sys', null, `You need ${PROFS[prof].name} ${shown(n.req)} to gather this.`); return false; }
   const got = rollNode(n, null); for (const [k, c] of got) addMat(k, c, true);
   if (got.length) chat('loot', null, `You gather ${lootLine(got)}.`);
   skillUp(prof, n.req);

@@ -104,7 +104,7 @@ defineZone('north', {
   rares: [[[100, 480, -40, 250], 'oldwhite', 22, false], [[-480, 100, -240, 250], 'thestillqueen', 23, true]],
   hunt: [{ area: 0, lvl: [20, 21] }, { area: 1, lvl: [21, 22] }, { area: 2, lvl: [22, 23] }, { area: 3, lvl: [23, 24] }, { area: 4, lvl: [24, 25] }],
   labels: [{ t: 'Wolves, bears (20-21)', x: 0, z: 300 }, { t: 'The Pines (21-22)', x: 300, z: 160 }, { t: 'The Frozen Field (22-23)', x: -200, z: 20 }, { t: 'Trolls, elementals (23-24)', x: 300, z: -100 }, { t: 'Kaldmark (24-25)', x: 0, z: -360 }],
-  nodes: [['rimeiron', 'ore', 'oreiron', 90, null, 24], ['frostbloom', 'herb', 'herbmeadow', 90, null, 24]],
+  nodes: [['rimeiron', 'ore', 'oreiron', 100, null, 24], ['frostbloom', 'herb', 'herbmeadow', 100, null, 24]],
   scenery: { density: 22000, tuft: '#c8d8e0', kinds: [['snowpine', .05, 1.2, 2.4], ['icerock', .01, .8, 1.8], ['dead', .004, 1, 1.6]] },
   sky: { fog: '#c8d8e8', top: '#7a9ab8', hor: '#e8f0f8', k: .5, far: 220 },
 });

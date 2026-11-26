@@ -308,7 +308,8 @@ export function inspectLabel(e) {
   const p = e.prop; if (!p) return null;
   if (p.node) return Craft.nodeLabel(p);
   if (p.station) return `Craft: ${Craft.STATIONS[p.station].name}`;
-  if (needFor(p)) return (OBJ_VERB[p.tag] || 'Inspect') + (p.tag.startsWith('clue') ? ': ' + p.name : '');
+  if (p.use && X.propLabel) { const l = X.propLabel(e); if (l) return l; }
+  if (needFor(p)) return (OBJ_VERB[p.tag] || X.objVerb?.[p.tag] || 'Inspect') + (p.tag.startsWith('clue') ? ': ' + p.name : '');
   if (p.lore && !S.lore[p.lore]) return 'Read: ' + LORE[p.lore].title;
   return null;
 }
@@ -316,6 +317,7 @@ export function inspect(e) {
   const p = e.prop, h = S.hero; if (!p || dist(h, e) > 6) return null;
   if (p.node) { Craft.gather(e); save(); return null; }
   if (p.station) return { station: p.station };
+  if (p.use && X.propUse) { X.propUse(e); save(); return null; }
   const q = needFor(p);
   let read = null;
   if (q) {
@@ -381,7 +383,7 @@ export function fill(t) {
 // a fake player (from saved data) joins your group beside you
 export function addMate(d, hero) {
   const f = Cb.makeHuman(d.cls, d.lvl, { name: d.name, pal: d.pal || 1, x: hero.x + rnd(-2.5, 2.5), z: hero.z + rnd(-2.5, 2.5) });
-  f.kind = CLASSES[d.cls].models[d.pal || 1]; f.xp = d.xp || 0; f.bonusPow = d.bonusPow || 0; f.bonusSta = d.bonusSta || 0; f.bonusArm = d.bonusArm || 0;
+  f.kind = CLASSES[d.cls].models[Math.min(d.pal || 1, 2)]; f.xp = d.xp || 0; f.bonusPow = d.bonusPow || 0; f.bonusSta = d.bonusSta || 0; f.bonusArm = d.bonusArm || 0;
   f.fake = { persona: d.persona, guild: d.guild, mood: d.mood || 0, friend: !!d.friend, bff: !!d.bff, state: 'party', group: null };
   fakeGear(f); f.hp = Math.max(1, Math.round(f.maxHp * (d.hp ?? 1))); f.res = d.res !== undefined ? f.resMax * d.res : startRes(f);
   f.inParty = true; S.party.push(f); S.fakes.push(f);
@@ -499,7 +501,7 @@ function makeFakes(saved, zone = 'vale') {
     const pal = sv ? sv.pal : 1 + (i % 2);
     const inTown = i % 2 === 0;
     const e = Cb.makeHuman(cls, lvl, { name: sv ? sv.name : names[i % names.length], pal, x: tw.x + rnd(-12, 12), z: tw.z + rnd(-12, 12) });
-    e.kind = CLASSES[cls].models[pal];
+    e.kind = CLASSES[cls].models[Math.min(pal, 2)];
     e.xp = sv ? sv.xp : 0; e.bonusPow = sv?.bonusPow || 0; e.bonusSta = sv?.bonusSta || 0; e.bonusArm = sv?.bonusArm || 0;
     e.fake = { persona: sv ? sv.persona : pick(PERSONAS), guild: sv ? sv.guild : (Math.random() < .55 ? pick(GUILDS) : null), mood: sv ? sv.mood : 0, friend: sv ? sv.friend : false, state: inTown ? 'town' : 'hunt', until: S.time + rnd(20, 200), group: null };
     fakeGear(e); e.hp = e.maxHp; e.res = startRes(e);
@@ -612,7 +614,7 @@ export function askSuspect(q, key) {
 }
 // a raid holds 12; everything else holds 6
 export const partyCap = () => S.ext?.raid12 ? 12 : 6;
-export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.forCls && S.heroCls !== q.forCls) return 'locked'; if (q.when && !q.when()) return 'locked'; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned' && !(X.preAlt?.[q.pre] || []).some(id => S.quests[id]?.state === 'turned')) return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
+export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.forCls && S.heroCls !== q.forCls) return 'locked'; if (q.when && !q.when()) return 'locked'; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned' && !(X.preAlt?.[q.pre] || []).some(id => S.quests[id]?.state === 'turned')) return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.pre3 && S.quests[q.pre3]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
 export function acceptQuest(q) {
   S.quests[q.id] = { state: q.obj.talk ? 'done' : 'active', n: 0 };
   if (S.declined) delete S.declined[q.id];
@@ -721,6 +723,7 @@ Cb.setHooks({
     let a = amt * (1 + xpBoost() + (X.xpBonus ? X.xpBonus() : 0)) * X.xpMul.reduce((k, f) => k * f(), 1);
     // veteran xp, earned while another class sat at the cap, doubles what this class earns until it runs out
     if (!(lockedAt10() && p.lvl >= 10) && p.lvl < MAX_LVL && S.vetXp > 0) { const x = Math.min(a, S.vetXp); S.vetXp -= x; a += x; }
+    if (X.rested) a = X.rested(p, a);
     return a;
   },
   onOverflow(p, over) { if (over > 0) S.vetXp = Math.min(40000, (S.vetXp || 0) + Math.round(over)); },

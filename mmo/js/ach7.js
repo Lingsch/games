@@ -31,7 +31,7 @@ export const DEEDS = [
   ['raid', 'Between Worlds', 'Defeat the Gravelord.', () => !!S.flags?.gravelordDead, { gold: 100 }],
   ['raidall', 'Rift-Walker', 'Defeat every boss in Between Worlds.', () => ['gatewarden', 'bonefather', 'sorrow', 'spite', 'choir', 'colossus', 'nocturne', 'engine', 'gravelord'].every(fin), { title: 'the Rift-Walker' }],
   ['case3', 'Three for Three', 'Name the right killer in all three murder cases.', () => S.flags?.case1 === 'linus' && ['rennick', 'linus'].includes(S.flags?.case2) && S.flags?.case3 === 'tally', { title: 'the Unfooled' }],
-  ['prof', 'Master Crafter', 'Reach 100 in any profession.', () => Object.values(S.prof || {}).some(v => v >= 100), { title: 'the Master Crafter' }],
+  ['prof', 'Master Crafter', 'Reach 50 in any profession.', () => Object.values(S.prof || {}).some(v => v >= 125), { title: 'the Master Crafter' }],
   ['g500', 'Busy Hands', 'Gather from 500 nodes, pools or wrecks.', () => C().gathered >= 500, { gold: 30 }],
   ['ex1', 'Exalted', 'Reach Exalted with any faction.', () => Object.keys(Rep.FACTIONS).some(f => Rep.standing(f) >= 4), { gold: 50 }],
   ['ex5', 'Beloved of the Realm', 'Reach Exalted with all five factions.', () => Object.keys(Rep.FACTIONS).every(f => Rep.standing(f) >= 4), { title: 'the Beloved' }],

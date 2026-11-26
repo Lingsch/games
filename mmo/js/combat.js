@@ -21,7 +21,7 @@ export function makeEnt(o) {
 // a player-class body: the hero, a companion or a fake player
 export function makeHuman(cls, lvl, o = {}) {
   const C = CLASSES[cls];
-  const e = makeEnt({ team: 'ally', cls, lvl, resType: C.res, spd: 7, kind: C.models[o.pal || 0], ...o });
+  const e = makeEnt({ team: 'ally', cls, lvl, resType: C.res, spd: 7, kind: C.models[Math.min(o.pal || 0, C.models.length - 1)], ...o });
   recalc(e); e.hp = e.maxHp; e.res = startRes(e);
   return e;
 }

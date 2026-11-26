@@ -506,6 +506,7 @@ function mezAdd(e, t, g, key) {
 }
 function fight(e, t, group) {
   const n = Cb.enemiesNear(e, e, 9).filter(m => !cc(m)).length;
+  if (aiHooks.preFight?.(e, t, group, n)) return true;
   const brain = BRAINS[e.cls];
   return brain ? brain(e, t, group, n) : false;
 }
@@ -564,6 +565,7 @@ export const PULL_AB = { bulwark: 'taunt', wardancer: 'challenge', bladewarden: 
 
 // ---------- your companions ----------
 export const aiHooks = {};
+export { tryUse, ready, isTank, isHealer, cc, mezNear, hpPct, stopMove };
 export function companionAI(e, dt) {
   const hero = S.hero, group = S.party;
   if (e.dead || e.onBoat) return;
@@ -572,6 +574,7 @@ export function companionAI(e, dt) {
   if (e.forceTo) { const f = e.forceTo; if (S.time > f.until || f.g && f.g.t <= 0) e.forceTo = null; else if (Math.hypot(e.x - f.x, e.z - f.z) > (f.r || 1.2)) { e.sit = false; e.casting = null; goTo(e, f.x, f.z, dt, (f.r || 1.2) * .7, 1.15); return; } }
   if (e.casting) { stopMove(e, dt); if (e.casting.tgt && e.casting.tgt !== e) face(e, e.casting.tgt, dt); return; }
   if (escapeDanger(e, dt)) return;
+  if (aiHooks.position?.(e, dt, group)) return;
   const role = CLASSES[e.cls].role;
   const allFoes = groupFoes(group);
   const foes = allFoes.filter(m => !cc(m)).length ? allFoes.filter(m => !cc(m)) : allFoes;
@@ -703,6 +706,7 @@ export function companionAI(e, dt) {
     else { stopMove(e, dt); face(e, n, dt); e.anim.atk = .6; g.t += dt; if (g.t > 1.6) aiHooks.gathered?.(e); return; }
   }
   if (upkeepBuffs(e, group)) return;
+  if (aiHooks.job?.(e, dt)) return;
   // follow in formation, rest when the group rests
   const slot = group.indexOf(e), ring = slot >= 6 ? 1 : 0, a = formYaw() + Math.PI + ((slot % 6) - 3) * .5 + ring * .25, r = 3 + (slot % 2) * 1.6 + ring * 3.4;
   const fx = hero.x + Math.sin(a) * r, fz = hero.z + Math.cos(a) * r;

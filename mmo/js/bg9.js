@@ -96,7 +96,7 @@ function startMatch(key) {
 function endMatch(won, quiet) {
   if (!M) return; const b = M.b, key = M.key; M.over = true;
   for (const e of [...M.enemies, ...M.towers]) { e.dead = true; e.remove = true; } if (M.general) { M.general.remove = true; } if (M.ourGeneral) M.ourGeneral.remove = true;
-  M = null; S.ext.bgKey = null;
+  M = null; S.ext.bgKey = null; for (const p of S.party) p.bgJob = null;
   // the players the battlemaster found for you go their own way
   const pre = S.ext.bgPre; if (pre) { for (const p of [...S.party]) if (!p.isHero && !pre.includes(p.name)) Game.kick(p); S.ext.bgPre = null; }
   if (quiet) return;
@@ -132,7 +132,7 @@ X.tick.push(dt => {
   M.enemies = M.enemies.filter(e => !e.remove);
   if (b.how === 'ctf') ctf(dt, b, h); else if (b.how === 'hold') hold(dt, b, h); else war(dt, b, h);
   if (!M) return;
-  if (M && tk > .5) { tk = 0; steer(.5, b); }
+  if (M && tk > .5) { tk = 0; steer(.5, b); jobs(b); }
   if (M && M.t > b.time) endMatch(M.score[0] > M.score[1] ? true : M.score[0] < M.score[1] ? false : null);
 });
 // the rivals march: each one has a job, and goes to do it when nothing is in front of them
@@ -150,10 +150,38 @@ function steer(dt, b) {
     if (b.how === 'war' && Math.hypot(e.x - goal.x, e.z - goal.z) < 18 && !goal.dead) Cb.addThreat(e, goal, 5);
   }
 }
+// Build 10: the players the battlemaster finds for you play the objective; your own companions stay with you
+const fillIns = () => S.party.filter(p => !p.isHero && !p.dead && !(S.ext.bgPre || []).includes(p.name));
+function jobs(b) {
+  const F = fillIns(), h = H();
+  for (const p of S.party) if (!F.includes(p)) p.bgJob = null;
+  F.forEach((p, i) => {
+    let j = null;
+    if (b.how === 'ctf') {
+      if (M.flag.carrier === p) j = { ...b.home, run: true };
+      else if (i === 0 && F.length > 2) j = { ...b.home, r: 6 };
+      else if (M.flag.theirCarrier && !M.flag.theirCarrier.dead) j = { x: M.flag.theirCarrier.x, z: M.flag.theirCarrier.z, r: 3 };
+      else if (M.flag.carrier && !M.flag.carrier.dead) j = { x: M.flag.carrier.x, z: M.flag.carrier.z, r: 4 };
+      else j = { ...b.away, r: 2 };
+    } else if (b.how === 'hold') {
+      const pts = M.points.slice().sort((a, c) => (a.owner === 1) - (c.owner === 1) || Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(c.x - p.x, c.z - p.z));
+      const want = pts.filter(q => q.owner !== 1), pt = want.length ? want[i % want.length] : M.points[i % M.points.length];
+      j = { x: pt.x, z: pt.z, r: 5 };
+    } else {
+      const ourHit = M.towers.find(t => t.bgTower === 'ours' && !t.dead && M.enemies.some(e => !e.dead && dist(e, t) < 25));
+      const theirs = M.towers.filter(t => t.bgTower === 'theirs' && !t.dead).sort((a, c) => dist(a, p) - dist(c, p))[0];
+      const goal = i % 3 === 0 && ourHit ? ourHit : theirs || M.general;
+      if (goal && !goal.dead) j = { x: goal.x, z: goal.z, r: goal === ourHit ? 6 : 14 };
+    }
+    p.bgJob = j;
+  });
+}
+X.bgJobs = () => M ? fillIns().map(p => p.bgJob) : [];
 function ctf(dt, b, h) {
   // take their banner
-  if (M.flag.theirs === 'home' && !h.dead && Math.hypot(h.x - b.away.x, h.z - b.away.z) < 4) { M.flag.theirs = 'carried'; M.flag.carrier = h; Cb.buff(h, 'redbanner', 9999, { slow: .15 }, h); chat('sys', null, 'You have the red banner! Bring it home!'); X.ui?.toast?.('You have the banner!'); for (const e of M.enemies) if (!e.dead) Cb.addThreat(e, h, 3); }
-  if (M.flag.carrier === h && M.flag.ours === 'home' && Math.hypot(h.x - b.home.x, h.z - b.home.z) < 5) { M.score[0]++; M.flag.carrier = null; M.flag.theirs = 'home'; h.buffs = h.buffs.filter(x => x.id !== 'redbanner'); chat('sys', null, `Captured! Silver ${M.score[0]}, Red ${M.score[1]}.`); X.ui?.toast?.('Banner captured!'); }
+  if (M.flag.theirs === 'home') { const c = S.party.find(p => !p.dead && Math.hypot(p.x - b.away.x, p.z - b.away.z) < 4); if (c) { M.flag.theirs = 'carried'; M.flag.carrier = c; Cb.buff(c, 'redbanner', 9999, { slow: .15 }, c); if (c === h) { chat('sys', null, 'You have the red banner! Bring it home!'); X.ui?.toast?.('You have the banner!'); } else chat('party', c.name, 'Got their banner! Cover me, I\'m running it home!'); for (const e of M.enemies) if (!e.dead) Cb.addThreat(e, c, 3); } }
+  if (M.flag.carrier && M.flag.carrier !== h && M.flag.carrier.dead) { const c = M.flag.carrier; c.buffs = c.buffs.filter(x => x.id !== 'redbanner'); M.flag.carrier = null; M.flag.theirs = 'home'; chat('sys', null, `${c.name} has fallen. The red banner returns to its camp.`); }
+  { const c = M.flag.carrier; if (c && !c.dead && M.flag.ours === 'home' && Math.hypot(c.x - b.home.x, c.z - b.home.z) < 5) { M.score[0]++; M.flag.carrier = null; M.flag.theirs = 'home'; c.buffs = c.buffs.filter(x => x.id !== 'redbanner'); chat('sys', null, `${c === h ? 'Captured!' : c.name + ' captures the banner!'} Silver ${M.score[0]}, Red ${M.score[1]}.`); X.ui?.toast?.('Banner captured!'); } }
   // they take yours
   if (M.flag.ours === 'home') { const r = M.enemies.find(e => !e.dead && Math.hypot(e.x - b.home.x, e.z - b.home.z) < 4); if (r) { M.flag.ours = 'carried'; M.flag.theirCarrier = r; chat('sys', null, `${r.name} has taken the silver banner! Stop them!`); X.ui?.toast?.('They have your banner!'); } }
   const tc = M.flag.theirCarrier; if (tc && !tc.dead && Math.hypot(tc.x - b.away.x, tc.z - b.away.z) < 5) { M.score[1]++; M.flag.theirCarrier = null; M.flag.ours = 'home'; chat('sys', null, `They captured your banner. Silver ${M.score[0]}, Red ${M.score[1]}.`); }

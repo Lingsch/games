@@ -109,7 +109,7 @@ defineZone('deep', {
   rares: [[[-480, -120, -200, 200], 'thepalegrub', 22, false], [[-120, 480, -460, -230], 'oldlamplighter', 24, true]],
   hunt: [{ area: 0, lvl: [20, 21] }, { area: 1, lvl: [21, 22] }, { area: 2, lvl: [22, 23] }, { area: 3, lvl: [23, 24] }, { area: 4, lvl: [24, 25] }],
   labels: [{ t: 'Crawlers, boars (20-21)', x: 0, z: 290 }, { t: 'The Fungal Reach (21-22)', x: -300, z: 40 }, { t: 'Golems, trolls (22-23)', x: 300, z: -40 }, { t: 'The Hollowborn (23-24)', x: -150, z: -120 }, { t: 'The Starless Steps (24-25)', x: 100, z: -380 }],
-  nodes: [['starsteel', 'ore', 'oresilver', 90, null, 24], ['deepcap', 'herb', 'herbgrave', 90, null, 24]],
+  nodes: [['starsteel', 'ore', 'oresilver', 100, null, 24], ['deepcap', 'herb', 'herbgrave', 100, null, 24]],
   scenery: { density: 20000, tuft: '#3a5a5a', kinds: [['shroom', .012, .7, 1.6], ['crystal', .008, .7, 1.8], ['stalag', .03, .7, 1.6]] },
   sky: { sun: .45, fog: '#141a22', top: '#05060a', mid: '#0a0c14', hor: '#1a2030', k: .9, far: 150 },
 });

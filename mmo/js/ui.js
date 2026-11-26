@@ -513,8 +513,8 @@ export function openFriendPick(afterUnlock, afterSwitch, newCls) {
       const cur = pend[fr.name] || fr.cls;
       const box = el(`<div class="card"><h3>${esc(fr.name)} <span class="dim" style="font:500 12px Alegreya Sans">· ${roleIcon(cur)} ${CLASSES[cur].name} (${CLASSES[cur].role})</span></h3><div class="fpick">${FAMILIES.map(f => CLASS_KEYS.filter(k => CLASSES[k].family === f).map(k => `<button data-k="${k}" class="${k === cur ? 'on' : ''}" style="--c:${CLASSES[k].color}">${roleIcon(k)} ${CLASSES[k].name}</button>`).join('')).join('')}</div></div>`);
       const job = fr.craft || {}, J = Craft.PROFS;
-      box.appendChild(el(`<div><p class="setl" style="margin-top:8px">Gathers</p><div class="seg">${['', ...Craft.GATHER_JOBS].map(p => `<button data-g="${p}" class="${(job.gather || '') === p ? 'on' : ''}">${p ? J[p].icon + ' ' + J[p].name + (job.skill?.[p] ? ' ' + job.skill[p] : '') : 'Nothing'}</button>`).join('')}</div>
-        <p class="setl">Crafts</p><div class="seg">${['', ...Craft.MAKE_JOBS].map(p => `<button data-m="${p}" class="${(job.make || '') === p ? 'on' : ''}">${p ? J[p].icon + ' ' + J[p].name + (job.skill?.[p] ? ' ' + job.skill[p] : '') : 'Nothing'}</button>`).join('')}</div></div>`));
+      box.appendChild(el(`<div><p class="setl" style="margin-top:8px">Gathers</p><div class="seg">${['', ...Craft.GATHER_JOBS].map(p => `<button data-g="${p}" class="${(job.gather || '') === p ? 'on' : ''}">${p ? J[p].icon + ' ' + J[p].name + (job.skill?.[p] ? ' ' + Craft.shown(job.skill[p]) : '') : 'Nothing'}</button>`).join('')}</div>
+        <p class="setl">Crafts</p><div class="seg">${['', ...Craft.MAKE_JOBS].map(p => `<button data-m="${p}" class="${(job.make || '') === p ? 'on' : ''}">${p ? J[p].icon + ' ' + J[p].name + (job.skill?.[p] ? ' ' + Craft.shown(job.skill[p]) : '') : 'Nothing'}</button>`).join('')}</div></div>`));
       box.onclick = ev => { const b = ev.target.closest('button'); if (!b) return; if (b.dataset.k) { pend[fr.name] = b.dataset.k; refreshSheet(); } if (b.dataset.g !== undefined) { Craft.setJob(fr, 'gather', b.dataset.g); Game.save(); refreshSheet(); } if (b.dataset.m !== undefined) { Craft.setJob(fr, 'make', b.dataset.m); Game.save(); refreshSheet(); } };
       body.appendChild(box);
     }
@@ -636,7 +636,7 @@ function objText(q) {
 // ---------- professions, materials, food and the collection ----------
 function tabTrade(body) {
   const P = Craft.PROFS;
-  body.appendChild(el(`<div class="card"><h3>Professions</h3><div class="profs">${Object.entries(P).map(([k, p]) => { const v = Craft.skill(k); return `<div class="prof ${v === null ? 'off' : ''}"><span>${p.icon}</span><b>${p.name}</b><small>${v === null ? 'not learned' : v + ' / 100'}</small>${v === null ? '' : `<i style="width:${v}%"></i>`}</div>`; }).join('')}</div></div>`));
+  body.appendChild(el(`<div class="card"><h3>Professions</h3><div class="profs">${Object.entries(P).map(([k, p]) => { const v = Craft.skill(k); return `<div class="prof ${v === null ? 'off' : ''}"><span>${p.icon}</span><b>${p.name}</b><small>${v === null ? 'not learned' : Craft.shown(v) + ' / 50'}</small>${v === null ? '' : `<i style="width:${v / 1.25}%"></i>`}</div>`; }).join('')}</div></div>`));
   const jobs = (S.friends || []).filter(fr => fr.craft && (fr.craft.gather || fr.craft.make));
   if (jobs.length) body.appendChild(el(`<div class="card"><h3>Friends' jobs</h3>${jobs.map(fr => `<p style="margin:2px 0">${esc(fr.name)}: ${[fr.craft.gather, fr.craft.make].filter(Boolean).map(p => `${P[p].icon} ${P[p].name} ${Craft.skill(p, fr)}`).join(' · ')}</p>`).join('')}</div>`));
   const mats = Object.entries(S.mats || {}).filter(([, n]) => n > 0);
@@ -661,15 +661,15 @@ export function openCraft(st) {
     const all = Craft.craftersAt(st);
     if (!all.length) { body.appendChild(el(`<div class="card"><p style="margin:0">Nobody in your group knows ${S0.profs.map(p => Craft.PROFS[p].name).join(' or ')}. A trainer in the crafters' quarter can teach you, or give a friend the job.</p></div>`)); return; }
     if (craftPick >= all.length) craftPick = 0;
-    if (all.length > 1) { const tabs = el(`<div class="seg">${all.map((c, i) => `<button data-i="${i}" class="${i === craftPick ? 'on' : ''}">${Craft.PROFS[c.p].icon} ${c.who ? esc(c.who.name) : 'You'} · ${Craft.skill(c.p, c.who)}</button>`).join('')}</div>`); tabs.onclick = ev => { const i = ev.target.closest('button')?.dataset.i; if (i !== undefined) { craftPick = +i; refreshSheet(); } }; body.appendChild(tabs); }
+    if (all.length > 1) { const tabs = el(`<div class="seg">${all.map((c, i) => `<button data-i="${i}" class="${i === craftPick ? 'on' : ''}">${Craft.PROFS[c.p].icon} ${c.who ? esc(c.who.name) : 'You'} · ${Craft.shown(Craft.skill(c.p, c.who))}</button>`).join('')}</div>`); tabs.onclick = ev => { const i = ev.target.closest('button')?.dataset.i; if (i !== undefined) { craftPick = +i; refreshSheet(); } }; body.appendChild(tabs); }
     for (const { who, p } of [all[craftPick]]) {
       const v = Craft.skill(p, who), P = Craft.PROFS[p];
-      body.appendChild(el(`<h3 style="font:700 14px Cinzel;margin:8px 0 4px">${P.icon} ${P.name}${who ? ' · ' + esc(who.name) : ''} <span class="dim" style="font:500 12px Alegreya Sans">· ${v} / 100</span></h3>`));
+      body.appendChild(el(`<h3 style="font:700 14px Cinzel;margin:8px 0 4px">${P.icon} ${P.name}${who ? ' · ' + esc(who.name) : ''} <span class="dim" style="font:500 12px Alegreya Sans">· ${Craft.shown(v)} / 50</span></h3>`));
       const list = Object.values(Craft.RECIPES).filter(r => r.prof === p && Craft.knows(r, who)).sort((a, b) => a.req - b.req);
       for (const r of list) {
         const can = v >= r.req, has = Craft.haveMats(r), col = v < r.req ? '#888' : v < r.req + 15 ? '#ff9a3a' : v < r.req + 30 ? '#ffd34d' : v < r.req + 45 ? '#7fd35a' : '#9a9a9a';
         const mats = Object.entries(r.mats).map(([k, n]) => { const have = (S.mats || {})[k] || 0; return `<span style="color:${have >= n ? 'var(--ink)' : '#ff8a6a'}">${Craft.MATS[k].icon} ${have}/${n} ${esc(Craft.MATS[k].name)}</span>`; }).join(' ');
-        const c = el(`<div class="card craft"><div><b style="color:${col}">${esc(r.name)}</b>${r.rare ? ' <small style="color:#b86bff">rare</small>' : ''}<small class="dim"> · skill ${r.req}</small><div class="mats">${mats}</div></div><button ${can && has ? '' : 'disabled'}>Craft</button></div>`);
+        const c = el(`<div class="card craft"><div><b style="color:${col}">${esc(r.name)}</b>${r.rare ? ' <small style="color:#b86bff">rare</small>' : ''}<small class="dim"> · skill ${Craft.shown(r.req)}</small><div class="mats">${mats}</div></div><button ${can && has ? '' : 'disabled'}>Craft</button></div>`);
         c.querySelector('button').onclick = () => { const m = Craft.craft(r.id, Game, who); if (m) toast(m); refreshSheet(); };
         body.appendChild(c);
       }
@@ -944,7 +944,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 9 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 10 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

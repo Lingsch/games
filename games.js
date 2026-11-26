@@ -19,11 +19,11 @@ window.GAMES = [
   {
     title: "Single-Player MMO",
     folder: "mmo",
-    version: "Build 9",
+    version: "Build 10",
     updated: "November 2026",
     kind: "Tab-target MMO, solo",
-    blurb: "The same world, a hundred years after the summoner wars. Uncover the Gravelord's plot in the Vale with your two friends, then sail the Saltreach Coast to the Sunken Fleet.",
-    facts: ["16 classes", "Levels 1–20", "2 zones"],
+    blurb: "The same world, a hundred years after the summoner wars. Four peoples, sixteen classes that split in two at level 20, and a chase for three keys to the door below the Last Lamp. Buy a house, take an outpost for your guild, and keep the holidays.",
+    facts: ["16 classes", "Levels 1–25", "4 peoples"],
     accent: "#63b7c9"
   },
   {

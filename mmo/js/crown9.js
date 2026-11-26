@@ -112,7 +112,7 @@ defineZone('crown', {
   rares: [[[-480, -150, -480, 120], 'kingsstag', 21, false], [[180, 480, -150, 150], 'thebellman', 23, true]],
   hunt: [{ area: 0, lvl: [20, 21] }, { area: 1, lvl: [21, 22] }, { area: 2, lvl: [22, 23] }, { area: 3, lvl: [23, 24] }, { area: 4, lvl: [24, 25] }],
   labels: [{ t: "King's Fields (20-21)", x: -300, z: -100 }, { t: 'Thornfield rebels (21-22)', x: 150, z: 260 }, { t: 'Blackwater plague (22-23)', x: 330, z: -20 }, { t: 'The Ashwood (23-24)', x: 100, z: -330 }, { t: "The Duke's Reach (24-25)", x: -320, z: 200 }],
-  nodes: [['crowngold', 'ore', 'oresilver', 90, null, 22], ['kingsfoil', 'herb', 'herbmeadow', 90, null, 24]],
+  nodes: [['crowngold', 'ore', 'oresilver', 100, null, 22], ['kingsfoil', 'herb', 'herbmeadow', 100, null, 24]],
   scenery: { density: 24000, tuft: '#7a9a4a', kinds: [['oak', .03, 1.1, 2.2], ['birch', .015, 1, 1.6], ['hedge', .004, 1, 1.3], ['pine', .01, 1, 1.8]] },
   sky: { fog: '#a8b8a8', top: '#5a8ac8', hor: '#d8e8f0', k: .25 },
 });
