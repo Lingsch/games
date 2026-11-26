@@ -956,7 +956,7 @@ export function showTitle(view = 'home') {
   const PATHS = { smuggler: ['Smuggler', 'The free worlds', 'You inherit a grounded freighter and a debt on the frontier moon of Dustfall.', '#ffb347'], justice: ['Justice', 'The Republic and the order', 'A first-year novice of the lamp-keepers, posted to a freezing fort on the edge of Republic space.', '#6ad8ff'], dark: ['Dark', 'The Empire and the Dusk Covenant', 'A conscript who survived the Winnowing. Now an initiate of the Covenant on the furnace world of Cinder, where the other initiates would like your bunk.', '#ff4a3a'] };
   const heroes = Object.keys(PATHS).map(p => [p, Game.saveInfoFor(p)]).filter(x => x[1]);
   if (view === 'home') X.newPath = null;
-  const head = `<h1>Stars Beneath</h1><div class="sub">Build 10 · two thousand years after the Gravelord fell</div>`;
+  const head = `<h1>Stars Beneath</h1><div class="sub">Build 11 · two thousand years after the Gravelord fell</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${heroes.map(([p, i]) => `<button class="pri" data-a="cont" data-p="${p}">Continue<small>${esc(i.name)} · level ${i.lvl} ${CLASSES[i.cls]?.name || ''} · ${PATHS[p][0]}</small></button>`).join('')}

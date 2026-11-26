@@ -102,7 +102,7 @@ export function addThreat(mob, src, amt) {
 function engage(mob, src) {
   mob.engaged = true;
   const M = MOBS[mob.mob];
-  if (mob.camp && M.social) for (const o of S.ents) if (o !== mob && !o.dead && o.camp === mob.camp && !o.engaged && dist(o, mob) < M.social + 10) { o.threat.set(src, 1); o.combatT = S.time; o.engaged = true; }
+  if (mob.camp && (M.social || String(mob.camp).startsWith('pk'))) for (const o of S.ents) if (o !== mob && !o.dead && o.camp === mob.camp && !o.engaged && dist(o, mob) < (M.social || 4) + 10) { o.threat.set(src, 1); o.combatT = S.time; o.engaged = true; }
 }
 export function topThreat(mob) {
   let best = null, bv = -1;

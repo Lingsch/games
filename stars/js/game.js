@@ -108,7 +108,12 @@ function densify(zone) {
     for (let k = 0; k < 6; k++) {
       const ang = rng() * TAU, d = 2.6 + rng() * 2.4, x = sp.x + Math.sin(ang) * d, z = sp.z + Math.cos(ang) * d;
       if ((depthAt(x, z) > .5) !== wet && !world.underwater) continue;
-      add.push({ ...sp, x, z, y: hgt(x, z), alive: null, timer: 0 }); break;
+      // From the MMO's Build 12: in the early game the partner is a real pack: they fight together, and some packs are three strong
+      const early = sp.lvl[1] <= 11 && !sp.dungeon;
+      if (early) { sp.camp = sp.camp || 'pk' + zone + add.length; }
+      add.push({ ...sp, x, z, y: hgt(x, z), alive: null, timer: 0 });
+      if (early && rng() < .35) { const a2 = ang + 2.1; add.push({ ...sp, x: sp.x + Math.sin(a2) * d, z: sp.z + Math.cos(a2) * d, y: hgt(sp.x + Math.sin(a2) * d, sp.z + Math.cos(a2) * d), alive: null, timer: 0 }); }
+      break;
     }
   }
   world.spawns.push(...add);
@@ -313,6 +318,7 @@ export function inspectLabel(e) {
   const p = e.prop; if (!p) return null;
   if (p.node) return Craft.nodeLabel(p);
   if (p.station) return `Craft: ${Craft.STATIONS[p.station].name}`;
+  if (p.use && X.propLabel) { const l = X.propLabel(e); if (l) return l; }
   if (needFor(p)) return (OBJ_VERB[p.tag] || 'Inspect') + (p.tag.startsWith('clue') ? ': ' + p.name : '');
   if (p.lore && !S.lore[p.lore]) return 'Read: ' + LORE[p.lore].title;
   return null;
@@ -321,6 +327,7 @@ export function inspect(e) {
   const p = e.prop, h = S.hero; if (!p || dist(h, e) > 6) return null;
   if (p.node) { Craft.gather(e); save(); return null; }
   if (p.station) return { station: p.station };
+  if (p.use && X.propUse) { X.propUse(e); save(); return null; }
   const q = needFor(p);
   let read = null;
   if (q) {

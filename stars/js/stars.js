@@ -68,7 +68,7 @@ set(O, 'shield', ['Riot Shield', 'Barrier Plate', 'Tower Shield']); set(O, 'tome
 set(O, 'sabre', ['Off-hand Sabre', 'Parrying Blade']); set(O, 'charm', ['Lucky Chit', 'Dog Tags', 'Worry Stone']); set(O, 'relic', ['Ward Icon', 'Service Medal']); set(O, 'totem', ['Seed Canister', 'Beast Whistle', 'Spore Pouch']);
 set(O, 'knife', ['Boot Knife', 'Throwing Knife']); set(O, 'vial', ['Toxin Kit', 'Trick Belt']); set(O, 'lute', ['Voice Amp', 'Signal Horn', 'Hand Drum']); set(O, 'grimoire', ['Black Slate', 'Void Lantern']); set(O, 'bond', ['Drone Controller', 'Command Slate']);
 set(BASE_NAMES.head, 'plate', ['Helmet', 'Visor Helm']); set(BASE_NAMES.head, 'leather', ['Flight Cap', 'Goggles']); set(BASE_NAMES.head, 'cloth', ['Hood', 'Circlet']);
-set(BASE_NAMES.chest, 'plate', ['Battle Plate', 'Carapace']); set(BASE_NAMES.chest, 'leather', ['Flight Jacket', 'Duster']); set(BASE_NAMES.chest, 'cloth', ['Longcoat', 'Vestments']);
+set(BASE_NAMES.chest, 'plate', ['Battle Plate', 'Carapace']); set(BASE_NAMES.chest, 'leather', ['Flight Jacket', 'Duster']); set(BASE_NAMES.chest, 'cloth', ['Longcoat', 'Field Coat']);
 set(BASE_NAMES.legs, 'plate', ['Greaves', 'Legplates']); set(BASE_NAMES.legs, 'leather', ['Spacer Trousers', 'Chaps']); set(BASE_NAMES.legs, 'cloth', ['Trousers', 'Wraps']);
 set(BASE_NAMES.feet, 'plate', ['Mag Boots', 'Warboots']); set(BASE_NAMES.feet, 'leather', ['Deck Boots', 'Treads']); set(BASE_NAMES.feet, 'cloth', ['Soft Boots', 'Sandals']);
 

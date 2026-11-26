@@ -406,8 +406,10 @@ export const MOBS = {
   abom: { name: 'Grathul the Stitched', kind: 'abom', hpM: 1, dmgM: 1, spd: 5, range: 3.6, weak: 'fire', resist: 'earth', scale: 1.5, aggro: 14, social: 30, undead: true },
 };
 // Build 4.4: enemies are tougher and hit harder across the board
-export const mobHp = L => (42 + 28 * L) * 1.5;
-export const mobDmg = L => (4 + 2.3 * L) * 1.75;
+// From the MMO's Build 12: the early game bites. Levels 1-10 hit 20% harder with 30% more health, easing back to normal by 14.
+const early = (L, k) => L <= 10 ? k : L < 14 ? 1 + (k - 1) * (14 - L) / 4 : 1;
+export const mobHp = L => (42 + 28 * L) * 1.5 * early(L, 1.3);
+export const mobDmg = L => (4 + 2.3 * L) * 1.75 * early(L, 1.2);
 export const mobXp = L => 18 + 13 * L + .9 * L * L;
 
 // ---------- items ----------
@@ -429,7 +431,7 @@ export const BASE_NAMES = {
   feet: { plate: ['Sabatons', 'Warboots'], leather: ['Boots', 'Treads'], cloth: ['Slippers', 'Sandals'] },
 };
 const PREFIX = ['Worn', 'Sturdy', 'Fine', 'Polished', 'Surplus', 'Spacer\'s', 'Dockyard', 'Veteran\'s'];
-const SUFFIX = [['of the Bear', 'sta'], ['of Might', 'pow'], ['of the Eagle', 'crit'], ['of Fortitude', 'sta'], ['of Power', 'pow'], ['of Precision', 'crit']];
+const SUFFIX = [['of the Long Haul', 'sta'], ['of Might', 'pow'], ['of the Marksman', 'crit'], ['of Fortitude', 'sta'], ['of Power', 'pow'], ['of Precision', 'crit']];
 // weapon and off-hand types per class
 export const WTYPE = { bulwark: ['mace', 'shield'], cleric: ['staff', 'tome'], longwatch: ['bow', 'quiver'], elementalist: ['staff', 'orb'],
   wardancer: ['blade', 'sabre'], bladewarden: ['greatsword', 'charm'], monk: ['wraps', 'charm'], aegis: ['wand', 'relic'], lifebinder: ['staff', 'totem'], druid: ['staff', 'totem'],
