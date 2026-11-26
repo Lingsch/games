@@ -141,6 +141,17 @@ function buildSystem(sys) {
     pack(-200, 270, ['raider', 'raider', 'pirate']).forEach(e => { e.name = e.kind === 'raider' ? 'Syndicate Gunship' : 'Syndicate Interceptor'; });
     for (let i = 0; i < 4; i++) { const a = rng() * TAU; const e = spawn('bait', Math.cos(a) * 110, 40 + Math.sin(a) * 110, { team: 'neutral', name: 'Free hauler', lane: a }); e.hull = e.max = 9999; }
   }
+  if (!F.objs.some(o => o.type === 'dock')) {
+    const Sy = Ship.SYSTEMS[sys] || { name: 'Port' }, ice = sys === 'cairn';
+    const pl = new THREE.Mesh(new THREE.SphereGeometry(520, 40, 24), new THREE.MeshLambertMaterial({ color: ice ? '#dce8f4' : '#9ab8d8', fog: false })); addObj({ type: 'decor', x: 0, y: -560, z: 60, mesh: pl });
+    addObj({ type: 'dock', name: Sy.name, label: `Land on ${Sy.name}`, x: 0, z: 0, r: 13, mesh: mk(ringGeo(12, '#9be36b'), .1) });
+    addObj({ type: 'buoy', name: 'Jump buoy', label: 'Open the star map', x: -70, z: -330, r: 13, mesh: mk(ringGeo(12, '#6ad8ff'), .1) });
+    rocksAt(230, -110, 130, 36); rocksAt(-250, 140, 110, 26);
+    for (const [x, z] of [[250, -130], [-270, 160], [-130, -270]]) addObj({ type: 'wreck', name: 'Drifting wreck', x: x + rnd(-30, 30), z: z + rnd(-30, 30), r: 15, prog: 0, mesh: mk(wreckGeo(), .1) });
+    const foes = ice ? [['skiff', 'skiff'], ['pirate', 'drone'], ['pirate', 'skiff']] : [['pirate', 'pirate'], ['pirate', 'raider']];
+    foes.forEach((ks, i) => { const a = 1 + i * 2.1; pack(Math.cos(a) * 250, Math.sin(a) * 250, ks).forEach(e => { e.name = ice ? (e.kind === 'drone' ? 'Imperial Probe' : e.kind === 'pirate' ? 'Imperial Interceptor' : 'Deserter Skiff') : (e.kind === 'raider' ? 'Black-flag Gunship' : 'Lane Pirate'); }); });
+    if (!ice) for (let i = 0; i < 5; i++) { const a = rng() * TAU; const e = spawn('bait', Math.cos(a) * 120, 40 + Math.sin(a) * 120, { team: 'neutral', name: 'Republic hauler', lane: a }); e.hull = e.max = 9999; }
+  }
   const w = S.ext.wreck; if (w && w.sys === sys) F.wreck = addObj({ type: 'wreck', mine: true, name: 'Your lost cargo', x: w.x, z: w.z, r: 15, prog: 0, mesh: mk(wreckGeo(), .1) });
 }
 function rocksAt(cx, cz, rad, n) { for (let i = 0; i < n; i++) { const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * rad, s = 2 + Math.random() * 5, m = mk(rockGeo(), .05); m.scale.setScalar(s); m.rotation.set(rnd(0, 6), rnd(0, 6), rnd(0, 6)); const o = { x: cx + Math.cos(a) * d, z: cz + Math.sin(a) * d, r: s * 1.1, mesh: m, spin: rnd(-.3, .3) }; m.position.set(o.x, rnd(-2, 2), o.z); G.add(m); F.rocks.push(o); } }
@@ -184,20 +195,20 @@ body.flying #chat{bottom:auto!important;right:auto!important;left:var(--sl);top:
 #flyMis{position:absolute;right:calc(var(--sr) + 22px);bottom:calc(var(--sb) + 34px + 96px * var(--joy));width:58px;height:58px;border-radius:50%;font-size:20px;background:rgba(106,216,255,.2);border:2px solid #6ad8ff;padding:0}#flyMis small{display:block;font-size:10px}#flyMis.cd{opacity:.45}`;
   document.head.appendChild(css);
 }
-function say(t, hold = 2.6) { const m = hud.querySelector('#flyMsg'); m.textContent = t; m.style.opacity = 1; F.msgT = hold; }
+function say(t, hold = 2.6) { const m = hud.querySelector('#flyMsg'); m.textContent = X.textFix ? X.textFix(t) : t; m.style.opacity = 1; F.msgT = hold; }
 
 // ---------- starting and stopping ----------
 function begin(mode, sys) {
   makeHud(); fit();
   const st = stats();
   F.on = true; F.paused = false; F.sys = sys; F.mode = mode; F.t = 0; F.ev = null; F.homeFn = null; F.fireHeld = F.boostHeld = false; F.spawnT = 50; F.misT = 0; F.wreck = null;
-  F.P = { x: 0, z: 30, yaw: Math.PI, vx: 0, vz: 0, v: 20, hull: st.hull, max: st.hull, shield: st.shield, maxS: st.shield, energy: 100, fireT: 0, hitT: 0, bank: 0, side: 1, mesh: mk(shipGeo(), .1), safeT: 3, repT: 0 };
+  F.P = { x: 0, z: 30, yaw: Math.PI, vx: 0, vz: 0, v: 20, hull: st.hull, max: st.hull, shield: st.shield, maxS: st.shield, energy: 100, fireT: 0, hitT: 0, bank: 0, side: 1, mesh: mk(X.shipLook ? shipGeo(...X.shipLook()) : shipGeo(), .1), safeT: 3, repT: 0 };
   // the model was built to sit on landing legs; in flight it rides its own centre
   F.P.mesh.children.forEach(c => c.position.y = -3.4); F.P.mesh.scale.setScalar(.62);
   if (mode === 'system') buildSystem(sys); else buildDeep();
   G.add(F.P.mesh); G.visible = true; R.worldGroup.visible = false;
   for (const k in R.kinds) { const K = R.kinds[k]; K.mesh.count = K.ol.count = 0; } R.shadows.count = 0; R.arrows.count = 0; R.selRing.visible = false; R.tankRing.visible = false; R.clearTelegraphs();
-  document.body.classList.add('flying'); hud.classList.remove('hide');
+  document.body.classList.add('flying'); hud.classList.remove('hide'); hud.querySelector('#flyTop b').textContent = 'The ' + (X.shipName ? X.shipName() : 'Second Chance');
   S.target = null;
 }
 function end() {
@@ -208,12 +219,12 @@ function end() {
 export function launch() {
   if (S.zone !== 'ship' || F.on) return;
   const sys = Ship.here(); begin('system', sys);
-  F.obj = ''; say(sys === 'moon' ? 'Dustfall falls away beneath you' : sys === 'sunder' ? 'Sunder falls away, white and gold' : 'Clear of lock six', 3);
+  F.obj = ''; say(sys === 'moon' ? 'Dustfall falls away beneath you' : sys === 'sunder' ? 'Sunder falls away, white and gold' : sys === 'halfway' ? 'Clear of lock six' : `${Ship.SYSTEMS[sys].name} falls away beneath you`, 3);
   chat('sys', null, `You take the helm. ${Ship.SYSTEMS[sys].name} drops away behind the Second Chance.`);
   const crew = (S.friends || [])[0]; if (crew && !S.ext.flown) setTimeout(() => chat('party', crew.name, "I'll be in the engine room keeping her in one piece. Try not to make that difficult, Captain."), 1800);
   S.ext.flown = (S.ext.flown || 0) + 1;
 }
-function dock() { const sys = F.sys, name = Ship.SYSTEMS[sys].name; end(); chat('sys', null, sys === 'moon' ? 'The Second Chance settles onto the pad at Dustfall Port.' : sys === 'sunder' ? 'The Second Chance settles onto the Saltmarket landing field.' : `The Second Chance noses into lock six at ${name}.`); }
+function dock() { const sys = F.sys, name = Ship.SYSTEMS[sys].name; end(); chat('sys', null, !['moon', 'sunder', 'halfway'].includes(sys) ? `The Second Chance sets down on ${name}.` : sys === 'moon' ? 'The Second Chance settles onto the pad at Dustfall Port.' : sys === 'sunder' ? 'The Second Chance settles onto the Saltmarket landing field.' : `The Second Chance noses into lock six at ${name}.`); }
 
 // ---------- fighting ----------
 function fire(e, isP) {
@@ -259,7 +270,13 @@ function lost() {
   F.paused = true; say('The Second Chance is breaking up', 3);
   setTimeout(() => {
     const wx = p.x, wz = p.z; end(); F.onDone = null;
-    if (sys === 'moon' && !deep) {
+    const zn = Ship.SYSTEMS[sys]?.zone, pd = Ship.PADS[zn];
+    if (!deep && sys !== 'moon' && sys !== 'halfway' && pd) {
+      S.gold -= Math.round(cut * .6); S.ext.sys = sys;
+      const a = Math.random() * TAU; Game.travel(zn, { x: pd.x + Math.cos(a) * 50, z: pd.z - 70 - Math.abs(Math.sin(a)) * 40 }, true);
+      S.hero.hp = Math.max(1, Math.round(S.hero.maxHp * .35));
+      chat('sys', null, `Your escape pod comes down hard outside ${world.names.town}. A recovery crew brings what is left of the Second Chance back to the pad, and the repair bill is ${Math.round(cut * .6)} credits.`);
+    } else if (sys === 'moon' && !deep) {
       S.gold -= Math.round(cut * .6); S.ext.sys = 'moon';
       const a = Math.random() * TAU; Game.travel('moon', { x: D1.port.x + Math.cos(a) * 70, z: D1.port.z - 40 - Math.abs(Math.sin(a)) * 60 }, true);
       S.hero.hp = Math.max(1, Math.round(S.hero.maxHp * .35));
@@ -446,7 +463,7 @@ const EVENTS = {
     F.ev = { text: () => o.gone ? 'Derelict stripped' : woke && hostiles().length ? `Drive off the scavengers: ${hostiles().length} left` : 'Hold beside the derelict to salvage it', onSalvage() { chat('sys', null, pick(["Her log is gone, but the last entry is scratched into the bulkhead by hand: 'The lamp went out. We never saw what took it.'", "Her nav plot still shows a heading: straight for a star that the tables say was never there.", "Every clock aboard stopped at the same second. Juno says that doesn't happen. Then she stops talking about it."])); eventDone('Salvage aboard. Resuming the jump.'); }, tick() { } };
   },
   patrol(proceed) {
-    const rep = Math.random() < .5, who = rep ? 'Republic' : 'Imperial', fine = Math.min(S.gold, Math.round(12 + lvl() * 3)), smooth = ['blightblade', 'bard'].includes(S.heroCls);
+    const rep = X.path?.() === 'justice' ? false : Math.random() < .5, who = rep ? 'Republic' : 'Imperial', fine = Math.min(S.gold, Math.round(12 + lvl() * 3)), smooth = ['blightblade', 'bard'].includes(S.heroCls);
     chat('sys', null, `A ${who} patrol cutter matches your course and paints the Second Chance with a targeting beam.`);
     UI.openSheet(`${who} patrol`, body => {
       const el = h => { const d = document.createElement('div'); d.innerHTML = h; body.appendChild(d.firstElementChild); return body.lastElementChild; };

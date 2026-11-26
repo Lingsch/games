@@ -18,7 +18,10 @@ import './zones.js';
 import { defineHuntZones, zoneAt } from './hunt.js';
 import * as R from './render.js';
 
-const SAVE_KEY = 'stars-beneath-1';
+const SLOT = { smuggler: 'stars-beneath-1', justice: 'stars-beneath-justice', dark: 'stars-beneath-dark' };
+let SAVE_KEY = SLOT[(() => { try { return localStorage.getItem('stars-slot'); } catch (e) { return null; } })()] || SLOT.smuggler;
+export function setSlot(p) { SAVE_KEY = SLOT[p] || SLOT.smuggler; try { localStorage.setItem('stars-slot', p); } catch (e) { } }
+export function saveInfoFor(p) { const k = SAVE_KEY; SAVE_KEY = SLOT[p] || k; const i = saveInfo(); SAVE_KEY = k; return i; }
 // Build 4.4: quests give three quarters of the xp they used to, like everything else
 for (const q of QUESTS) q.xp = Math.round((q.xp || 0) * Cb.XP_RATE);
 
@@ -51,18 +54,19 @@ function starterGear(cls) {
 }
 
 // ---------- starting and loading ----------
-export function newGame(cls, heroName, seed = (Math.random() * 1e9) | 0, friendCls = null) {
+export function newGame(cls, heroName, seed = (Math.random() * 1e9) | 0, friendCls = null, path = 'smuggler') {
   S.pendingFriendCls = friendCls;
   S.seed = seed; S.time = 0; S.gold = 5; S.bag = []; S.pots = { hpot: 3, mpot: 3 }; S.quests = {}; S.friends = [];
   S.classes = {}; S.gear = {}; S.bar = {};
   for (const k of CLASS_KEYS) { S.classes[k] = { lvl: 1, xp: 0 }; S.gear[k] = starterGear(k); S.bar[k] = defaultBar(k); }
   S.heroCls = cls; S.heroName = heroName; S.owned = [cls]; S.unlockPicks = 0;
-  S.pops = {}; S.bind = null; S.zone = 'moon'; S.pole = false;
+  const start = X.starts?.[path] || { zone: 'moon', sys: 'moon', gold: 12, hello: 'You wake in {town}, with twelve credits and a letter.' };
+  S.pops = {}; S.bind = null; S.zone = start.zone; S.pole = false;
   S.flags = {}; S.lore = {}; S.perks = []; S.bank = []; S.used = {}; S.scenesSeen = {}; S.vetXp = 0; S.huntOn = false; S.prof = {}; S.mats = {}; S.recipes = []; S.cons = {}; S.collection = []; S.title = null; S.pet = null; S.campOrder = null; S.cmd = 'follow'; S.ext = {};
-  S.friendsMade = true; S.friends = []; S.ext.sys = 'moon'; S.gold = 12;
-  startWorld({ zone: 'moon' });
-  S.pendingScene = 'intro';
-  chat('sys', null, `You wake in ${world.names.town}, with twelve credits and a letter.`);
+  S.friendsMade = true; S.friends = []; S.ext.sys = start.sys; S.ext.path = path; S.gold = start.gold; X.newPath = null;
+  startWorld({ zone: start.zone });
+  S.pendingScene = start.scene || 'intro';
+  chat('sys', null, start.hello.replace('{town}', world.names.town));
 }
 // fake players as plain data, so they keep their levels between zones and saves
 export function fakeData(f) { return { name: f.name, cls: f.cls, lvl: f.lvl, xp: f.xp || 0, pal: f.pal || 1, persona: f.fake.persona, guild: f.fake.guild, mood: f.fake.mood, friend: f.fake.friend, bff: !!f.fake.bff, bonusPow: f.bonusPow || 0, bonusSta: f.bonusSta || 0, bonusArm: f.bonusArm || 0 }; }
@@ -344,6 +348,7 @@ export function acctBonus() {
   const a = { sta: n10 + n20, pow: n20 };
   S.perks = (S.perks || []).filter(k => levelOf(k) >= 10).slice(0, 2);
   for (const k of S.perks) for (const [key, v] of Object.entries(PERKS[k].data)) a[key] = (a[key] || 0) + v;
+  if (X.acct) X.acct(a);
   return a;
 }
 export function refreshAcct() { const h = S.hero; if (!h) return; h.acct = acctBonus(); Cb.recalc(h); }
@@ -610,7 +615,7 @@ export function askSuspect(q, key) {
 }
 // a raid holds 12; everything else holds 6
 export const partyCap = () => S.ext?.raid12 ? 12 : 6;
-export function questState(q) { if (S.quests[q.id]) return S.quests[q.id].state; if (q.forCls && S.heroCls !== q.forCls) return 'locked'; if (q.when && !q.when()) return 'locked'; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
+export function questState(q) { if (q.path && q.path !== (S.ext?.path || 'smuggler')) return 'locked'; if (S.quests[q.id]) return S.quests[q.id].state; if (q.forCls && S.heroCls !== q.forCls) return 'locked'; if (q.when && !q.when()) return 'locked'; if (q.needLvl && levelOf(q.cls || S.heroCls) < q.needLvl) return 'locked'; if (q.pre && S.quests[q.pre]?.state !== 'turned') return 'locked'; if (q.pre2 && S.quests[q.pre2]?.state !== 'turned') return 'locked'; if (q.req && Object.entries(q.req).some(([k, v]) => S.flags[k] !== v)) return 'locked'; return 'open'; }
 export function acceptQuest(q) {
   S.quests[q.id] = { state: q.obj.talk ? 'done' : 'active', n: 0 };
   if (S.declined) delete S.declined[q.id];

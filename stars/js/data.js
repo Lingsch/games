@@ -547,7 +547,8 @@ export const BOOK = { rank: () => 0, names: ['', 'Adept', 'Master'], pow: [1, 1.
 export const rankMul = (e, ab) => (rankOf(e, ab) > 1 ? 1.35 : 1) * BOOK.pow[BOOK.rank(e, ab)];
 export const costMul = (e, ab) => BOOK.cost[BOOK.rank(e, ab)];
 export const cdMul = (e, ab) => BOOK.cd[BOOK.rank(e, ab)];
-export const rankName = (e, ab) => { const b = ab ? BOOK.rank(e, ab) : 0; return (b ? BOOK.names[b] + ' ' : '') + ab.name + (rankOf(e, ab) > 1 ? ' II' : ''); };
+export const X_NAME = { fn: null };
+export const rankName = (e, ab) => { const b = ab ? BOOK.rank(e, ab) : 0; return (b ? BOOK.names[b] + ' ' : '') + (X_NAME.fn ? X_NAME.fn(e, ab) : ab.name) + (rankOf(e, ab) > 1 ? ' II' : ''); };
 const NEW_SPELLS = {
   bulwark: {
     bash: { name: 'Shield Bash', icon: '🛡️', lvl: 12, kind: 'util', cost: 15, cd: 12, range: 3, tgt: 'enemy', desc: 'Interrupts any spell and stuns for 2 seconds (bosses are only interrupted).',

@@ -87,6 +87,9 @@ export function sfig(o, p, sk = 0) {
     if (w === 'baton') return [Q(T(Box(.035, .035, .6), x, .9, .3), DARK), Q(T(Box(.045, .045, .18), x, .9, .52), p.g, 2)];
     if (w === 'blade') return [Q(T(Box(.03, .08, .62), x, .88, .38), METAL), Q(T(Box(.034, .02, .6), x, .84, .38), p.g, 1.8), Q(T(Box(.12, .03, .05), x, .88, .06), DARK)];
     if (w === 'wrench') return [Q(T(Box(.035, .035, .42), x, .88, .22), METAL), Q(T(Box(.1, .04, .08), x, .88, .45), METAL)];
+    if (w === 'lampblade') return [Q(T(Box(.04, .04, .92), x, .9, .54), p.g, 2.8), Q(T(Box(.055, .055, .2), x, .9, .0), METAL), Q(T(Box(.12, .03, .05), x, .9, .1), p.t)];
+    if (w === 'lampknife') return [Q(T(Box(.035, .035, .42), x, .9, .3), p.g, 2.6), Q(T(Box(.05, .05, .14), x, .9, .02), METAL)];
+    if (w === 'lantern') return [Q(T(Box(.03, .34, .03), x, .98, .22), DARK), Q(T(Cyl(.08, .08, .18, 6), x, .76, .22), METAL), Q(T(Sph(.065, 6, 5), x, .76, .22), p.g, 3.2), Q(T(Cone(.09, .08, 6), x, .88, .22), METAL)];
     if (w === 'slate') return [Q(T(Box(.03, .22, .16), x, .92, .2), DARK), Q(T(Box(.034, .18, .12), x, .92, .2), p.g, 1.2)];
     return [];
   };

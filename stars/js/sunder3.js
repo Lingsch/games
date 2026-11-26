@@ -338,5 +338,5 @@ Object.assign(LFG_D, {
   drydock: { name: 'The Dry Dock', lvl: [9, 10], zone: 'sunder', at: () => ({ x: D3.dock.x, z: D3.dock.z + 60 }) },
 });
 // Sunder on the star map: the core gets its fix once Imre Sol has pointed the way
-Object.assign(SYSTEMS, { sunder: { name: 'Sunder', sub: 'Desert trade world', zone: 'sunder', x: .6, y: .34, info: 'A dry seabed with a market on it. Everything bought or sold in six systems crosses Saltmarket sooner or later.', need: () => !!S.quests.su_k1, why: 'The core has no fix for this lane yet.' } });
+Object.assign(SYSTEMS, { sunder: { name: 'Sunder', sub: 'Desert trade world', path: 'smuggler', zone: 'sunder', x: .6, y: .34, info: 'A dry seabed with a market on it. Everything bought or sold in six systems crosses Saltmarket sooner or later.', need: () => !!S.quests.su_k1, why: 'The core has no fix for this lane yet.' } });
 X.zone.push(zone => { if (zone === 'sunder') { S.ext.sys = 'sunder'; if (S.bind?.zone !== 'sunder' && !S.ext.sunderSeen) { S.ext.sunderSeen = 1; chat('sys', null, 'The air tastes of salt and hot metal. Somewhere a market is shouting.'); } } });

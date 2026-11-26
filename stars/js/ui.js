@@ -87,7 +87,7 @@ function refreshKeys(force) {
       if (!key) return;
       el.classList.toggle('ultk', CLASSES[S.heroCls].abilities[key]?.kind === 'ult');
       el.querySelector('.ic').textContent = key === 'attack' ? '⚔️' : CLASSES[S.heroCls].abilities[key].icon;
-      el.querySelector('.lab').textContent = key === 'attack' ? 'Attack' : CLASSES[S.heroCls].abilities[key].name;
+      el.querySelector('.lab').textContent = key === 'attack' ? 'Attack' : (X.abName ? X.abName(S.hero, CLASSES[S.heroCls].abilities[key]) : CLASSES[S.heroCls].abilities[key].name);
       el.style.setProperty('--c', key === 'attack' ? '#c9ccd2' : kindCol(CLASSES[S.heroCls].abilities[key]));
     });
   }
@@ -464,7 +464,7 @@ export function openBook(tab) {
   });
 }
 // ---------- weapons: equip a class's weapon to play it ----------
-const WICON = { cannon: '💥', injector: '💉', mace: '🔨', staff: '🪄', bow: '🏹', blade: '⚔️', greatsword: '🗡️', wraps: '👊', dagger: '🔪', rapier: '🤺', wand: '✨' };
+const WICON = { lampblade: '🔆', lantern: '🏮', shortblade: '🗡️', cannon: '💥', injector: '💉', mace: '🔨', staff: '🪄', bow: '🏹', blade: '⚔️', greatsword: '🗡️', wraps: '👊', dagger: '🔪', rapier: '🤺', wand: '✨' };
 export const weaponOf = k => `${BASE_NAMES.weapon[WTYPE[k][0]][0]} & ${BASE_NAMES.off[WTYPE[k][1]][0]}`;
 const wIcon = k => WICON[WTYPE[k][0]] || '⚔️';
 function weaponRack(body) {
@@ -945,24 +945,34 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Stars Beneath</h1><div class="sub">Build 3 · two thousand years after the Gravelord fell</div>`;
+  const PATHS = { smuggler: ['Smuggler', 'The free worlds', 'You inherit a grounded freighter and a debt on the frontier moon of Dustfall.', '#ffb347'], justice: ['Justice', 'The Republic and the order', 'A first-year novice of the lamp-keepers, posted to a freezing fort on the edge of Republic space.', '#6ad8ff'] };
+  const heroes = Object.keys(PATHS).map(p => [p, Game.saveInfoFor(p)]).filter(x => x[1]);
+  if (view === 'home') X.newPath = null;
+  const head = `<h1>Stars Beneath</h1><div class="sub">Build 4 · two thousand years after the Gravelord fell</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
-      ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
-      <button class="${info ? '' : 'pri'}" data-a="new">New character</button>
+      ${heroes.map(([p, i]) => `<button class="pri" data-a="cont" data-p="${p}">Continue<small>${esc(i.name)} · level ${i.lvl} ${CLASSES[i.cls]?.name || ''} · ${PATHS[p][0]}</small></button>`).join('')}
+      <button class="${heroes.length ? '' : 'pri'}" data-a="new">New character</button>
       <button data-a="set">Settings</button></div>
       <div class="acts" style="justify-content:center;margin-top:10px">${info ? '<button data-a="copyc">📋 Copy save code</button>' : ''}<button data-a="pastec">📥 Paste save code</button></div>
       <textarea id="codeBox" class="hide" style="height:70px;width:100%;margin-top:6px" placeholder="Paste a code starting STAR1."></textarea><div class="acts hide" id="codeGo" style="justify-content:center"><button data-a="loadc">Load this code</button></div>`;
-    const loadCode = async code => { try { const sv = await Game.readCode(code); Game.loadSave(sv); afterStart(); toast('Save loaded'); } catch (e) { toast("That code didn't work"); } };
+    const loadCode = async code => { try { const sv = await Game.readCode(code); Game.setSlot(sv.ext?.path || 'smuggler'); Game.loadSave(sv); afterStart(); toast('Save loaded'); } catch (e) { toast("That code didn't work"); } };
     T.onclick = async ev => {
-      const a = ev.target.closest('button')?.dataset.a;
+      const a = ev.target.closest('button')?.dataset.a, bp = ev.target.closest('button')?.dataset.p;
       if (a === 'copyc') { const code = await Game.makeCode(true); try { await navigator.clipboard.writeText(code); toast('Save code copied'); } catch (e) { const t = $('codeBox'); t.classList.remove('hide'); t.value = code; t.select(); toast('Select and copy the code'); } }
       if (a === 'pastec') { let code = ''; try { code = await navigator.clipboard.readText(); } catch (e) { } if (code && code.trim().startsWith('STAR1.')) { if (!info || confirmReplace(info)) loadCode(code); } else { $('codeBox').classList.remove('hide'); $('codeBox').value = ''; $('codeGo').classList.remove('hide'); $('codeBox').focus(); } }
       if (a === 'loadc') loadCode($('codeBox').value);
-      if (a === 'cont') { try { Game.loadSave(); afterStart(); } catch (e) { console.error(e); toast('That save could not be loaded'); } }
-      if (a === 'new') showTitle('new');
+      if (a === 'cont') { try { if (bp) Game.setSlot(bp); Game.loadSave(); afterStart(); } catch (e) { console.error(e); toast('That save could not be loaded'); } }
+      if (a === 'new') showTitle('path');
       if (a === 'set') showTitle('set');
     };
+    return;
+  }
+  if (view === 'path') {
+    T.innerHTML = `${head}<button data-a="back" style="margin:8px 0">← Back</button><div class="card" style="text-align:left"><h3>Choose your path</h3><p class="dim" style="margin:0 0 6px">Each path has its own hero, its own start and its own story.</p>
+      ${Object.entries(PATHS).map(([p, [n, who, txt, c]]) => `<div class="card" data-path="${p}" style="cursor:pointer;border-color:${c};margin:6px 0"><b style="color:${c}">${n}</b> <small class="dim">· ${who}</small><p style="margin:3px 0 0">${txt}</p>${Game.saveInfoFor(p) ? `<p style="color:#ff8a6a;font-size:12px;margin:3px 0 0">You already have a ${n.toLowerCase()} hero. A new one replaces them.</p>` : ''}</div>`).join('')}
+      <div class="card" style="margin:6px 0;opacity:.5"><b>Dark side</b> <small class="dim">· The Empire</small><p style="margin:3px 0 0">Not yet open.</p></div></div>`;
+    T.onclick = ev => { const c = ev.target.closest('[data-path]'); if (c) { X.newPath = c.dataset.path; Game.setSlot(X.newPath); showTitle('new'); return; } if (ev.target.closest('button')?.dataset.a === 'back') showTitle('home'); };
     return;
   }
   if (view === 'set') { T.onclick = null; T.innerHTML = head; const box = document.createElement('div'); T.appendChild(box); renderSettings(box, false, () => showTitle('home')); return; }
@@ -974,7 +984,7 @@ export function showTitle(view = 'home') {
       <div class="card" style="text-align:left"><h3>Choose your weapon</h3>
       ${FAMILIES.map(f => `<p style="margin:10px 0 4px;font:700 13px Orbitron;color:var(--acc)">${FAMILY_ICON[f]} ${X.famPl?.[f] || f + 's'}</p><div class="wpick">${CLASS_KEYS.filter(k => CLASSES[k].family === f && !(X.hiddenCls || []).includes(k)).map(k => { const c = CLASSES[k]; return `<div class="card ${pick === k ? 'on' : ''}" data-k="${k}" style="border-color:${c.color}"><span class="wi">${wIcon(k)}</span><div><b style="color:${c.color}">${weaponOf(k)}</b><small>${c.name} · ${c.role}</small><p>${esc(c.blurb)}</p></div></div>`; }).join('')}</div>`).join('')}</div>
       ${info ? `<p style="color:#ff8a6a;font-size:13px">Starting a new character replaces ${esc(info.name)} (level ${info.lvl}). Copy their save code in Settings first if you want to keep them.</p>` : ''}
-      <div style="position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,rgba(13,17,20,.95) 30%)"><button class="pri" data-a="go" style="width:100%;opacity:1" ${pick ? '' : 'disabled'}>${pick ? `Wake up on Dustfall as a ${CLASSES[pick].name}` : 'Tap a weapon to choose it'}</button></div>`;
+      <div style="position:sticky;bottom:0;padding:8px 0;background:linear-gradient(transparent,rgba(13,17,20,.95) 30%)"><button class="pri" data-a="go" style="width:100%;opacity:1" ${pick ? '' : 'disabled'}>${pick ? `${X.newPath === 'justice' ? 'Report to Fort Lastlight' : 'Wake up on Dustfall'} as a ${CLASSES[pick].name}` : 'Tap a weapon to choose it'}</button></div>`;
   };
   T.dataset.name = '';
   draw();
@@ -982,8 +992,8 @@ export function showTitle(view = 'home') {
   T.onclick = ev => {
     const card = ev.target.closest('.wpick .card'), a = ev.target.closest('button')?.dataset.a;
     if (card) { T.dataset.name = $('heroName').value; const y = $('title').scrollTop; if (pick !== card.dataset.k) fcls = Game.defaultFriendCls(card.dataset.k); pick = card.dataset.k; draw(); $('title').scrollTop = y; return; }
-    if (a === 'back') showTitle('home');
-    if (a === 'go' && pick) { const n = ($('heroName').value || 'Hero').trim().slice(0, 14) || 'Hero'; Game.newGame(pick, n, undefined, []); afterStart(); }
+    if (a === 'back') showTitle('path');
+    if (a === 'go' && pick) { const n = ($('heroName').value || 'Hero').trim().slice(0, 14) || 'Hero'; Game.newGame(pick, n, undefined, [], X.newPath || 'smuggler'); afterStart(); }
   };
 }
 let replArmed = 0;

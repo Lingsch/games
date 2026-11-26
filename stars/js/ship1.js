@@ -17,7 +17,7 @@ const O = [0, 0, 0];
 
 // ---------- where the ship can go ----------
 export const SYSTEMS = {
-  moon: { name: 'Dustfall', sub: 'Frontier colony moon', zone: 'moon', x: .2, y: .72, info: 'One port, one cantina and no questions. Home, for now.' },
+  moon: { name: 'Dustfall', sub: 'Frontier colony moon', path: 'smuggler', zone: 'moon', x: .2, y: .72, info: 'One port, one cantina and no questions. Home, for now.' },
   halfway: { name: 'Halfway Station', sub: 'Free port', zone: 'halfway', x: .47, y: .5, info: 'A fuel depot that grew a market. Everyone trades here, because nobody can agree on who gets to blow it up.' },
   sarn: { name: 'The Lamp of Sarn', sub: 'No star on the current tables', x: .82, y: .2, dark: true, info: "The core's old chart marks a star here in red. The scope shows nothing but a cold spot. The core will not plot a jump to it. Not yet." },
   core1: { name: 'Republic space', sub: 'Lanes closed to unregistered ships', x: .7, y: .78, locked: true, info: 'The Republic checks papers at every lane. The Second Chance has none.' },
@@ -25,7 +25,7 @@ export const SYSTEMS = {
 };
 export const LANES = [['moon', 'halfway'], ['halfway', 'sunder'], ['halfway', 'core1'], ['halfway', 'core2'], ['halfway', 'sarn']];
 export const PADS = { moon: { x: D1.pad.x, z: D1.pad.z + 17 } };   // where you stand after walking down the ramp
-const open = s => s && s.zone && (!s.need || s.need());
+const open = s => s && s.zone && (!s.need || s.need()) && (!s.path || s.path === (S.ext?.path || 'smuggler'));
 export const here = () => SYSTEMS[S.ext?.sys] ? S.ext.sys : 'moon';
 X.noFakes = ['ship', 'halfway'];
 X.gate = X.gate || {};
@@ -57,8 +57,9 @@ addKinds({ helm: [build([P(T(Box(2.4, 1, .8), 0, .5), 0, O, '#3a4450'), P(T(Box(
   bunk: [bunkGeo(), [0, 0, 0, 0], 0, .03] });
 
 registerZone('ship', seed => {
-  world.names = { zone: 'The Second Chance', town: 'the Second Chance' };
-  const w = buildInstance(seed, { name: 'The Second Chance', floor: '#565c64', rock: '#12151b', walls: false, fog: '#0c1018', light: 1.05, noMarker: true, exitTo: SYSTEMS[here()].zone, exitLabel: 'Down the ramp',
+  const SN = X.shipName ? X.shipName() : 'Second Chance';
+  world.names = { zone: 'The ' + SN, town: 'the ' + SN };
+  const w = buildInstance(seed, { name: 'The ' + SN, floor: '#565c64', rock: '#12151b', walls: false, fog: '#0c1018', light: 1.05, noMarker: true, exitTo: SYSTEMS[here()].zone, exitLabel: 'Down the ramp',
     rects: [[-6, 52, 6, 72], [-2, 36, 2, 52], [-8, 16, 8, 36], [-18, 20, -8, 32], [8, 20, 18, 32], [-2, 6, 2, 16], [-8, -8, 8, 6]],
     doors: [[0, 52], [0, 36], [-8, 26], [8, 26], [0, 16], [0, 6]], props: [], packs: [], bosses: [] });
   const items = bulkheads('#6a727c', '#ffcf6a'), put = (geo, x, z, ry = 0, s = 1) => items.push({ geo, m: mat4(x, 0, z, ry, s) });
@@ -69,8 +70,8 @@ registerZone('ship', seed => {
   for (const [x, z] of [[0, 44], [0, 11], [-5, 33], [5, 19]]) put(build([P(T(Box(.6, .1, .6), 0, 3.3), 0, O, '#ffe0a0', 2)]), x, z);
   meshWithOutline(mergeBuilt(items), .04);
   world.town = { x: 0, z: 26, R: 6 };
-  world.places = [{ name: 'The Second Chance', x: 0, z: 30, R: 44, kind: 'town' }];
-  world.regionNames = ['Aboard the Second Chance'];
+  world.places = [{ name: 'The ' + SN, x: 0, z: 30, R: 44, kind: 'town' }];
+  world.regionNames = ['Aboard the ' + SN];
   Object.assign(world.spots, { bridge: { x: 0, z: -2 }, hold: { x: 0, z: 62 } });
   return w;
 });
@@ -118,9 +119,10 @@ function mapCanvas(sel) {
   const g = c.getContext('2d'), px = s => [s.x * 600, s.y * 380];
   for (let i = 0; i < 140; i++) { g.fillStyle = `rgba(255,255,255,${.15 + ((i * 37) % 10) / 22})`; g.fillRect((i * 7919) % 600, (i * 104729) % 380, 1.5, 1.5); }
   g.lineWidth = 1.5;
-  for (const [a, b] of LANES) { const A = SYSTEMS[a], B = SYSTEMS[b]; if (!A || !B) continue; const open = !A.locked && !B.locked && !A.dark && !B.dark && (!A.need || A.need()) && (!B.need || B.need()); g.strokeStyle = open ? 'rgba(106,216,255,.7)' : 'rgba(160,170,190,.25)'; g.setLineDash(open ? [] : [5, 6]); g.beginPath(); g.moveTo(...px(A)); g.lineTo(...px(B)); g.stroke(); }
+  const mine = s => s && (!s.path || s.path === (S.ext?.path || 'smuggler'));
+  for (const [a, b] of LANES) { const A = SYSTEMS[a], B = SYSTEMS[b]; if (!mine(A) || !mine(B)) continue; const open = !A.locked && !B.locked && !A.dark && !B.dark && (!A.need || A.need()) && (!B.need || B.need()); g.strokeStyle = open ? 'rgba(106,216,255,.7)' : 'rgba(160,170,190,.25)'; g.setLineDash(open ? [] : [5, 6]); g.beginPath(); g.moveTo(...px(A)); g.lineTo(...px(B)); g.stroke(); }
   g.setLineDash([]);
-  for (const [k, s] of Object.entries(SYSTEMS)) { const [x, y] = px(s);
+  for (const [k, s] of Object.entries(SYSTEMS)) { if (!mine(s)) continue; const [x, y] = px(s);
     if (s.dark) { g.strokeStyle = '#ff3a2a'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 9, 0, TAU); g.stroke(); g.fillStyle = '#070b14'; g.beginPath(); g.arc(x, y, 7, 0, TAU); g.fill(); }
     else { g.fillStyle = s.locked || (s.need && !s.need()) ? '#7a8496' : '#ffe0a0'; g.beginPath(); g.arc(x, y, s.locked ? 5 : 7, 0, TAU); g.fill(); }
     if (k === here()) { g.strokeStyle = '#9be36b'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 13, 0, TAU); g.stroke(); }
@@ -132,7 +134,7 @@ export function openStarMap() {
   let sel = here();
   UI.openSheet('Star map', body => {
     const c = mapCanvas(sel); body.appendChild(c);
-    c.onclick = ev => { const r = c.getBoundingClientRect(), mx = (ev.clientX - r.left) / r.width, my = (ev.clientY - r.top) / r.height; let best = null, bd = .12; for (const [k, s] of Object.entries(SYSTEMS)) { const d = Math.hypot(s.x - mx, (s.y - my) * .63); if (d < bd) { bd = d; best = k; } } if (best) { sel = best; UI.refreshSheet(); } };
+    c.onclick = ev => { const r = c.getBoundingClientRect(), mx = (ev.clientX - r.left) / r.width, my = (ev.clientY - r.top) / r.height; let best = null, bd = .12; for (const [k, s] of Object.entries(SYSTEMS)) { if (s.path && s.path !== (S.ext?.path || 'smuggler')) continue; const d = Math.hypot(s.x - mx, (s.y - my) * .63); if (d < bd) { bd = d; best = k; } } if (best) { sel = best; UI.refreshSheet(); } };
     const s = SYSTEMS[sel], card = document.createElement('div'); card.className = 'card'; card.style.textAlign = 'left';
     card.innerHTML = `<h3 style="margin:0">${s.name}</h3><p class="dim" style="margin:2px 0 6px">${s.sub}${sel === here() ? ' · you are here' : ''}</p><p style="margin:0 0 8px">${s.info}</p>`;
     const linked = LANES.some(([a, b]) => (a === here() && b === sel) || (b === here() && a === sel));

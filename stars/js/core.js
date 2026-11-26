@@ -52,6 +52,7 @@ export const nextId = () => _id++;
 
 // chat feed: channel is 'sys', 'party', 'gen', 'say', 'loot', 'combat', 'guild'
 export function chat(ch, from, text) {
+  if (X.textFix) text = X.textFix(text);
   S.log.push({ ch, from, text, t: S.time });
   if (S.log.length > 120) S.log.shift();
   S.logDirty = true;

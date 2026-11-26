@@ -307,6 +307,7 @@ X.book.push(['lfg', 'LFG', body => {
   if (q) { const c = el(`<div class="card" style="padding:8px">Looking for a group for <b>${esc(LFG_D[q.key].name)}</b>… <div class="acts"><button>Leave queue</button></div></div>`); c.querySelector('button').onclick = () => { cancelQueue(); refreshSheet(); }; body.appendChild(c); }
   if (ready) { const c = el(`<div class="card" style="padding:8px">Your group for <b>${esc(LFG_D[ready].name)}</b> is ready.<div class="acts"><button class="pri">Take us there</button><button>We'll walk</button></div></div>`); c.onclick = ev => { const b = ev.target.closest('button'); if (!b) return; if (b.classList.contains('pri')) { X.ui.closeSheet(); goTo(ready); } else { S.ext.lfgReady = null; refreshSheet(); } }; body.appendChild(c); }
   for (const [k, d] of Object.entries(LFG_D)) {
+    if (X.lfgOk && !X.lfgOk(d)) continue;
     const c = el(`<div class="who"><div><b>${esc(d.name)}</b> <small>levels ${d.lvl[0]}-${d.lvl[1]}</small></div><button ${q || S.party.length >= (d.raid ? 12 : 6) ? 'disabled' : ''}>Queue</button></div>`);
     c.querySelector('button').onclick = () => { const m = queue(k); if (m) toast(m); refreshSheet(); }; body.appendChild(c);
   }
