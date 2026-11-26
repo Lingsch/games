@@ -682,10 +682,21 @@ function tabBags(body) {
   if (!S.bag.length) body.appendChild(el('<p class="dim">Your bags are empty.</p>'));
   const vend = S.ents.some(n => n.vendor && !n.dead && dist(S.hero, n) < 8), C0 = CLASSES[S.heroCls].abilities;
   if (vend && S.bag.some(it => it.junk)) { const b = el(`<div class="acts" style="margin:0 0 6px"><button>Sell all trade goods (${S.bag.filter(it => it.junk).reduce((a, it) => a + it.value, 0)}g)</button></div>`); b.querySelector('button').onclick = () => { P8.sellJunk(); refreshSheet(); }; body.appendChild(b); }
-  for (const it of S.bag) {
+  // Build 13: a gear focus to auto-equip by, and a sort
+  const G = Game.gearPrefs(), ups = new Set(S.bag.filter(it => Game.isUpgrade(it, G.focus)));
+  const gc = el(`<div class="card"><h3 style="margin:0 0 4px">Gear focus</h3><div class="seg" style="flex-wrap:wrap">${Game.FOCI.map(([k, n]) => `<button data-f="${k}" style="flex:1 0 auto;padding:0 8px" class="${G.focus === k ? 'on' : ''}">${n}</button>`).join('')}</div><p class="dim" style="font-size:12px;margin:4px 0">Power is strength and magic both: every attack and spell scales off it. Health comes from Stamina.</p><div class="acts"><button class="pri" data-a="auto">Equip best ${ups.size ? `(${ups.size} upgrade${ups.size > 1 ? 's' : ''})` : ''}</button><button data-a="tog">Auto-equip loot: ${G.auto ? 'on' : 'off'}</button></div><h3 style="margin:8px 0 4px">Sort</h3><div class="seg" style="flex-wrap:wrap">${[['new', 'Newest'], ['up', 'Upgrades'], ['rarity', 'Rarity'], ['lvl', 'Level'], ['slot', 'Slot'], ['value', 'Value']].map(([k, n]) => `<button data-s="${k}" style="flex:1 0 auto;padding:0 8px" class="${G.sort === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>`);
+  gc.onclick = ev => { const b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.f) G.focus = b.dataset.f; if (b.dataset.s) G.sort = b.dataset.s; if (b.dataset.a === 'tog') G.auto = !G.auto;
+    if (b.dataset.a === 'auto') { const put = Game.autoEquip(G.focus); toast(put.length ? `You put on ${put.length > 2 ? put.length + ' pieces' : put.join(' and ')}.` : 'You are already wearing your best for that.'); }
+    Game.save(); refreshSheet(); };
+  body.appendChild(gc);
+  const W = Game.focusW(G.focus), SO = Game.GEAR_SLOTS, gearish = it => SO.includes(it.slot) && !it.junk && !it.book;
+  const order = { up: (a, b) => (ups.has(b) - ups.has(a)) || (Game.itemScore(b, W) - Game.itemScore(a, W)), rarity: (a, b) => (b.rarity || 0) - (a.rarity || 0) || (b.lvl || 0) - (a.lvl || 0), lvl: (a, b) => (b.lvl || 0) - (a.lvl || 0) || (b.rarity || 0) - (a.rarity || 0), slot: (a, b) => (SO.indexOf(a.slot) + 1 || 99) - (SO.indexOf(b.slot) + 1 || 99) || Game.itemScore(b, W) - Game.itemScore(a, W), value: (a, b) => (b.value || 0) - (a.value || 0) }[G.sort];
+  const list = order ? [...S.bag].sort((a, b) => (!!a.junk - !!b.junk) || (G.sort === 'value' ? 0 : gearish(b) - gearish(a)) || order(a, b)) : [...S.bag].reverse();
+  for (const it of list) {
     const ok = Game.canWear(S.heroCls, it), cur = S.gear[S.heroCls][it.slot], bk = it.book, why = bk && (bk.blank ? (X.blankOptions(S.hero, bk.rank).length ? null : 'None of your spells are ready for this rank.') : X.whyNot(S.hero, bk.cls, bk.key, bk.rank));
     const note = bk ? (why ? `<p style="font-size:12px;margin:2px 0">${esc(why)}</p>` : '') : it.junk ? '' : ok ? '' : `<p style="font-size:12px;margin:2px 0">A ${CLASSES[S.heroCls].name} can't use this.</p>`;
-    const c = el(`<div class="card it" style="--c:${RARITY[it.rarity].c}">${itemHtml(it, ok ? cur : null)}${note}<div class="acts">${ok ? '<button data-a="eq">Equip</button>' : ''}${bk && !why ? '<button data-a="study">Study</button>' : ''}${vend ? `<button data-a="sell">Sell ${it.value}g</button>` : ''}${S.party.length > 1 ? '<button data-a="give">Give…</button>' : ''}${Craft.skill('enchanting') !== null && it.rarity >= 1 ? '<button data-a="de">Disenchant</button>' : ''}</div></div>`);
+    const c = el(`<div class="card it" style="--c:${RARITY[it.rarity].c}">${ups.has(it) ? '<span style="float:right;color:#7fd35a;font-weight:700;font-size:12px">▲ upgrade</span>' : ''}${itemHtml(it, ok ? cur : null)}${note}<div class="acts">${ok ? '<button data-a="eq">Equip</button>' : ''}${bk && !why ? '<button data-a="study">Study</button>' : ''}${vend ? `<button data-a="sell">Sell ${it.value}g</button>` : ''}${S.party.length > 1 ? '<button data-a="give">Give…</button>' : ''}${Craft.skill('enchanting') !== null && it.rarity >= 1 ? '<button data-a="de">Disenchant</button>' : ''}</div></div>`);
     c.onclick = ev => {
       const a = ev.target.dataset.a;
       if (a === 'eq') { Game.equip(it); refreshSheet(); }
@@ -952,7 +963,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 12 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 12.1 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

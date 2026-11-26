@@ -678,7 +678,48 @@ function questProgress(mob, near) {
 }
 
 // ---------- bags and loot ----------
-export function addToBag(it) { if (S.bag.length >= 30) { chat('sys', null, 'Your bags are full.'); return false; } S.bag.push(it); return true; }
+export function addToBag(it, back) { if (S.bag.length >= 30) { chat('sys', null, 'Your bags are full.'); return false; } S.bag.push(it); if (!back) autoOnLoot(it); return true; }
+// ---------- gear focus: sorting and auto-equip (Build 13) ----------
+// The game has four gear stats. Power is both strength and magic: every class's attacks and spells scale off it.
+export const GEAR_SLOTS = ['weapon', 'off', 'head', 'chest', 'legs', 'feet', 'neck', 'ring'];
+export const FOCI = [['role', 'Best for my role'], ['sta', 'Health'], ['pow', 'Power'], ['crit', 'Crit'], ['arm', 'Armor']];
+const ROLE_W = { tank: { sta: 1, arm: .35, pow: .4, crit: 1 }, healer: { pow: 1, crit: 2.5, sta: .45, arm: .05 }, dps: { pow: 1, crit: 3, sta: .3, arm: .05 } };
+const FOCUS_W = { sta: { sta: 1, arm: .1, crit: .1, pow: .05 }, pow: { pow: 1, crit: .5, sta: .05 }, crit: { crit: 1, pow: .05, sta: .02 }, arm: { arm: 1, sta: .3, pow: .02 } };
+export const gearPrefs = () => (S.ext.gear13 = S.ext.gear13 || { focus: 'role', sort: 'new', auto: false });
+export const focusW = f => FOCUS_W[f] || ROLE_W[CLASSES[S.heroCls]?.role] || ROLE_W.dps;
+export const itemScore = (it, W) => it && it.stats ? Object.entries(it.stats).reduce((a, [k, v]) => a + (W[k] || 0) * v, 0) : 0;
+const wearable = it => it && it.stats && GEAR_SLOTS.includes(it.slot) && !it.book && !it.junk && canWear(S.heroCls, it);
+function loadScore(set, W) {
+  let s = 0; const sets = {};
+  for (const k in set) { const it = set[k]; if (!it) continue; s += itemScore(it, W); if (it.set) sets[it.set] = (sets[it.set] || 0) + 1; }
+  for (const [id, n] of Object.entries(sets)) for (const [need, b] of Object.entries(SETS[id]?.bonus || {})) if (n >= +need) s += itemScore({ stats: b }, W);
+  return s;
+}
+// the best mix of worn and bagged gear for a focus. Set bonuses count, so a greedy pick that breaks a set is checked against keeping it.
+export function bestLoadout(f) {
+  const W = focusW(f), cur = S.gear[S.heroCls] || {}, pool = {}, greedy = {};
+  for (const s of GEAR_SLOTS) {
+    pool[s] = [cur[s], ...S.bag.filter(b => b.slot === s && wearable(b))].filter(Boolean);
+    greedy[s] = pool[s].reduce((a, b) => itemScore(b, W) > itemScore(a, W) + 1e-6 ? b : a, pool[s][0] || null);
+  }
+  let best = greedy, bs = loadScore(greedy, W);
+  for (const id of new Set(Object.values(pool).flat().map(it => it.set).filter(Boolean))) {
+    const t = { ...greedy };
+    for (const s of GEAR_SLOTS) { const p = pool[s].filter(it => it.set === id).sort((a, b) => itemScore(b, W) - itemScore(a, W))[0]; if (p) t[s] = p; }
+    const ts = loadScore(t, W); if (ts > bs + 1e-6) { best = t; bs = ts; }
+  }
+  return best;
+}
+export function isUpgrade(it, f) { if (!wearable(it)) return false; const W = focusW(f), cur = S.gear[S.heroCls] || {}; return loadScore({ ...cur, [it.slot]: it }, W) > loadScore(cur, W) + 1e-6; }
+export function autoEquip(f) {
+  const best = bestLoadout(f), cur = S.gear[S.heroCls] || {}, put = [];
+  for (const s of GEAR_SLOTS) if (best[s] && best[s] !== cur[s]) { equip(best[s]); put.push(best[s].name); }
+  return put;
+}
+function autoOnLoot(it) {
+  const g = S.ext?.gear13; if (!g?.auto || !S.hero || !isUpgrade(it, g.focus)) return;
+  equip(it); chat('loot', null, `You put on ${it.name}.`);
+}
 export function equip(it) {
   const cls = S.heroCls; if (!canWear(cls, it)) { chat('sys', null, `A ${CLASSES[cls].name} can't use that.`); return; }
   const old = S.gear[cls][it.slot]; S.gear[cls][it.slot] = it; S.bag = S.bag.filter(b => b !== it); if (old) S.bag.push(old);

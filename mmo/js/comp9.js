@@ -30,12 +30,12 @@ X.compTake = (who, it) => {
   const d = doll(who.name), old = d[it.slot];
   if (old && score(old) >= score(it)) { S.gold += it.value; chat('party', who.name, `mine's better, sold it for ${it.value}g`); return true; }
   d[it.slot] = it; refit(who); who.fake.mood += 2;
-  if (old && !Game.addToBag(old)) S.gold += old.value;
+  if (old && !Game.addToBag(old, true)) S.gold += old.value;
   chat('loot', null, `${who.name} puts on ${it.name}.`); chat('party', who.name, pick(['ty!! that\'s an upgrade', 'ooh shiny, thanks', 'putting it on now', 'nice, much better than what I had']));
   return true;
 };
-export function giveTo(who, it) { S.bag = S.bag.filter(x => x !== it); if (!X.compTake(who, it)) Game.addToBag(it); Game.save(); }
-export function takeBack(who, slot) { const d = doll(who.name), it = d[slot]; if (!it) return; if (!Game.addToBag(it)) { X.ui.toast('Your bags are full.'); return; } delete d[slot]; refit(who); Game.save(); }
+export function giveTo(who, it) { S.bag = S.bag.filter(x => x !== it); if (!X.compTake(who, it)) Game.addToBag(it, true); Game.save(); }
+export function takeBack(who, slot) { const d = doll(who.name), it = d[slot]; if (!it) return; if (!Game.addToBag(it, true)) { X.ui.toast("Your bags are full."); return; } delete d[slot]; refit(who); Game.save(); }
 
 // ---------- training ----------
 export const DRILLS = { drill: ['Weapon Drill', '⚔️', 'powP', .03, '% power'], endure: ['Endurance', '❤️', 'hpP', .04, '% health'], foot: ['Footwork', '🦶', 'dodge', .015, '% dodge'], sense: ['Battle Sense', '🧠', 'crit', .01, '% critical chance'] };
