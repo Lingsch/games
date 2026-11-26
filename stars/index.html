@@ -293,5 +293,11 @@ h3.qt{margin:4px 0 6px;font:700 15px Orbitron,serif}h3.qt .dim{font:500 12px 'Ex
 <div id="title" class="hide"><div id="titleIn"></div></div>
 <div id="toast"></div>
 <div id="tip" class="plate hide"></div>
-<script type="module" src="js/main.js"></script>
+<script src="../sync.js"></script>
+<script type="module">
+// Save sync first (so the newest save is in place), then the game.
+if (window.RodSync) { try { await RodSync.start({ game: "stars", keys: ["stars-beneath-1"] }); } catch (e) { console.warn(e); } }
+await import("./js/main.js");
+if (window.RodSync) RodSync.arm();
+</script>
 </body></html>
