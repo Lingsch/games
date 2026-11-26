@@ -183,15 +183,15 @@ X.release = () => {
 // ---------- loot: need/greed, master looter, DKP or a loot council ----------
 export const LOOT_MODES = { needgreed: 'Need / Greed', master: 'Master looter', dkp: 'DKP', council: 'Loot council' };
 const lootMode = () => (S.zone === RAID || S.zone?.startsWith('h_') || S.party.length > 6) ? (S.ext.guild?.loot || 'needgreed') : 'master';
-const wants = (p, it) => it.slot !== 'collect' && it.slot !== 'recipe' && Game.canWear(p.cls, it);
+const wants = (p, it) => it.book ? X.canStudy(p, it) : it.slot !== 'collect' && it.slot !== 'recipe' && Game.canWear(p.cls, it);
 X.kill.push(m => {
   if (!(m.raidBoss || MOBS[m.mob]?.raidBoss) || S.zone !== RAID) return;
   S.ext.dkp = S.ext.dkp || {}; for (const p of S.party) S.ext.dkp[p.name] = (S.ext.dkp[p.name] || 0) + 10;
   setTimeout(() => { const mode = lootMode(); if (mode === 'master' || !m.loot?.length) return; distribute(m, mode); }, 50);
 });
 function distribute(m, mode) {
-  const items = m.loot.filter(it => it.slot !== 'collect'); if (!items.length) return;
-  m.loot = m.loot.filter(it => it.slot === 'collect');     // collectibles stay on the body for you
+  const items = m.loot.filter(it => it.slot !== 'collect' && !X.isSmall?.(it)); if (!items.length) return;
+  m.loot = m.loot.filter(it => it.slot === 'collect' || X.isSmall?.(it));     // collectibles stay on the body for you
   const { el, esc, openSheet, refreshSheet, closeSheet } = X.ui;
   const rolls = items.map(it => ({ it, mine: null, done: false }));
   const resolve = r => {
@@ -213,13 +213,14 @@ function distribute(m, mode) {
       if (winner) { const off = S.party.filter(p => p.fake && p !== winner)[0]; if (off) setTimeout(() => chat('guild', off.name, pick(['fair call', 'hm. ok', `grats ${winner.name}`, 'council has spoken', 'i would have picked differently but ok'])), 1500); }
     }
     chat('party', null, line);
+    if (winner && !winner.isHero && it.book) Game.assignLoot({ loot: [it] }, it, winner);
     if (winner?.isHero) { if (!Game.addToBag(it)) chat('sys', null, 'Your bags are full; the item goes to the guild bank.'); }
     r.done = true;
   };
   openSheet(`${m.name}: ${LOOT_MODES[mode]}`, body => {
     body.appendChild(el(`<p class="dim" style="margin:0 0 6px">${mode === 'dkp' ? `Your DKP: ${S.ext.dkp[S.hero.name] || 0}` : mode === 'council' ? 'You and your officers decide.' : 'Roll for what you want.'}</p>`));
     for (const r of rolls) {
-      const it = r.it, can = Game.canWear(S.heroCls, it);
+      const it = r.it, can = it.book ? X.canStudy(S.hero, it) : Game.canWear(S.heroCls, it);
       const c = el(`<div class="card it" style="--c:${RARITY[it.rarity].c}"><b style="color:${RARITY[it.rarity].c}">${esc(it.name)}</b> <span class="dim">L${it.lvl} ${it.slot}${can ? '' : ' · not for you'}</span><div class="acts"></div></div>`);
       const acts = c.querySelector('.acts');
       if (r.done) acts.textContent = 'Done.';

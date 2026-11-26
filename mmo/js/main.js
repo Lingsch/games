@@ -21,11 +21,13 @@ import './wastes7.js';
 import './wastesq.js';
 import * as Raid from './raid7.js';
 import './soul7.js';
+import './spell8.js';
+import * as P8 from './party8.js';
 import './heroic7.js';
 import './ach7.js';
 
 UI.init();
-window.__G = { S, Game, Cb, UI, Sea, world, Rep, Social, X, Vale6, Raid }; // a handle for testing from the console
+window.__G = { S, Game, Cb, UI, Sea, world, Rep, Social, X, Vale6, Raid, P8 }; // a handle for testing from the console
 generateWorld(7);                 // a backdrop for the title screen
 UI.showTitle();
 document.getElementById('load').remove();

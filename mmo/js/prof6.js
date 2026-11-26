@@ -81,7 +81,7 @@ coastHooks.build.push(({ rng }) => {
   placeNodes('coast', rng, 400, 30, 16, 26, 10);
   // Crookwater's crafting yard: every station the Vale has, plus a salvage bench, and three trainers
   const C = C6.crook, Y = { x: C.x - 6, z: C.z + 12 };
-  for (const [k, dx, dz] of [['forge', -5, -3], ['tanrack', -6, 2.5], ['loom', -2, 6], ['alchemy', 3.5, 5.5], ['cookfire', 5.5, 0], ['enchant', 1.5, -5], ['salvage', -1, -1]])
+  for (const [k, dx, dz] of [['forge', -5, -3], ['tanrack', -6, 2.5], ['loom', -2, 6], ['alchemy', 3.5, 5.5], ['cookfire', 5.5, 0], ['enchant', 1.5, -5], ['salvage', -1, -1], ['scribe', 4.2, -4.2]])
     world.props.push({ id: 'c6' + k, kind: k, tag: 'station', station: k, name: Craft.STATIONS[k].name, x: Y.x + dx, z: Y.z + dz, yaw: Math.atan2(-dx, -dz), scale: 1 });
   world.storyNpcs.push({ key: 'smith6', x: Y.x - 3, z: Y.z - 1, yaw: Math.PI / 3 }, { key: 'weaver6', x: Y.x - 4, z: Y.z + 5, yaw: Math.PI * .8 }, { key: 'herb6', x: Y.x + 5, z: Y.z + 3, yaw: -Math.PI * .7 });
   world.extraPlaces.push({ name: "Crookwater's Workyard", x: Y.x, z: Y.z, R: 7, kind: 'site' });

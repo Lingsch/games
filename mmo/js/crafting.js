@@ -135,6 +135,7 @@ function makeGear(r) {
   if (o.jewel) type = o.slot;
   return makeItem({ name, slot: o.slot, type, armorType, lvl: L, rarity: rar, stats, value: Math.round((3 + L * 4) * 4), crafted: true });
 }
+export const craftHooks = {};          // Build 8: tome -> blank tome item, mat -> add a material
 export function haveMats(r, n = 1) { return Object.entries(r.mats).every(([k, v]) => (S.mats[k] || 0) >= v * n); }
 // returns a message for the player
 export function craft(id, G, who = null) {
@@ -144,10 +145,12 @@ export function craft(id, G, who = null) {
   if (!haveMats(r)) return "You don't have the materials.";
   const o = r.out;
   if (o.ench) { const it = S.gear[S.heroCls][o.slot]; if (!it) return `You have no ${o.slot} equipped to enchant.`; }
-  if (o.slot && !o.ench && S.bag.length >= 30) return 'Your bags are full.';
+  if ((o.slot || o.tome) && !o.ench && S.bag.length >= 30) return 'Your bags are full.';
   for (const [k, v] of Object.entries(r.mats)) S.mats[k] -= v;
   if (o.pot) { S.pots[o.pot] = (S.pots[o.pot] || 0) + o.n; chat('loot', null, `You make ${r.name}.`); }
   else if (o.cons) { S.cons[o.cons] = (S.cons[o.cons] || 0) + o.n; chat('loot', null, `You make ${o.n} ${CONS[o.cons].name}.`); }
+  else if (o.mat) { craftHooks.mat(o.mat, o.n); chat('loot', null, `${who ? who.name + ' makes' : 'You make'} ${r.name}.`); }
+  else if (o.tome) { const it = craftHooks.tome(o.tome); G.addToBag(it); chat('loot', null, `${who ? who.name + ' writes' : 'You write'} a ${it.name}.`); }
   else if (o.ench) { const it = S.gear[S.heroCls][o.slot]; if (it.ench) it.stats[it.ench.stat] = Math.max(0, (it.stats[it.ench.stat] || 0) - it.ench.n); it.ench = { stat: o.ench, n: o.n, name: r.name.replace(/^Enchant \w+: /, '') }; it.stats[o.ench] = +((it.stats[o.ench] || 0) + o.n).toFixed(1); G.applyGear(S.hero, S.gear[S.heroCls]); chat('loot', null, `${it.name} glows: ${it.ench.name}.`); }
   else { const it = makeGear(r); G.addToBag(it); chat('loot', null, `${who ? who.name + ' makes' : 'You make'} ${it.name}.`); }
   skillUp(r.prof, r.req, who);
@@ -226,10 +229,10 @@ export function decorate(zone, seed) {
   }
   if (zone === 'vale') {
     // the crafters' quarter, inside the walls in the south-west of town
-    const Y = YARD, st = [['forge', -5, -3.5], ['tanrack', -6.5, 2], ['loom', -2, 6], ['alchemy', 3.5, 5.5], ['cookfire', 5.5, -.5], ['enchant', 1.5, -5.5]];
+    const Y = YARD, st = [['forge', -5, -3.5], ['tanrack', -6.5, 2], ['loom', -2, 6], ['alchemy', 3.5, 5.5], ['cookfire', 5.5, -.5], ['enchant', 1.5, -5.5], ['scribe', -3, -6.8]];
     for (const [k, dx, dz] of st) world.props.push({ id: 's' + k, kind: k, tag: 'station', station: k, name: STATIONS[k].name, x: Y.x + dx, z: Y.z + dz, yaw: Math.atan2(-dx, -dz), scale: 1 });
     world.storyNpcs.push({ key: 'smith', x: Y.x - 2.8, z: Y.z - 2.2, yaw: Math.PI / 4 }, { key: 'weaver', x: Y.x - .6, z: Y.z + 3.2, yaw: Math.PI }, { key: 'herbalist', x: Y.x + 2.2, z: Y.z + 2.6, yaw: Math.PI * .8 },
-      { key: 'cook', x: Y.x + 3, z: Y.z - .6, yaw: -Math.PI / 2 }, { key: 'tanner2', x: Y.x - 3.8, z: Y.z + 1, yaw: Math.PI / 2 });
+      { key: 'cook', x: Y.x + 3, z: Y.z - .6, yaw: -Math.PI / 2 }, { key: 'tanner2', x: Y.x - 3.8, z: Y.z + 1, yaw: Math.PI / 2 }, { key: 'quill', x: Y.x - 1.2, z: Y.z - 4.6, yaw: Math.PI * .1 });
     world.extraPlaces.push({ name: "The Crafters' Quarter", x: Y.x, z: Y.z, R: 8, kind: 'site' });
     // nothing hostile spawns on top of the yard
     world.spawns = world.spawns.filter(sp => Math.hypot(sp.x - Y.x, sp.z - Y.z) > 26);

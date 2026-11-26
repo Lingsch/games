@@ -25,7 +25,7 @@ for (const q of QUESTS) q.xp = Math.round((q.xp || 0) * Cb.XP_RATE);
 // ---------- gear ----------
 export function canWear(cls, it) {
   if (it.slot === 'ring' || it.slot === 'neck') return true;
-  if (it.slot === 'recipe' || it.slot === 'collect') return false;
+  if (it.slot === 'recipe' || it.slot === 'collect' || it.slot === 'book' || it.slot === 'junk') return false;
   if (it.slot === 'weapon') return WTYPE[cls][0] === it.type;
   if (it.slot === 'off') return WTYPE[cls][1] === it.type;
   return WEAR[CLASSES[cls].armor].includes(it.armorType);
@@ -685,6 +685,14 @@ export function assignLoot(mob, it, who) {
   mob.loot = mob.loot.filter(x => x !== it);
   if (it.recipe) { if (!Craft.learnRecipe(it.recipe)) chat('sys', null, 'You already know that recipe.'); save(); return; }
   if (it.collect) { Loot5.collect(it.collect); save(); return; }
+  if (X.takeSmall && (it.pot || it.mat || it.junk) && who === S.hero) { if (!X.takeSmall(it)) mob.loot.push(it); return; }
+  if (it.book && who !== S.hero) {
+    // a companion studies a tome they can use; one they can't, they sell for the group
+    const why = it.book.blank ? (X.blankOptions(who, it.book.rank).length ? null : 'no') : X.whyNot(who, it.book.cls, it.book.key, it.book.rank);
+    if (!why) { const k = it.book.blank ? pick(X.blankOptions(who, it.book.rank)) : null; X.study(who, it, k); who.fake.mood += 2; }
+    else { S.gold += it.value; chat('party', who.name, `can't use this one, sold it and put the ${it.value}g in your pocket`); }
+    chat('loot', null, `${who.name} receives ${it.name}.`); save(); return;
+  }
   if (who === S.hero) {
     if (!addToBag(it)) { mob.loot.push(it); return; }
     chat('loot', null, `You receive ${it.name}.`);

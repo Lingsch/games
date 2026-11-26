@@ -15,6 +15,7 @@ import * as Craft from './crafting.js';
 import * as Loot5 from './loot5.js';
 import { TESTIMONY } from './mystery.js';
 import { SET, OPTS, setOpt, apply as applySettings } from './settings.js';
+import * as P8 from './party8.js';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -66,7 +67,7 @@ function showTip(i, el) {
   const key = shownBar()[i]; if (!key) return;
   const tip = $('tip');
   if (key === 'attack') tip.innerHTML = '<b>Auto Attack</b><br>Toggle attacking your target with your weapon.';
-  else { const ab = CLASSES[S.heroCls].abilities[key]; const c = Cb.costOf(S.hero, ab); tip.innerHTML = `<b>${esc(rankName(S.hero, ab))}</b> ${ab.kind === 'ult' ? '· Ultimate' : ''}${rankOf(S.hero, ab) > 1 ? ' <span style="color:var(--acc)">(35% stronger)</span>' : ''}<br>${esc(ab.desc)}<br><span class="dim">${c ? c + ' ' + S.hero.resType + ' · ' : ''}${ab.cast ? ab.cast + ' s cast' : 'Instant'}${ab.cd ? ' · ' + ab.cd + ' s cooldown' : ''}</span>`; }
+  else { const ab = CLASSES[S.heroCls].abilities[key]; const c = Cb.costOf(S.hero, ab); tip.innerHTML = `<b>${esc(rankName(S.hero, ab))}</b> ${ab.kind === 'ult' ? '· Ultimate' : ''}<br>${esc(ab.desc)}<br><span class="dim">${c ? c + ' ' + S.hero.resType + ' · ' : ''}${ab.cast ? ab.cast + ' s cast' : 'Instant'}${ab.cd ? ' · ' + ab.cd + ' s cooldown' : ''}</span>`; }
   const r = el.getBoundingClientRect(); tip.classList.remove('hide');
   tip.style.left = clamp(r.left - 60, 6, innerWidth - 250) + 'px'; tip.style.top = (r.top - tip.offsetHeight - 8) + 'px';
 }
@@ -329,15 +330,7 @@ function updateFrames() {
     else if (t.mob && t.dead && t.loot?.length && t.lootFor === 'party') btns = `<button data-a="loot">Loot</button>`;
     if (!t.prop && !t.corpse && !(t.mob && t.dead)) btns += '<button data-a="insp">Inspect</button>';
     if ($('tgtBtns')._s !== btns) { $('tgtBtns').innerHTML = btns; $('tgtBtns')._s = btns; }
-    // threat on the target
-    let th = '';
-    if (t.mob && t.engaged && !t.dead && t.threat.size) {
-      const rows = [...t.threat.entries()].filter(([e]) => !e.dead).sort((a, b) => b[1] - a[1]).slice(0, 4), top = rows[0]?.[1] || 1;
-      const tankTop = rows[0] && roleOf(rows[0][0]) === 'tank';
-      th = rows.map(([e, v]) => { const me = e === h, hot = me && roleOf(h) !== 'tank' && v > top * .9 && rows[0][0] !== h && tankTop; return `<div class="th ${me ? 'me' : ''} ${hot ? 'hot' : ''}"><b>${esc(e.name)}</b><span>${Math.round(v / top * 100)}%</span><div class="bar" style="grid-column:1/3"><i style="width:${v / top * 100}%;background:${e === t.target ? '#ff6a4a' : CLASSES[e.cls]?.color || '#999'}"></i></div></div>`; }).join('');
-      th = '<div class="dim" style="font-size:10px">Threat</div>' + th;
-    }
-    if ($('threat')._s !== th) { $('threat').innerHTML = th; $('threat')._s = th; }
+    // threat is kept hidden: tanking is read from the fight, not a meter
   }
   // quest tracker under the target frame
   const tr = $('track'), r = tf.classList.contains('hide') ? null : tf.getBoundingClientRect();
@@ -356,7 +349,7 @@ function updateFrames() {
   const qn = QUESTS.filter(q => S.quests[q.id]?.state === 'done').length;
   if (qn) $('bookBtn').dataset.n = qn; else delete $('bookBtn').dataset.n;
 }
-const BUFF_ICON = { mounted: '🐎', guildbanner: '🏳️', fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
+const BUFF_ICON = { scroll: '📜', mounted: '🐎', guildbanner: '🏳️', fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
   focusmind: '🎯', wolfspirit: '🐺', markwild: '🐾', poisonblades: '🗡️', restsong: '🎼', hastesong: '🥁', haste: '⏩', ward: '🛡️', shelter: '🔯', renew: '🌱', rejuv: '🍃', wild: '🌳', regrowth: '🍀',
   bear: '🐻', cat: '🐆', chain: '🤺', untouch: '🌪️', crescendo: '🎺', empower: '💪', unbound: '🌋', treeoflife: '🌲', guard: '🛡️', evade: '💨', shadowstep: '🌑', fists: '👐', crescendo2: '🎶' };
 for (const c in CLASSES) for (const [k, a] of Object.entries(CLASSES[c].abilities)) if (!BUFF_ICON[k]) BUFF_ICON[k] = a.icon;
@@ -455,7 +448,7 @@ function itemHtml(it, cmp) {
   const rc = RARITY[it.rarity].c, s = it.stats;
   const st = Object.entries(s).map(([k, v]) => { const dlt = cmp ? v - (cmp.stats[k] || 0) : 0; return `<span>${{ sta: 'Stamina', pow: 'Power', crit: 'Crit %', arm: 'Armor' }[k]} ${v}${cmp && dlt ? ` <i class="${dlt > 0 ? 'up' : 'down'}">${dlt > 0 ? '+' : ''}${Math.round(dlt * 10) / 10}</i>` : ''}</span>`; }).join('');
   if (cmp) for (const k in cmp.stats) if (!(k in s)) { }
-  return `<b>${esc(it.name)}</b> <span class="dim">· ${SLOT_NAMES[it.slot]}${it.armorType ? ' · ' + it.armorType : it.type && it.type !== it.slot ? ' · ' + it.type : ''} · L${it.lvl}${it.crafted ? ' · crafted' : ''}</span><div class="st">${st}</div>${it.ench ? `<div class="dim" style="font-size:11.5px;color:#8affff">✨ ${esc(it.ench.name)}</div>` : ''}${it.set && SETS[it.set] ? `<div style="font-size:11.5px;color:#d8b24a">Set: ${esc(SETS[it.set].name)}. ${esc(SETS[it.set].desc)}</div>` : ''}`;
+  return `<b>${esc(it.name)}</b> <span class="dim">· ${SLOT_NAMES[it.slot]}${it.armorType ? ' · ' + it.armorType : it.type && it.type !== it.slot ? ' · ' + it.type : ''} · L${it.lvl}${it.crafted ? ' · crafted' : ''}</span><div class="st">${st}</div>${it.desc ? `<div style="font-size:12px;color:#d8c890">${esc(it.desc)}</div>` : ''}${it.ench ? `<div class="dim" style="font-size:11.5px;color:#8affff">✨ ${esc(it.ench.name)}</div>` : ''}${it.set && SETS[it.set] ? `<div style="font-size:11.5px;color:#d8b24a">Set: ${esc(SETS[it.set].name)}. ${esc(SETS[it.set].desc)}</div>` : ''}`;
 }
 let bookTab = 'char';
 export function openBook(tab) {
@@ -564,8 +557,8 @@ function tabSpells(body) {
   body.appendChild(el(`<p class="dim" style="margin-top:0">Tap a spell to put it on the bar, then tap a bar slot below to place it. Swap two bar slots by tapping one, then the other. Default bars hold your active spells, then your buffs, then the ultimate.</p>`));
   const slots = el('<div id="barEdit" style="display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin-bottom:10px"></div>');
   bar.forEach((k, i) => {
-    const ab = k && k !== 'attack' ? C.abilities[k] : null;
-    const b = el(`<button style="min-height:46px;font-size:20px;padding:0;${editPick === i || (pendingSpell && 1) ? '' : ''}${swapEdit === i ? 'box-shadow:0 0 0 2px var(--acc)' : ''}">${k ? (k === 'attack' ? '⚔️' : ab.icon) : '·'}</button>`);
+    const ab = k && k !== 'attack' ? C.abilities[k] : null, known = !ab || ab.lvl <= h.lvl;
+    const b = el(`<button style="min-height:46px;font-size:20px;padding:0;${swapEdit === i ? 'box-shadow:0 0 0 2px var(--acc)' : ''}">${k && known ? (k === 'attack' ? '⚔️' : ab.icon) : '·'}</button>`);
     b.onclick = () => {
       if (pendingSpell !== null) { const j = bar.indexOf(pendingSpell); if (j >= 0) bar[j] = bar[i]; bar[i] = pendingSpell; pendingSpell = null; refreshKeys(true); refreshSheet(); return; }
       if (swapEdit >= 0) { [bar[swapEdit], bar[i]] = [bar[i], bar[swapEdit]]; swapEdit = -1; refreshKeys(true); refreshSheet(); return; }
@@ -577,14 +570,14 @@ function tabSpells(body) {
   const tools = el('<div class="acts" style="margin:-4px 0 10px"><button data-a="clear">Clear selected slot</button><button data-a="reset">Reset to default</button></div>');
   tools.onclick = ev => { const a = ev.target.dataset.a; if (a === 'clear' && swapEdit >= 0) { bar[swapEdit] = null; swapEdit = -1; } if (a === 'reset') S.bar[S.heroCls] = defaultBar(S.heroCls); refreshKeys(true); refreshSheet(); };
   body.appendChild(tools);
-  const all = [['attack', { name: 'Auto Attack', icon: '⚔️', lvl: 1, kind: 'attack', desc: 'Toggle attacking your target with your weapon.' }], ...Object.entries(C.abilities)];
+  const all = [['attack', { name: 'Auto Attack', icon: '⚔️', lvl: 1, kind: 'attack', desc: 'Toggle attacking your target with your weapon.' }], ...Object.entries(C.abilities).filter(([, a]) => a.lvl <= h.lvl)];
   for (const [k, ab] of all) {
-    const lock = ab.lvl > h.lvl, cost = k === 'attack' ? 0 : Cb.costOf(h, ab), onBar = bar.includes(k);
-    const card = el(`<div class="card sp ${lock ? 'lock' : ''}" style="${pendingSpell === k ? 'box-shadow:0 0 0 2px var(--acc)' : ''}"><div class="ic">${ab.icon}</div><div style="flex:1"><b>${esc(k === 'attack' ? ab.name : rankName(h, ab))}</b> <small>${ab.kind === 'ult' ? 'ULTIMATE' : ab.kind.toUpperCase()}</small> <span class="dim">${lock ? '· level ' + ab.lvl : k !== 'attack' && rankOf(h, ab) < 2 && ab.lvl + 10 <= MAX_LVL ? '· Rank II at ' + (ab.lvl + 10) : ''}</span><p style="margin:2px 0">${esc(ab.desc)}</p><span class="dim" style="font-size:12px">${cost ? cost + ' ' + h.resType + ' · ' : ''}${ab.cast ? ab.cast + ' s cast' : 'Instant'}${ab.cd ? ' · ' + ab.cd + ' s cooldown' : ''}${onBar ? ' · on bar' : ''}</span></div></div>`);
+    const lock = false, cost = k === 'attack' ? 0 : Cb.costOf(h, ab), onBar = bar.includes(k);
+    const card = el(`<div class="card sp ${lock ? 'lock' : ''}" style="${pendingSpell === k ? 'box-shadow:0 0 0 2px var(--acc)' : ''}"><div class="ic">${ab.icon}</div><div style="flex:1"><b>${esc(k === 'attack' ? ab.name : rankName(h, ab))}</b> <small>${ab.kind === 'ult' ? 'ULTIMATE' : ab.kind.toUpperCase()}</small> <p style="margin:2px 0">${esc(ab.desc)}</p><span class="dim" style="font-size:12px">${cost ? cost + ' ' + h.resType + ' · ' : ''}${ab.cast ? ab.cast + ' s cast' : 'Instant'}${ab.cd ? ' · ' + ab.cd + ' s cooldown' : ''}${onBar ? ' · on bar' : ''}</span></div></div>`);
     card.onclick = () => { pendingSpell = pendingSpell === k ? null : k; swapEdit = -1; refreshSheet(); };
     body.appendChild(card);
   }
-  if (Object.values(C.abilities).some(a => a.kind === 'ult')) body.appendChild(el(`<p class="dim" style="font-size:12px">Ultimates charge from fighting: damage dealt, damage taken and healing done fill the gold strip on the key.</p>`));
+  if (Object.values(C.abilities).some(a => a.kind === 'ult' && a.lvl <= h.lvl)) body.appendChild(el(`<p class="dim" style="font-size:12px">Ultimates charge from fighting: damage dealt, damage taken and healing done fill the gold strip on the key.</p>`));
 }
 let pendingSpell = null, swapEdit = -1, editPick = -1;
 function tabLore(body) {
@@ -687,13 +680,17 @@ export function openCraft(st) {
 function tabBags(body) {
   body.appendChild(el(`<p style="margin-top:0">Gold: <b style="color:var(--acc)">${S.gold}</b> · Potions: 🧪 ${S.pots.hpot} · 💧 ${S.pots.mpot} · Bags ${S.bag.length}/30</p>`));
   if (!S.bag.length) body.appendChild(el('<p class="dim">Your bags are empty.</p>'));
-  const vend = S.ents.some(n => n.vendor && !n.dead && dist(S.hero, n) < 8);
+  const vend = S.ents.some(n => n.vendor && !n.dead && dist(S.hero, n) < 8), C0 = CLASSES[S.heroCls].abilities;
+  if (vend && S.bag.some(it => it.junk)) { const b = el(`<div class="acts" style="margin:0 0 6px"><button>Sell all trade goods (${S.bag.filter(it => it.junk).reduce((a, it) => a + it.value, 0)}g)</button></div>`); b.querySelector('button').onclick = () => { P8.sellJunk(); refreshSheet(); }; body.appendChild(b); }
   for (const it of S.bag) {
-    const ok = Game.canWear(S.heroCls, it), cur = S.gear[S.heroCls][it.slot];
-    const c = el(`<div class="card it" style="--c:${RARITY[it.rarity].c}">${itemHtml(it, ok ? cur : null)}${ok ? '' : `<p style="font-size:12px;margin:2px 0">A ${CLASSES[S.heroCls].name} can't use this.</p>`}<div class="acts">${ok ? '<button data-a="eq">Equip</button>' : ''}${vend ? `<button data-a="sell">Sell ${it.value}g</button>` : ''}${S.party.length > 1 ? '<button data-a="give">Give…</button>' : ''}${Craft.skill('enchanting') !== null && it.rarity >= 1 ? '<button data-a="de">Disenchant</button>' : ''}</div></div>`);
+    const ok = Game.canWear(S.heroCls, it), cur = S.gear[S.heroCls][it.slot], bk = it.book, why = bk && (bk.blank ? (X.blankOptions(S.hero, bk.rank).length ? null : 'None of your spells are ready for this rank.') : X.whyNot(S.hero, bk.cls, bk.key, bk.rank));
+    const note = bk ? (why ? `<p style="font-size:12px;margin:2px 0">${esc(why)}</p>` : '') : it.junk ? '' : ok ? '' : `<p style="font-size:12px;margin:2px 0">A ${CLASSES[S.heroCls].name} can't use this.</p>`;
+    const c = el(`<div class="card it" style="--c:${RARITY[it.rarity].c}">${itemHtml(it, ok ? cur : null)}${note}<div class="acts">${ok ? '<button data-a="eq">Equip</button>' : ''}${bk && !why ? '<button data-a="study">Study</button>' : ''}${vend ? `<button data-a="sell">Sell ${it.value}g</button>` : ''}${S.party.length > 1 ? '<button data-a="give">Give…</button>' : ''}${Craft.skill('enchanting') !== null && it.rarity >= 1 ? '<button data-a="de">Disenchant</button>' : ''}</div></div>`);
     c.onclick = ev => {
       const a = ev.target.dataset.a;
       if (a === 'eq') { Game.equip(it); refreshSheet(); }
+      if (a === 'study') { if (bk.blank) { const acts = c.querySelector('.acts'); acts.innerHTML = X.blankOptions(S.hero, bk.rank).map(k => `<button data-w="${k}">${C0[k].icon} ${esc(C0[k].name)}</button>`).join(''); return; } const m = X.study(S.hero, it); if (m) toast(m); Game.save(); refreshKeys(true); refreshSheet(); }
+      if (ev.target.dataset.w) { const m = X.study(S.hero, it, ev.target.dataset.w); if (m) toast(m); Game.save(); refreshKeys(true); refreshSheet(); }
       if (a === 'sell') { Game.sell(it); refreshSheet(); }
       if (a === 'de') { const m = Craft.disenchant(it, Game); if (m) toast(m); refreshSheet(); }
       if (a === 'give') { const acts = c.querySelector('.acts'); acts.innerHTML = S.party.filter(p => !p.isHero).map((p, i) => `<button data-g="${i}">${esc(p.name)}${Game.canWear(p.cls, it) ? ' ✓' : ''}</button>`).join(''); }
@@ -888,6 +885,8 @@ export function openLoot(m) {
   if (!m.loot?.length || m.lootFor !== 'party') return;
   if (dist(S.hero, m) > 8) { toast('Too far away'); return; }
   if (m.lootGold) { S.gold += m.lootGold; chat('loot', null, `You loot ${m.lootGold} gold.`); m.lootGold = 0; }
+  m.loot = m.loot.filter(it => !(X.isSmall(it) && X.takeSmall(it)));
+  if (!m.loot.length) { Game.save(); return; }
   openSheet('Loot: ' + m.name, body => {
     if (!m.loot.length) { body.appendChild(el('<p class="dim">Nothing left.</p>')); setTimeout(closeSheet, 400); return; }
     body.appendChild(el('<p class="dim" style="margin-top:0">You are the master looter. Choose who gets each item. Your companions notice whether you\'re fair.</p>'));
@@ -931,6 +930,7 @@ function renderSettings(box, inGame, back) {
 const segHtml = k => { const [label, opts] = OPTS[k]; return `<p class="setl">${label}</p><div class="seg">${opts.map(([n, v]) => `<button data-o="${k}" data-v="${v}" class="${SET[k] === v ? 'on' : ''}">${n}</button>`).join('')}</div>`; };
 function openMenu() {
   openSheet('Menu', body => {
+    const st = document.createElement('div'); st.innerHTML = P8.statsHtml(); st.onclick = ev => P8.statsClick(ev); body.appendChild(st);
     const box = document.createElement('div'); body.appendChild(box);
     renderSettings(box, true, null);
     const nw = el('<div class="card"><h3>New character</h3><p>Start someone new from the title screen. You only have room for one character on this device, so copy your save code first.</p><div class="acts"><button>Back to the title screen</button></div></div>');
@@ -944,7 +944,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 7 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 8 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

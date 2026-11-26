@@ -1,6 +1,6 @@
 // Entities, stats, tab-target combat, threat, buffs, casting, death, experience and loot.
 import { S, clamp, dist, angTo, rnd, pick, chat, floatText, nextId } from './core.js';
-import { CLASSES, MOBS, GCD, mobHp, mobDmg, mobXp, xpNeed, MAX_LVL, SCHOOL_COL, randomGear, NAMED_LOOT, makeItem, QUESTS, CHAT, RES, startRes, PETS, roleOf, rankOf, specialLoot } from './data.js';
+import { CLASSES, MOBS, GCD, mobHp, mobDmg, mobXp, xpNeed, MAX_LVL, SCHOOL_COL, randomGear, NAMED_LOOT, makeItem, QUESTS, CHAT, RES, startRes, PETS, roleOf, rankOf, rankMul, costMul, cdMul, specialLoot } from './data.js';
 import { hgt, blocked, world } from './world.js';
 import * as R from './render.js';
 
@@ -376,7 +376,7 @@ export const C = { leapTo, stepBehind, pw, damage, heal, gain, taunt, dropThreat
 
 // ---------- using abilities ----------
 export function abilityOf(e, key) { return key === 'attack' ? null : CLASSES[e.cls]?.abilities[key]; }
-export function costOf(e, ab) { const c = ab.cost || 0; return e.resType === 'mana' ? Math.round(c / 100 * e.resMax) : c; }
+export function costOf(e, ab) { const c = (ab.cost || 0) * costMul(e, ab); return e.resType === 'mana' ? Math.round(c / 100 * e.resMax) : Math.round(c); }
 // why an ability can't be used right now, or null if it can
 export function cantUse(e, key, t) {
   const ab = abilityOf(e, key); if (!ab) return 'none';
@@ -430,12 +430,12 @@ export function useAbility(e, key, t) {
 function finish(e, key, tt) {
   const ab = abilityOf(e, key);
   e.res -= costOf(e, ab);
-  if (ab.cd) e.cds[key] = ab.cd;
+  if (ab.cd) e.cds[key] = ab.cd * cdMul(e, ab);
   if (ab.kind === 'ult') e.ult = 0;
   e.lastCast = S.time; e.anim.atk = 1; e.sit = false;
   if (ab.tgt === 'enemy' && tt && !e.autoOn && (CLASSES[e.cls].res !== 'mana' || e.cls === 'bard' || hasBuff(e, 'cat') || hasBuff(e, 'bear'))) { e.target = tt; e.autoOn = true; }
-  if (key === 'aimed' && hasBuff(e, 'deadeye')) { e.buffs = e.buffs.filter(b => b.id !== 'deadeye'); curRank = rankOf(e, ab) > 1 ? 1.35 : 1; try { CLASSES.longwatch.abilities.aimed.fx(C, e, tt); } finally { curRank = 1; } const p = projectiles[projectiles.length - 1]; if (p) p.opts = { ...p.opts, sureCrit: true }; }
-  else { curRank = rankOf(e, ab) > 1 ? 1.35 : 1; try { ab.fx(C, e, tt, ab); } finally { curRank = 1; } }
+  if (key === 'aimed' && hasBuff(e, 'deadeye')) { e.buffs = e.buffs.filter(b => b.id !== 'deadeye'); curRank = rankMul(e, ab); try { CLASSES.longwatch.abilities.aimed.fx(C, e, tt); } finally { curRank = 1; } const p = projectiles[projectiles.length - 1]; if (p) p.opts = { ...p.opts, sureCrit: true }; }
+  else { curRank = rankMul(e, ab); try { ab.fx(C, e, tt, ab); } finally { curRank = 1; } }
   if (ab.kind === 'attack' || ab.kind === 'util') { if (tt && tt !== e && tt.mob && !tt.engaged) addThreat(tt, e, 1); }
   const col = SC[ab.school || (ab.kind === 'heal' ? 'holy' : 'phys')] || SC.phys;
   R.burst(e.x, e.y + 1.6, e.z, 8, col, 1.5, .5, .4);

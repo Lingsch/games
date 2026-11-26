@@ -111,6 +111,11 @@ function questTargets0(q) {
     if (!out.length) for (const e of S.ents) if (e.named === o.named && !e.dead) out.push({ x: e.x, z: e.z });
     return out;
   }
+  if (o.gather) {
+    const t = o.gather === 'fish' ? 'fish' : o.gather === 'salvage' ? 'wreck' : o.gather, h = S.hero;
+    world.props.filter(p => p.node && p.node.type === t && !p.node.gone).sort((a, b) => Math.hypot(a.x - h.x, a.z - h.z) - Math.hypot(b.x - h.x, b.z - h.z)).slice(0, 4).forEach(p => out.push({ x: p.x, z: p.z }));
+    return out;
+  }
   const keys = o.kill || o.collect; if (!keys) return out;
   const near = o.near && world.spots?.[o.near], reef = o.reef && world.buoy;
   const groups = {};
@@ -195,9 +200,15 @@ function drawMark(g, m, px, py, s, big) {
   g.lineWidth = 3 * sz; g.strokeStyle = '#000';
   switch (m.type) {
     case 'area': {
-      g.fillStyle = m.story ? 'rgba(255,176,32,.22)' : 'rgba(255,211,77,.18)'; g.strokeStyle = m.story ? STORY : GOLD; g.lineWidth = 2 * sz; g.setLineDash([6 * sz, 4 * sz]);
-      g.beginPath(); g.arc(px, py, Math.max(8, m.r * s), 0, TAU); g.fill(); g.stroke(); g.setLineDash([]); break; }
-    case 'qpt': { const r = 7 * sz; g.fillStyle = m.story ? STORY : GOLD; g.beginPath(); g.moveTo(px, py - r); g.lineTo(px + r, py); g.lineTo(px, py + r); g.lineTo(px - r, py); g.closePath(); g.stroke(); g.fill(); break; }
+      const pulse = .5 + .5 * Math.sin(performance.now() / 260), col = m.story ? STORY : GOLD, rr = Math.max(big ? 12 : 9, m.r * s);
+      g.fillStyle = m.story ? 'rgba(255,176,32,.30)' : 'rgba(255,211,77,.26)'; g.beginPath(); g.arc(px, py, rr, 0, TAU); g.fill();
+      g.strokeStyle = '#000'; g.lineWidth = 5 * sz; g.stroke(); g.strokeStyle = col; g.lineWidth = 3 * sz; g.stroke();
+      g.globalAlpha = .35 + .5 * pulse; g.lineWidth = 2 * sz; g.beginPath(); g.arc(px, py, rr + (3 + pulse * 5) * sz, 0, TAU); g.stroke(); g.globalAlpha = 1;
+      qGlyph(g, px, py, col, sz); break; }
+    case 'qpt': {
+      const pulse = .5 + .5 * Math.sin(performance.now() / 260), col = m.story ? STORY : GOLD;
+      g.globalAlpha = .3 + .5 * pulse; g.strokeStyle = col; g.lineWidth = 2.5 * sz; g.beginPath(); g.arc(px, py, (12 + pulse * 6) * sz, 0, TAU); g.stroke(); g.globalAlpha = 1;
+      qGlyph(g, px, py, col, sz * 1.25); break; }
     case 'giver': {
       if (!m.mk) { g.fillStyle = '#d8c890'; g.beginPath(); g.arc(px, py, 3.5 * sz, 0, TAU); g.stroke(); g.fill(); break; }
       g.font = `900 ${Math.round((m.story ? 24 : 20) * sz)}px Cinzel, serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
@@ -220,16 +231,28 @@ function drawMark(g, m, px, py, s, big) {
     case 'exit': g.font = `700 ${Math.round(13 * sz)}px Cinzel, serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineWidth = 3; g.strokeText('➜', px, py); g.fillStyle = '#fff'; g.fillText('➜', px, py); break;
   }
 }
+// a bold gold diamond with a ! so a quest target reads at a glance
+function qGlyph(g, px, py, col, sz) {
+  const r = 9 * sz; g.lineWidth = 3; g.strokeStyle = '#000'; g.fillStyle = col;
+  g.beginPath(); g.moveTo(px, py - r); g.lineTo(px + r, py); g.lineTo(px, py + r); g.lineTo(px - r, py); g.closePath(); g.stroke(); g.fill();
+  g.font = `900 ${Math.round(12 * sz)}px Cinzel, serif`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#2a1800'; g.fillText('!', px, py + 1);
+}
 function heroArrow(g, px, py, sz = 1) {
   g.save(); g.translate(px, py); g.rotate(Math.PI - S.hero.yaw); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 2;
   g.beginPath(); g.moveTo(0, -10 * sz); g.lineTo(7 * sz, 8 * sz); g.lineTo(0, 4 * sz); g.lineTo(-7 * sz, 8 * sz); g.closePath(); g.stroke(); g.fill(); g.restore();
 }
 
 // ---------- the minimap: north is always up ----------
-let miniMarks = [], miniT = -9;
+let miniMarks = [], miniT = -9, qMobs = new Set();
+// mob kinds an active quest wants killed or looted
+function questMobs() {
+  const set = new Set();
+  for (const q of QUESTS) { const st = S.quests[q.id]; if (st?.state !== 'active' || q.obj.zone && q.obj.zone !== S.zone) continue; for (const k of q.obj.kill || q.obj.collect || []) set.add(k); }
+  return set;
+}
 export function drawMini(c) {
   const h = S.hero; if (!h || !ensureBase()) return;
-  if (S.time - miniT > .5 || S.time < miniT) { miniT = S.time; miniMarks = marks().filter(m => ['quests', 'givers', 'items', 'enemies'].includes(m.layer) && (m.type !== 'item' || m.hot || m.node) && m.type !== 'npc' && !(m.type === 'giver' && !m.mk) && m.type !== 'zone'); }
+  if (S.time - miniT > .5 || S.time < miniT) { qMobs = questMobs(); miniT = S.time; miniMarks = marks().filter(m => ['quests', 'givers', 'items', 'enemies'].includes(m.layer) && (m.type !== 'item' || m.hot || m.node) && m.type !== 'npc' && !(m.type === 'giver' && !m.mk) && m.type !== 'zone'); }
   const g = c.getContext('2d'), W = c.width, span = 120, s = W / span, k = N / (2 * WH);
   g.save(); g.clearRect(0, 0, W, W); g.beginPath(); g.arc(W / 2, W / 2, W / 2, 0, TAU); g.clip();
   g.fillStyle = '#1b2228'; g.fillRect(0, 0, W, W);
@@ -250,6 +273,7 @@ export function drawMini(c) {
   for (const e of S.ents) {
     if (e.dead || e.remove || Math.abs(e.x - h.x) > span / 2 || Math.abs(e.z - h.z) > span / 2) continue;
     const [px, py] = P(e.x, e.z);
+    if (e.mob && qMobs.has(e.mob) && !e.named && !e.boss) { g.fillStyle = e === S.target ? '#fff' : GOLD; g.strokeStyle = '#000'; g.lineWidth = 2; g.beginPath(); g.arc(px, py, 4.5, 0, TAU); g.stroke(); g.fill(); continue; }
     if (e.mob) { if (e.engaged || e === S.target) { g.fillStyle = e === S.target ? '#fff' : '#ff4a3a'; g.beginPath(); g.arc(px, py, e.boss ? 6 : 3.5, 0, TAU); g.fill(); } else if (!e.named) { g.fillStyle = 'rgba(255,90,72,.75)'; g.beginPath(); g.arc(px, py, 2.2, 0, TAU); g.fill(); } }
     else if (e.inParty && !e.isHero) drawMark(g, { type: 'party' }, px, py, s, false);
     else if (e.fake) drawMark(g, { type: 'fake' }, px, py, s, false);
@@ -263,7 +287,7 @@ export function drawMini(c) {
     const key = m.q?.id || m.title; if (seen.has(key)) continue; seen.add(key); if (seen.size > 6) break;
     const a = Math.atan2(m.z - h.z, m.x - h.x), rx = W / 2 + Math.cos(a) * (W / 2 - 9), ry = W / 2 + Math.sin(a) * (W / 2 - 9);
     g.save(); g.translate(rx, ry); g.rotate(a); g.fillStyle = m.story || m.mk === '!' && m.story ? STORY : GOLD; g.strokeStyle = '#000'; g.lineWidth = 2;
-    g.beginPath(); g.moveTo(8, 0); g.lineTo(-5, -6); g.lineTo(-5, 6); g.closePath(); g.stroke(); g.fill(); g.restore();
+    g.beginPath(); g.moveTo(11, 0); g.lineTo(-7, -8); g.lineTo(-7, 8); g.closePath(); g.lineWidth = 3; g.stroke(); g.fill(); g.restore();
   }
   heroArrow(g, W / 2, W / 2);
   g.strokeStyle = 'rgba(238,228,204,.55)'; g.lineWidth = 3; g.beginPath(); g.arc(W / 2, W / 2, W / 2 - 1.5, 0, TAU); g.stroke();
@@ -307,7 +331,7 @@ function draw() {
   g.drawImage(base, ox, oy, 2 * WH * view.s, 2 * WH * view.s);
   const ms = marks().filter(m => on[m.layer]);
   hits = [];
-  const order = { zone: 0, area: 1, region: 2, place: 3, label: 3, exit: 4, item: 5, svc: 6, npc: 6, named: 7, boss: 7, fake: 8, party: 9, qpt: 10, corpse: 10, giver: 11 };
+  const order = { zone: 0, region: 2, place: 3, label: 3, exit: 4, item: 5, svc: 6, npc: 6, named: 7, boss: 7, fake: 8, area: 8.5, party: 9, qpt: 10, corpse: 10, giver: 11 };
   ms.sort((a, b) => (order[a.type] ?? 5) - (order[b.type] ?? 5));
   const zoomed = view.s > view.fit * 2.2, labels = [];
   const label = (t, x, y, font, col, pri, alpha = 1) => labels.push({ t, x, y, font, col, pri, alpha });
@@ -326,7 +350,8 @@ function draw() {
       if (zoomed || m.r * view.s > 30) label(`${m.title} ${m.zn.lvl[0]}-${m.zn.lvl[1]}`, px, py + Math.min(m.r * view.s - 10, 26), '700 11.5px Alegreya Sans, sans-serif', m.col, 5);
       hits.push({ m, px, py, r: m.r * view.s, area: true }); continue;
     }
-    if (m.type === 'area') { hits.push({ m, px, py, r: Math.max(8, m.r * view.s), area: true }); continue; }
+    if (m.type === 'area' || m.type === 'qpt') label(m.title, px, py + (m.type === 'area' ? Math.min(Math.max(12, m.r * view.s) + 12, 40) : 20), '700 12.5px Alegreya Sans, sans-serif', m.story ? STORY : GOLD, 9.5);
+    if (m.type === 'area') { hits.push({ m, px, py, r: Math.max(12, m.r * view.s), area: true }); continue; }
     if ((m.type === 'named' || m.type === 'boss') && zoomed) label(m.title, px, py + 15, '11.5px Alegreya Sans, sans-serif', m.col, 6);
     if ((m.type === 'giver' || m.type === 'svc' && m.e) && zoomed) label(m.title, px, py + 16, '11.5px Alegreya Sans, sans-serif', m.type === 'giver' && m.mk ? GOLD : '#fff', m.mk ? 9 : 8);
     hits.push({ m, px, py, r: 16 });
@@ -356,7 +381,7 @@ function draw() {
   g.fillStyle = GOLD; g.beginPath(); g.moveTo(cx, cy - 2); g.lineTo(cx + 6, cy + 12); g.lineTo(cx, cy + 8); g.lineTo(cx - 6, cy + 12); g.closePath(); g.stroke(); g.fill();
   drawT = performance.now();
 }
-export function tick() { if (open && performance.now() - drawT > 450) draw(); }
+export function tick() { if (open && performance.now() - drawT > 160) draw(); }
 function pick(px, py) {
   let best = null, bd = 1e9;
   for (const h of hits) {
