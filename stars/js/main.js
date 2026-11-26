@@ -44,6 +44,7 @@ import './front6.js';
 import * as Flight from './flight2.js';
 import './board6.js';
 import './more6.js';
+import './drones6.js';
 
 UI.init();
 window.__G = { S, Game, Cb, UI, Sea, world, Rep, Social, X, Vale6, Raid, P8, Ship, Flight }; // a handle for testing from the console

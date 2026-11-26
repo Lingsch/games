@@ -26,10 +26,10 @@ W.duskknife = ['Dusk Knife', 'Covenant Dirk', 'Shade Edge']; W.skullcase = ['Gra
 const DARK_W = { wardancer: ['duskblade', 'offdusk'], lifebinder: ['reliquary', 'veincord'], knifeshade: ['duskknife', 'knife'], warlock: ['skullcase', 'deadbook'] };
 const pal = (a, b, t, g) => ({ a, b, t, g }), HUM = [.6, .4, 1.6, .15], HEAVY = [.55, .4, 1.9, .15];
 const LOOKS = {
-  wardancer: [{ body: 'armor', head: 'helmet', r: 'lampblade', l: 'lampblade', cloak: '#1a1014' }, HEAVY, [pal('#2c2c34', '#16161a', '#8a1a1a', '#ff3a2a'), pal('#34282c', '#1a1214', '#a8843a', '#ff6a2a'), pal('#28283a', '#12121e', '#6a1a4a', '#c84aff')]],
-  lifebinder: [{ body: 'coat', head: 'hood', r: 'canister', l: 'injector', cloak: '#3a0e12' }, HUM, [pal('#5a1a1e', '#2a0e10', '#c8a25a', '#ff4a4a'), pal('#4a1a2a', '#220c14', '#b8b89a', '#ff6a8a'), pal('#3a1414', '#1c0a0a', '#8a8a8a', '#ff3a2a')]],
-  knifeshade: [{ body: 'suit', knee: true, head: 'hood', r: 'lampknife', l: 'lampknife', cloak: '#141418' }, HUM, [pal('#26262c', '#121216', '#6a1a1a', '#c84aff'), pal('#2a2226', '#141012', '#8a1a1a', '#ff3a2a'), pal('#22282a', '#101416', '#3a5a4a', '#7aff4a')]],
-  warlock: [{ body: 'coat', head: 'hood', r: 'lantern', l: 'slate', cloak: '#1c2a1c' }, HUM, [pal('#2a3a2e', '#141c16', '#b8b89a', '#8dff5a'), pal('#2e2a3a', '#16141c', '#b8b89a', '#a8ff7a'), pal('#3a3a34', '#1c1c18', '#e8e2c0', '#5aff8a')]],
+  wardancer: [{ pack: true, coils: true, body: 'armor', head: 'helmet', r: 'lampblade', l: 'lampblade', cloak: '#1a1014' }, HEAVY, [pal('#2c2c34', '#16161a', '#8a1a1a', '#ff3a2a'), pal('#34282c', '#1a1214', '#a8843a', '#ff6a2a'), pal('#28283a', '#12121e', '#6a1a4a', '#c84aff')]],
+  lifebinder: [{ pack: true, coils: true, body: 'coat', head: 'hood', r: 'canister', l: 'injector', cloak: '#3a0e12' }, HUM, [pal('#5a1a1e', '#2a0e10', '#c8a25a', '#ff4a4a'), pal('#4a1a2a', '#220c14', '#b8b89a', '#ff6a8a'), pal('#3a1414', '#1c0a0a', '#8a8a8a', '#ff3a2a')]],
+  knifeshade: [{ pack: true, coils: true, body: 'suit', knee: true, head: 'hood', r: 'lampknife', l: 'lampknife', cloak: '#141418' }, HUM, [pal('#26262c', '#121216', '#6a1a1a', '#c84aff'), pal('#2a2226', '#141012', '#8a1a1a', '#ff3a2a'), pal('#22282a', '#101416', '#3a5a4a', '#7aff4a')]],
+  warlock: [{ pack: true, coils: true, body: 'coat', head: 'hood', r: 'lantern', l: 'slate', cloak: '#1c2a1c' }, HUM, [pal('#2a3a2e', '#141c16', '#b8b89a', '#8dff5a'), pal('#2e2a3a', '#16141c', '#b8b89a', '#a8ff7a'), pal('#3a3a34', '#1c1c18', '#e8e2c0', '#5aff8a')]],
 };
 const defs = {};
 for (const [cls, [o, anim, pals]] of Object.entries(LOOKS)) pals.forEach((p, i) => { defs['dk_' + cls + i] = [sfig(o, p, i + 1), anim, .05, .03]; });

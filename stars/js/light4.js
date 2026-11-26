@@ -49,10 +49,10 @@ Object.assign(WTYPE, LIGHT_W);
 export function dressLight() { dress(REN, LIGHT_WORDS); Object.assign(WTYPE, LIGHT_W); for (const k of LIGHT) CLASSES[k].models = [0, 1, 2].map(i => k + i); }
 const pal = (a, b, t, g) => ({ a, b, t, g }), HUM = [.6, .4, 1.6, .15];
 const LOOKS = {
-  wardancer: [{ body: 'coat', head: 'bare', tail: true, r: 'lampblade', l: 'lampblade', scarf: '#e8e2d0' }, [pal('#e8e2d0', '#5a6a8a', '#d8b24a', '#ffe9a0'), pal('#d8dce4', '#3a5a6a', '#c8a25a', '#9fe6ff'), pal('#e0d8c8', '#6a5a4a', '#d8b24a', '#c8ffb0')]],
-  lifebinder: [{ body: 'coat', head: 'hood', r: 'lantern', l: null, cloak: '#e8e2d0' }, [pal('#e8e2d0', '#c8b890', '#d8b24a', '#ffe9a0'), pal('#d8e0e8', '#8aa0b8', '#c8a25a', '#bfe6ff'), pal('#e0e8d8', '#9ab08a', '#d8b24a', '#d8ffb0')]],
-  knifeshade: [{ body: 'suit', knee: true, head: 'hood', r: 'lampknife', l: 'lampknife', cloak: '#8a9098' }, [pal('#8a9098', '#4a5058', '#d8b24a', '#ffe9a0'), pal('#7a8a9a', '#3a4654', '#c8a25a', '#9fe6ff'), pal('#9a9488', '#4e4a42', '#d8b24a', '#ffd0a0')]],
-  warlock: [{ body: 'coat', head: 'visor', r: 'lantern', l: 'slate', scarf: '#d8b24a' }, [pal('#f0ead8', '#8a7a5a', '#d8b24a', '#fff2b0'), pal('#e0e8f0', '#5a6a8a', '#c8a25a', '#bfe6ff'), pal('#f0e0d0', '#8a5a4a', '#d8b24a', '#ffc890')]],
+  wardancer: [{ pack: true, coils: true, body: 'coat', head: 'bare', tail: true, r: 'lampblade', l: 'lampblade', scarf: '#e8e2d0' }, [pal('#e8e2d0', '#5a6a8a', '#d8b24a', '#ffe9a0'), pal('#d8dce4', '#3a5a6a', '#c8a25a', '#9fe6ff'), pal('#e0d8c8', '#6a5a4a', '#d8b24a', '#c8ffb0')]],
+  lifebinder: [{ pack: true, coils: true, body: 'coat', head: 'hood', r: 'lantern', l: null, cloak: '#e8e2d0' }, [pal('#e8e2d0', '#c8b890', '#d8b24a', '#ffe9a0'), pal('#d8e0e8', '#8aa0b8', '#c8a25a', '#bfe6ff'), pal('#e0e8d8', '#9ab08a', '#d8b24a', '#d8ffb0')]],
+  knifeshade: [{ pack: true, coils: true, body: 'suit', knee: true, head: 'hood', r: 'lampknife', l: 'lampknife', cloak: '#8a9098' }, [pal('#8a9098', '#4a5058', '#d8b24a', '#ffe9a0'), pal('#7a8a9a', '#3a4654', '#c8a25a', '#9fe6ff'), pal('#9a9488', '#4e4a42', '#d8b24a', '#ffd0a0')]],
+  warlock: [{ pack: true, coils: true, body: 'coat', head: 'visor', r: 'lantern', l: 'slate', scarf: '#d8b24a' }, [pal('#f0ead8', '#8a7a5a', '#d8b24a', '#fff2b0'), pal('#e0e8f0', '#5a6a8a', '#c8a25a', '#bfe6ff'), pal('#f0e0d0', '#8a5a4a', '#d8b24a', '#ffc890')]],
 };
 const defs = {};
 for (const [cls, [o, pals]] of Object.entries(LOOKS)) pals.forEach((p, i) => { defs[cls + i] = [sfig(o, p, i + 1), HUM, .05, .03]; });
