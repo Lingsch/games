@@ -73,6 +73,8 @@ const KIND = {
   drone: { name: 'Scavenger Drone', geo: droneGeo, hull: 60, shield: 0, dmg: 7.5, spd: 40, turn: 2.5, rate: 1.4, r: 2.2, xp: .35, loot: .08, cr: [1, 3] },
   cutter: { name: 'Patrol Cutter', geo: () => cutterGeo('#4a6a9a'), hull: 460, shield: 210, dmg: 19.5, spd: 34, turn: 1.4, rate: 1.7, r: 6, xp: 1.5, loot: .5, cr: [0, 0] },
   ace: { name: 'Scarback Mollo', geo: () => raiderGeo('#2a2a2e'), hull: 650, shield: 260, dmg: 21, spd: 34, turn: 1.6, rate: 1.8, r: 5.4, xp: 3, loot: 1, cr: [30, 45], named: true },
+  wing: { name: 'Wingman', geo: () => skiffGeo(...(X.shipLook ? X.shipLook() : ['#8a8e96', '#c8782a'])), hull: 170, shield: 70, dmg: 0, spd: 40, turn: 2.2, rate: 1.6, r: 3, xp: 0, loot: 0, cr: [0, 0] },
+  hulk: { name: 'Corrin\'s Promise', geo: () => { const g = freighterGeo(); g.scale(2.6, 2.6, 2.6); return g; }, hull: 99999, shield: 0, dmg: 0, spd: 0, turn: 0, rate: 0, r: 26, xp: 0, loot: 0, cr: [0, 0] },
   bait: { name: 'The "Freighter"', geo: freighterGeo, hull: 565, shield: 130, dmg: 18, spd: 18, turn: .7, rate: 1.9, r: 9, xp: 2, loot: .8, cr: [15, 25] },
 };
 const scale = () => .85 + Math.max(0, lvl() - 3) * .11;
@@ -201,11 +203,12 @@ function say(t, hold = 2.6) { const m = hud.querySelector('#flyMsg'); m.textCont
 function begin(mode, sys) {
   makeHud(); fit();
   const st = stats();
-  F.on = true; F.paused = false; F.sys = sys; F.mode = mode; F.t = 0; F.ev = null; F.homeFn = null; F.fireHeld = F.boostHeld = false; F.spawnT = 50; F.misT = 0; F.wreck = null;
+  F.boardT = null; F.on = true; F.paused = false; F.sys = sys; F.mode = mode; F.t = 0; F.ev = null; F.homeFn = null; F.fireHeld = F.boostHeld = false; F.spawnT = 50; F.misT = 0; F.wreck = null;
   F.P = { x: 0, z: 30, yaw: Math.PI, vx: 0, vz: 0, v: 20, hull: st.hull, max: st.hull, shield: st.shield, maxS: st.shield, energy: 100, fireT: 0, hitT: 0, bank: 0, side: 1, mesh: mk(X.shipLook ? shipGeo(...X.shipLook()) : shipGeo(), .1), safeT: 3, repT: 0 };
   // the model was built to sit on landing legs; in flight it rides its own centre
   F.P.mesh.children.forEach(c => c.position.y = -3.4); F.P.mesh.scale.setScalar(.62);
-  if (mode === 'system') buildSystem(sys); else buildDeep();
+  if (mode === 'system') { buildSystem(sys); boardables(sys); } else buildDeep();
+  wings();
   G.add(F.P.mesh); G.visible = true; R.worldGroup.visible = false;
   for (const k in R.kinds) { const K = R.kinds[k]; K.mesh.count = K.ol.count = 0; } R.shadows.count = 0; R.arrows.count = 0; R.selRing.visible = false; R.tankRing.visible = false; R.clearTelegraphs();
   document.body.classList.add('flying'); hud.classList.remove('hide'); hud.querySelector('#flyTop b').textContent = 'The ' + (X.shipName ? X.shipName() : 'Second Chance');
@@ -242,6 +245,30 @@ function missile() {
   F.misT = 9; const [fx, fz] = fwd(p.yaw);
   for (const s of LR) F.shots.push({ x: p.x + fz * 3 * s, z: p.z - fx * 3 * s, dx: fx, dz: fz, spd: 95, life: 3.2, dmg: stats().dmg * 5, mine: true, home: best, mis: true });
 }
+// Build 6: crew beyond the first fly escort; big ships can be crippled and boarded; derelicts wait to be searched
+function wings() { const crew = (S.friends || []).slice(1, 3); crew.forEach((c, i) => { const w = spawn('wing', F.P.x + (i ? 14 : -14), F.P.z - 12, { team: 'wing', name: c.name, slot: i ? 1 : -1, mul: 1 }); w.yaw = F.P.yaw; w.dmg = stats().dmg * .45; }); if (crew.length && !S.ext.wingTold) { S.ext.wingTold = 1; setTimeout(() => chat('party', crew[0].name, "I'm on your wing, Captain. Point at something."), 2200); } }
+function wingAI(e, dt, p) {
+  let tgt = null, bd = 230; for (const t of hostiles()) { const dp = Math.hypot(t.x - p.x, t.z - p.z), d = Math.hypot(t.x - e.x, t.z - e.z); if ((t.aggro || dp < 110) && dp < 230 && d < bd) { bd = d; tgt = t; } }
+  if (!tgt) { const [fx, fz] = fwd(p.yaw), tx = p.x - fx * 12 + fz * 14 * e.slot, tz = p.z - fz * 12 - fx * 14 * e.slot, d = Math.hypot(tx - e.x, tz - e.z); return [d > 6 ? Math.atan2(tx - e.x, tz - e.z) : p.yaw, d > 40 ? e.K.spd : d > 6 ? Math.max(p.v, 14) : p.v]; }
+  tgt.aggro = true; const d = bd, tt = d / 150, lx = tgt.x + (tgt.vx || 0) * tt, lz = tgt.z + (tgt.vz || 0) * tt; let want = Math.atan2(lx - e.x, lz - e.z);
+  e.brk -= dt; if (e.brk > 0) want = e.brkYaw; else if (d < 20) { e.brk = rnd(.6, 1.1); e.brkYaw = e.yaw + pick([-1, 1]) * rnd(1.2, 1.9); want = e.brkYaw; }
+  e.fireT -= dt; if (e.fireT <= 0 && d < 130 && Math.abs(wrapA(Math.atan2(lx - e.x, lz - e.z) - e.yaw)) < .22) { e.fireT = 1 / e.K.rate; const a = Math.atan2(lx - e.x, lz - e.z); F.shots.push({ x: e.x, z: e.z, dx: Math.sin(a), dz: Math.cos(a), spd: 150, life: 1.2, dmg: e.dmg, mine: true }); }
+  return [want, e.K.spd];
+}
+function cripple(e) { e.hull = 1; e.shield = e.maxS = 0; e.team = 'neutral'; e.crippled = true; e.aggro = false; e.v = 0; F.boardT = e; R.burst(e.x, 0, e.z, 40, [.5, .8, 1], 16, .8, 2);
+  addObj({ type: 'board', name: e.name, label: `Board the ${e.name}`, x: e.x, z: e.z, r: e.K.r + 8, mesh: mk(ringGeo(e.K.r + 6, '#ffcf6a'), .1), info: { type: 'prize', name: e.name, cut: e.K.cr[1] } });
+  say(`${e.name} is dead in space. Close in to board her`, 3.4); crewSay("She's crippled, Captain. There'll be a strongbox aboard, and people sat on it.", 900); }
+function boardables(sys) {
+  if (lvl() < 5) return;
+  const a = (S.ext.flown || 0) * 1.7 + 2, x = Math.cos(a) * 300, z = Math.sin(a) * 300;
+  addObj({ type: 'decor', x, z, mesh: mk(wreckGeo(), .1) }); addObj({ type: 'board', name: 'Derelict', label: 'Board the derelict', x, z, r: 14, mesh: mk(ringGeo(13, '#8dffef'), .1), info: { type: 'derelict', name: 'the derelict' } });
+  pack(x + 30, z + 20, ['drone', 'drone', 'drone']);
+  if (sys === 'halfway' && lvl() >= 8) { const hx = 230, hz = -210; const h = spawn('hulk', hx, hz, { team: 'neutral', name: "Corrin's Promise", crippled: true }); h.yaw = .7; h.v = 0;
+    addObj({ type: 'board', name: "Corrin's Promise", label: "Board Corrin's Promise", x: hx + 34, z: hz + 10, r: 16, mesh: mk(ringGeo(14, '#ffffff'), .1), info: { type: 'hulk', name: "Corrin's Promise" } });
+    pack(hx - 40, hz + 60, ['raider', 'drone', 'drone']).forEach(e => { e.name = e.kind === 'raider' ? 'Wrecker Gunship' : 'Wrecker Drone'; }); pack(hx + 70, hz - 30, ['pirate', 'pirate', 'drone']).forEach(e => { e.name = e.kind === 'drone' ? 'Wrecker Drone' : 'Wrecker Skiff'; }); }
+}
+function boardShip(o) { const info = { ...o.info, lvl: lvl(), sys: F.sys }; end(); S.ext.board = info; chat('sys', null, `You match airlocks with ${info.name} and cycle the hatch.`); Game.travel('board', null, true); }
+X.givePart = (tier, why) => gainPart(makePart(tier, .25), why);
 function hurt(e, dmg, by) {
   if (e.dead) return; e.hitT = .15;
   if (e.shield > 0) { const a = Math.min(e.shield, dmg); e.shield -= a; dmg -= a; R.burst(e.x, 0, e.z, 4, [.4, .8, 1], 6, .3, 1.2); }
@@ -249,10 +276,11 @@ function hurt(e, dmg, by) {
   e.sT = 4; // shields wait before recharging
   if (e === F.P) { S.shake = Math.min(.5, (S.shake || 0) + dmg / 60); if (e.hull <= 0) lost(); return; }
   if (e.team === 'neutral' && by === F.P && e.kind === 'cutter') e.team = 'foe';
-  if (e.hull <= 0) destroyed(e);
+  if (e.hull <= 0) { if (e.team === 'foe' && e.K.r >= 5 && !e.K.named && e.kind !== 'cutter' && F.mode === 'system' && !F.ev && !F.boardT && lvl() >= 5 && Math.random() < .6) cripple(e); else destroyed(e); }
 }
 function destroyed(e) {
   e.dead = true; G.remove(e.mesh); R.burst(e.x, 0, e.z, 50, [1, .7, .3], 22, .9, 2.4); R.burst(e.x, 0, e.z, 24, [1, 1, .8], 9, .5, 3);
+  if (e.team === 'wing') { say(`${e.name} is hit and breaks off`, 3); chat('party', e.name, pick(["I'm hit. Limping back to the lock. Don't wait up.", "That's my engine gone. I'll see you aboard, Captain."])); return; }
   if (e.team === 'ally') { say(`${e.name} is lost`, 3); return; }
   if (e.team !== 'foe' && e.kind !== 'cutter') return;
   const K = e.K, cr = Math.round(rnd(K.cr[0], K.cr[1]) * (1 + lvl() * .08));
@@ -342,13 +370,16 @@ function ai(e, dt, p) {
   const K = e.K; e.hitT = Math.max(0, e.hitT - dt);
   e.sT = Math.max(0, (e.sT || 0) - dt); if (e.sT <= 0 && e.maxS) e.shield = Math.min(e.maxS, e.shield + e.maxS * .05 * dt);
   let tgt = null, want = e.yaw, spd = K.spd;
-  if (e.team === 'neutral') { // traffic flies its lane around the station
+  if (e.team === 'wing') { [want, spd] = wingAI(e, dt, p); }
+  else if (e.crippled) { spd = 0; }
+  else if (e.team === 'neutral') { // traffic flies its lane around the station
     if (e.lane !== undefined) { e.lane += dt * .1; const tx = Math.cos(e.lane) * 130, tz = 70 + Math.sin(e.lane) * 130; want = Math.atan2(tx - e.x, tz - e.z); spd = K.spd; }
     else { want = Math.atan2(p.x - e.x, p.z - e.z); spd = Math.hypot(p.x - e.x, p.z - e.z) > 50 ? K.spd : 8; }
   } else if (e.team === 'ally') { want = e.yaw + .12; spd = K.spd * .6; }
   else {
     const ally = F.ents.find(a => a.team === 'ally' && !a.dead), dP = Math.hypot(p.x - e.x, p.z - e.z);
     tgt = ally && !e.onP && (e.pref === 'ally' || dP > 70) ? ally : p;
+    if (e.tw === undefined && e.aggro) e.tw = Math.random() < .3 ? F.ents.find(a => a.team === 'wing' && !a.dead) || null : null; if (e.tw && !e.tw.dead && tgt === p) tgt = e.tw;
     const d = Math.hypot(tgt.x - e.x, tgt.z - e.z);
     if (!e.aggro) { if (dP < (e.home ? 120 : 9999) || e.hull < e.max || e.ev) e.aggro = true; else { const h = e.home; e.orb = (e.orb || Math.random() * 6) + dt * .5; want = Math.atan2(h.x + Math.cos(e.orb) * 30 - e.x, h.z + Math.sin(e.orb) * 30 - e.z); spd = K.spd * .5; tgt = null; } }
     if (tgt) {
@@ -374,7 +405,7 @@ function shots(dt, p) {
     if (s.home && !s.home.dead) { const want = Math.atan2(s.home.x - s.x, s.home.z - s.z), cur = Math.atan2(s.dx, s.dz), a = cur + clamp(wrapA(want - cur), -3.2 * dt, 3.2 * dt); s.dx = Math.sin(a); s.dz = Math.cos(a); if (Math.random() < .6) R.magic.emit(s.x, 0, s.z, 0, 0, 0, .35, 1.4, 1, .7, .3, 0); }
     s.x += s.dx * s.spd * dt; s.z += s.dz * s.spd * dt; s.life -= dt;
     if (s.mine) { for (const e of F.ents) if (!e.dead && (e.team === 'foe' || e.kind === 'cutter') && near(s, e, e.K.r + 1.4)) { hurt(e, s.dmg, p); e.aggro = true; e.onP = e.onP || Math.random() < .6; s.life = 0; break; } }
-    else { if (near(s, p, 3.2)) { hurt(p, s.dmg, s.from); s.life = 0; } else for (const e of F.ents) if (!e.dead && e.team === 'ally' && near(s, e, e.K.r + 1)) { hurt(e, s.dmg, s.from); s.life = 0; break; } }
+    else { if (near(s, p, 3.2)) { hurt(p, s.dmg, s.from); s.life = 0; } else for (const e of F.ents) if (!e.dead && (e.team === 'ally' || e.team === 'wing') && near(s, e, e.K.r + 1)) { hurt(e, s.dmg, s.from); s.life = 0; break; } }
     if (s.life > 0) for (const r of F.rocks) if (near(s, r, r.r)) { s.life = 0; R.burst(s.x, 0, s.z, 3, [.7, .6, .5], 5, .3, 1); break; }
   }
   F.shots = F.shots.filter(s => s.life > 0);
@@ -392,6 +423,7 @@ function objects(dt, p) {
       if (o.onHalf && !o.halfDone && o.prog >= (o.need || 3.5) / 2) { o.halfDone = true; o.onHalf(); }
     }
     if ((o.type === 'dock' || o.type === 'buoy') && d < o.r + 8) { homeLabel = hot ? 'Hostiles too close' : o.label; F.homeFn = hot ? null : () => o.type === 'dock' ? dock() : openMapInFlight(); }
+    if (o.type === 'board' && d < o.r + 8) { homeLabel = hot ? 'Hostiles too close' : o.label; F.homeFn = hot ? null : () => boardShip(o); }
   }
   const hb = hud.querySelector('#flyHome'); hb.classList.toggle('hide', !homeLabel); if (homeLabel) { hb.textContent = homeLabel; hb.disabled = !F.homeFn; }
   const pg = hud.querySelector('#flyProg'); pg.classList.toggle('hide', !prog); if (prog) { pg.querySelector('i').style.width = clamp(prog[0], 0, 1) * 100 + '%'; pg.querySelector('span').textContent = prog[1]; }
@@ -422,7 +454,7 @@ function drawHud(dt, p, st) {
   const dot = (x, z, col, sz, ring) => { const dx = x - p.x, dz = z - p.z; let rx = (dx * c - dz * s) * -sc, ry = -(dx * s + dz * c) * sc; const l = Math.hypot(rx, ry); if (l > 104) { rx *= 104 / l; ry *= 104 / l; } g.fillStyle = g.strokeStyle = col; g.beginPath(); g.arc(110 + rx, 110 + ry, sz, 0, TAU); if (ring) { g.lineWidth = 3; g.stroke(); } else g.fill(); };
   for (const r of F.rocks) dot(r.x, r.z, 'rgba(150,140,130,.35)', 2);
   for (const o of F.objs) if (!o.gone && o.type !== 'decor') dot(o.x, o.z, o.type === 'dock' ? '#9be36b' : o.type === 'buoy' ? '#6ad8ff' : '#ffcf6a', o.type === 'wreck' ? 5 : 8, o.type !== 'wreck');
-  for (const e of F.ents) if (!e.dead) dot(e.x, e.z, e.team === 'foe' ? (e.aggro ? '#ff5a3a' : '#c8782a') : e.team === 'ally' ? '#9be36b' : '#9aa8b8', e.K.r > 4.5 ? 7 : 5);
+  for (const e of F.ents) if (!e.dead) dot(e.x, e.z, e.team === 'foe' ? (e.aggro ? '#ff5a3a' : '#c8782a') : e.team === 'ally' || e.team === 'wing' ? '#9be36b' : '#9aa8b8', e.K.r > 4.5 ? 7 : 5);
   g.fillStyle = '#fff'; g.beginPath(); g.moveTo(110, 100); g.lineTo(117, 118); g.lineTo(103, 118); g.fill();
 }
 
