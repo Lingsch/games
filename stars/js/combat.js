@@ -532,7 +532,8 @@ function mobDied(e, src) {
     for (let i = 0; i < (e.boss ? 2 : 1); i++) e.loot.push(makeItem({ ...pool[i], named: true }));
   } else {
     const ch = e.elite ? .35 : .14;
-    if (Math.random() < ch) e.loot.push(randomGear(e.lvl, null, e.elite ? .1 : 0));
+    // From the MMO's Build 12: fewer pointless commons. Most plain pieces never drop; uncommon and better drop as before.
+    if (Math.random() < ch) { const it = randomGear(e.lvl, null, e.elite ? .1 : 0); if (it.rarity > 0 || Math.random() < .3) e.loot.push(it); }
   }
   e.lootFor = e.tagged === 'party' ? 'party' : 'other';
   hooks.onMobDeath(e, credit, near);

@@ -293,7 +293,7 @@ function updateFrames() {
   });
   let cmds = $('cmds');
   if (mates.length && !cmds) { cmds = document.createElement('div'); cmds.id = 'cmds'; cmds.innerHTML = ['follow', 'assist', 'hold', 'pull', 'clear', 'hunt'].map(c => `<button data-c="${c}">${{ follow: 'Follow', assist: 'Assist', hold: 'Hold', pull: 'Pull', clear: 'Clear', hunt: 'Hunt' }[c]}</button>`).join('') + '<button data-c="say" class="say1">💬</button>'; cmds.onclick = ev => { const c = ev.target.closest('button')?.dataset.c; if (c === 'say') openSay(); else if (c) Game.partyCommand(c); }; box.appendChild(cmds); }
-  if (cmds) { cmds.style.display = mates.length ? '' : 'none'; box.appendChild(cmds); cmds.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.c === S.cmd)); }
+  if (cmds) { cmds.style.display = mates.length ? '' : 'none'; if (cmds.parentElement !== box || cmds.nextElementSibling?.classList.contains('pf')) box.appendChild(cmds); /* re-appending every frame ate mouse clicks on PC */ cmds.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.c === S.cmd)); }
   // target
   const t = S.target, tf = $('tgt');
   if (!t || t.remove) { tf.classList.add('hide'); }
@@ -886,6 +886,13 @@ export function openLoot(m) {
   if (!m.loot?.length || m.lootFor !== 'party') return;
   if (dist(S.hero, m) > 8) { toast('Too far away'); return; }
   if (m.lootGold) { S.gold += m.lootGold; chat('loot', null, `You loot ${m.lootGold} credits.`); m.lootGold = 0; }
+  // From the MMO's Build 12: by default gear goes to need-or-greed rolls; recipes and collectibles are yours.
+  if (SET.loot !== 'master' && S.party.length <= 6 && X.rollItems) {
+    const mine = m.loot.filter(it => it.recipe || it.collect), roll = m.loot.filter(it => !(it.recipe || it.collect));
+    for (const it of mine) Game.assignLoot({ loot: [it] }, it, S.hero);
+    if (S.party.some(p => !p.isHero && !p.dead)) X.rollItems(roll, 'You'); else for (const it of roll) Game.assignLoot({ loot: [it] }, it, S.hero);
+    m.loot = []; Game.save(); return;
+  }
   m.loot = m.loot.filter(it => !(X.isSmall(it) && X.takeSmall(it)));
   if (!m.loot.length) { Game.save(); return; }
   openSheet('Loot: ' + m.name, body => {
@@ -907,6 +914,7 @@ function renderSettings(box, inGame, back) {
   box.innerHTML = `${back ? '<button data-a="back" style="margin-bottom:8px">← Back</button>' : ''}
     <div class="card" style="text-align:left"><h3>Camera &amp; touch</h3>${['camSpeed', 'joySize', 'tapSens'].map(segHtml).join('')}</div>
     <div class="card" style="text-align:left"><h3>Text &amp; interface size</h3>${['ui', 'text'].map(segHtml).join('')}</div>
+    <div class="card" style="text-align:left"><h3>Loot</h3>${segHtml('loot')}</div>
     <div class="card" style="text-align:left"><h3>Graphics</h3>${segHtml('gfx')}<p class="dim" style="font-size:12px;margin:0">Low and Medium draw fewer pixels, so the game runs smoother and the phone stays cooler.</p></div>
     <div class="card" style="text-align:left"><h3>Save codes</h3>
       ${info ? `<p style="margin:0 0 6px">Your character: <b>${esc(info.name)}</b>, level ${info.lvl} ${CLASSES[info.cls]?.name || ''}.</p><div class="acts"><button data-a="copy">Copy save code</button></div><textarea id="codeOut" readonly class="hide" style="height:60px"></textarea>` : '<p class="dim" style="margin:0 0 6px">No character saved on this device yet.</p>'}
@@ -948,7 +956,7 @@ export function showTitle(view = 'home') {
   const PATHS = { smuggler: ['Smuggler', 'The free worlds', 'You inherit a grounded freighter and a debt on the frontier moon of Dustfall.', '#ffb347'], justice: ['Justice', 'The Republic and the order', 'A first-year novice of the lamp-keepers, posted to a freezing fort on the edge of Republic space.', '#6ad8ff'], dark: ['Dark', 'The Empire and the Dusk Covenant', 'A conscript who survived the Winnowing. Now an initiate of the Covenant on the furnace world of Cinder, where the other initiates would like your bunk.', '#ff4a3a'] };
   const heroes = Object.keys(PATHS).map(p => [p, Game.saveInfoFor(p)]).filter(x => x[1]);
   if (view === 'home') X.newPath = null;
-  const head = `<h1>Stars Beneath</h1><div class="sub">Build 9 · two thousand years after the Gravelord fell</div>`;
+  const head = `<h1>Stars Beneath</h1><div class="sub">Build 10 · two thousand years after the Gravelord fell</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${heroes.map(([p, i]) => `<button class="pri" data-a="cont" data-p="${p}">Continue<small>${esc(i.name)} · level ${i.lvl} ${CLASSES[i.cls]?.name || ''} · ${PATHS[p][0]}</small></button>`).join('')}

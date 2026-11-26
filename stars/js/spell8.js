@@ -100,7 +100,7 @@ X.kill.push(m => {
   const D = MOBS[m.mob] || {}, add = it => it && m.loot.push(it);
   const bookCh = m.raidBoss || D.raidBoss ? .6 : m.boss ? .4 : m.named ? .25 : m.elite ? .08 : .025;
   if (Math.random() < bookCh) add(bookFor(m));
-  if (!m.boss && Math.random() < .3) add(junkFor(m));
+  if (!m.boss && Math.random() < .12) add(junkFor(m));   // less junk
   if (Math.random() < (m.elite || m.named ? .08 : .025)) add(jewelFor(m));
   if (Math.random() < .05) { const hp = Math.random() < .5; add(makeItem({ name: hp ? 'Healing Draught' : 'Clarity Draught', slot: 'junk', pot: hp ? 'hpot' : 'mpot', lvl: 1, rarity: 0, stats: {}, value: 0 })); }
   if ((D.human || D.undead || D.caster) && Math.random() < (m.named ? .6 : .08)) add(makeItem({ name: 'Torn Spell Page', slot: 'junk', mat: 'page', n: m.named ? 2 : 1, lvl: 1, rarity: 1, stats: {}, value: 0 }));

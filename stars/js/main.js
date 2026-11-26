@@ -48,6 +48,7 @@ import './drones6.js';
 import './heal7.js';
 import './build8.js';
 import './jobs9.js';
+import './qol10.js';
 
 UI.init();
 window.__G = { S, Game, Cb, UI, Sea, world, Rep, Social, X, Vale6, Raid, P8, Ship, Flight }; // a handle for testing from the console

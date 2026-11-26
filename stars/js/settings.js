@@ -1,9 +1,10 @@
 // Player settings: camera and touch, interface and text size, graphics quality. Kept on this device.
 import * as R from './render.js';
 const KEY = 'stars-settings';
-export const SET = { camSpeed: 1, joySize: 1, tapSens: 1, ui: 1, text: 1, gfx: 'high' };
+export const SET = { camSpeed: 1, joySize: 1, tapSens: 1, ui: 1, text: 1, gfx: 'high', loot: 'roll' };
 try { Object.assign(SET, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { }
 export const OPTS = {
+  loot: ['Gear from bodies you open', [['Need or greed', 'roll'], ['I hand it out', 'master']]],
   camSpeed: ['Camera speed', [['Slow', .6], ['Normal', 1], ['Fast', 1.5], ['Very fast', 2.1]]],
   joySize: ['Joystick size', [['Small', .8], ['Normal', 1], ['Large', 1.25], ['Huge', 1.5]]],
   tapSens: ['Tap sensitivity', [['Precise', .75], ['Normal', 1], ['Forgiving', 1.4]]],

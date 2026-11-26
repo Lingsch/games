@@ -72,7 +72,7 @@ function resolve(r, mine) {
   if (mine && mine !== 'pass') all.push({ p: S.hero, kind: mine, n: irnd(1, 100) });
   all.sort((a, b) => (a.kind === 'need' ? 0 : 1) - (b.kind === 'need' ? 0 : 1) || b.n - a.n);
   const best = all[0];
-  if (!best) { chat('party', null, `Everyone passed on ${it.name}. ${r.from} sells it, and gives you the ${it.value}g.`); S.gold += it.value; }
+  if (!best) { chat('party', null, r.from === 'You' ? `Everyone passed on ${it.name}. You sell it for ${it.value} credits.` : `Everyone passed on ${it.name}. ${r.from} sells it, and gives you the ${it.value} credits.`); S.gold += it.value; }
   else {
     chat('party', null, `${best.p.isHero ? 'You win' : best.p.name + ' wins'} ${it.name} (${best.kind} ${best.n}${all.length > 1 ? ', against ' + all.slice(1).map(x => `${x.p.isHero ? 'your' : x.p.name + "'s"} ${x.kind} ${x.n}`).join(', ') : ''}).`);
     if (best.p.isHero) { if (!Game.addToBag(it)) { if (S.bank.length < Game.BANK_SLOTS) { S.bank.push(it); chat('sys', null, `Your bags are full. ${it.name} goes to your bank.`); } else { S.gold += it.value; chat('sys', null, `No room anywhere. You sell ${it.name} for ${it.value}g.`); } } }
@@ -125,3 +125,6 @@ export function statsClick(ev) { const b = ev.target.closest('[data-sp]'); if (!
 
 // ---------- selling the trade goods in one go ----------
 export function sellJunk() { const j = S.bag.filter(it => it.junk); if (!j.length) return 0; const g = j.reduce((a, it) => a + it.value, 0); S.bag = S.bag.filter(it => !it.junk); S.gold += g; chat('sys', null, `You sell ${j.length} trade goods for ${g} credits.`); Game.save(); return g; }
+
+// gear from bodies you open goes to the same need-or-greed rolls
+X.rollItems = (items, from) => { for (const it of items) rolls.push({ it, t: ROLL_T, from, id: ++rollId }); drawRolls(); };

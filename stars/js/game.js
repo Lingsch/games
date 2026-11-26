@@ -302,7 +302,9 @@ export function storyFolk() {
 }
 export function spawnProp(p) {
   const e = Cb.makeEnt({ team: 'npc', maxHp: 1, hp: 1, prop: p, name: p.lore ? LORE[p.lore].title : p.name, kind: p.kind, x: p.x, z: p.z, scale: p.scale });
-  e.yaw = p.yaw; e.y = p.y ?? hgt(e.x, e.z); return e;
+  e.yaw = p.yaw; e.y = p.y ?? hgt(e.x, e.z);
+  if (!world.props.includes(p)) world.props.push(p);   // so storyFolk() brings it back when it rebuilds the town
+  return e;
 }
 const OBJ_VERB = { clue1: 'Examine', clue2: 'Examine', grave: 'Examine the grave', headstone: 'Set the headstone upright', bell: 'Ring the bell', wardstone: 'Touch the ward stone', journal: "Read Corwin's journal" };
 function needFor(p) { return QUESTS.find(q => q.obj.inspect === p.tag && S.quests[q.id]?.state === 'active' && !(S.used[q.id] || []).includes(p.id)); }
