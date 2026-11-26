@@ -267,7 +267,7 @@ function destroyed(e) {
 function lost() {
   const p = F.P, sys = F.sys, deep = F.mode !== 'system', cut = Math.round(S.gold * .15), ev = F.ev;
   R.burst(p.x, 0, p.z, 80, [1, .7, .3], 26, 1.1, 3);
-  F.paused = true; say('The Second Chance is breaking up', 3);
+  F.paused = true; say(`The ${X.shipName ? X.shipName() : 'Second Chance'} is breaking up`, 3); X.cargoLost?.();
   setTimeout(() => {
     const wx = p.x, wz = p.z; end(); F.onDone = null;
     const zn = Ship.SYSTEMS[sys]?.zone, pd = Ship.PADS[zn];

@@ -39,6 +39,7 @@ import './aliens5.js';
 import './dark5.js';
 import './cinder5.js';
 import './hollow5.js';
+import './systems6.js';
 import * as Flight from './flight2.js';
 
 UI.init();

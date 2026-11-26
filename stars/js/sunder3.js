@@ -168,7 +168,7 @@ registerZone('sunder', seed => {
     { name: 'The Glassworks', x: Gl.x, z: Gl.z, R: Gl.R, kind: 'dungeon' }, { name: 'The Syndicate Toll Post', x: Tp.x, z: Tp.z, R: Tp.R, kind: 'camp' }, { name: 'The Bonefields', x: D3.bones.x, z: D3.bones.z, R: D3.bones.R, kind: 'camp' }, { name: 'The Dry Dock', x: Dk.x, z: Dk.z, R: Dk.R, kind: 'dungeon' }];
   world.town = Tn;
   world.towns = [
-    { key: 'saltmarket', name: 'Saltmarket', x: Tn.x, z: Tn.z, R: Tn.R, guardName: 'Ledger Deputy', npcs: [['giver', 'beck', 12, -9], ['giver', 'hesk', -14, -7], ['giver', 'tamm', -19, 8], ['vendor', 'salt', -6, 17], ['bind', null, 6, 8]], guards: [[-4, -Tn.R + 4], [4, -Tn.R + 4], [Tn.R - 4, 6], [-Tn.R + 5, -2], [0, 12]] },
+    { key: 'saltmarket', name: 'Saltmarket', x: Tn.x, z: Tn.z, R: Tn.R, guardName: 'Ledger Deputy', npcs: [['giver', 'beck', 12, -9], ['giver', 'hesk', -14, -7], ['giver', 'tamm', -19, 8], ['vendor', 'salt', -6, 17], ['bind', null, 6, 8], ['armory', null, 16, 10]], guards: [[-4, -Tn.R + 4], [4, -Tn.R + 4], [Tn.R - 4, 6], [-Tn.R + 5, -2], [0, 12]] },
     { key: 'well', name: 'Wellhead Nine', x: Wl.x, z: Wl.z, R: Wl.R, guardName: 'Wellhand', npcs: [['giver', 'tobin', 1, 1]], guards: [[5, 6], [-5, 5]] },
   ];
   world.storyNpcs.push({ key: 'maren', x: Gl.x - 6, z: Gl.z - 11, yaw: 2.6, unless: ['marenfree', '*'] }, { key: 'maren', x: Tn.x + 16, z: Tn.z + 9, yaw: -1.6, when: ['marenfree', '*'] },

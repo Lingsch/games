@@ -412,7 +412,7 @@ function townsfolk(zone) {
       if (type === 'giver') S.npcs[key] = npc({ name: GIVERS[key].name, title: GIVERS[key].title, kind: GIVERS[key].model, x, z, giver: key });
       if (type === 'vendor') npc({ name: VEND[key], title: key === 'vill' ? 'Supplies and fishing poles' : 'Supplies', kind: key === 'light' ? 'villager2' : key === 'crook' || key === 'refuge' ? 'villager1' : key === 'ember' ? 'guard' : 'pirate1', x, z, vendor: key });
       if (type === 'bind') npc({ name: 'Medbay Beacon', title: 'Set your recovery point here', kind: 'corpse', x, z, bindstone: true, scale: 1.6 });
-      if (type === 'armory') S.npcs.armorer = npc({ name: 'Mistress Hale', title: 'Armory · class trials', kind: 'guard', x, z, armory: true, giver: 'armorer' });
+      if (type === 'armory') S.npcs.armorer = npc({ name: X.armorName?.() || 'Mistress Hale', title: 'Armory · weapon trials', kind: 'guard', x, z, armory: true, giver: 'armorer' });
     }
     for (const [dx, dz] of t.guards) guard(t, t.x + dx, t.z + dz, t.guardName || (t.key === 'fort' ? 'Halyard Marine' : 'Port Watch'));
     if (t.key === 'port') {
@@ -562,8 +562,8 @@ export const heroTitle = () => S.title && Loot5.COLLECT[S.title] ? Loot5.COLLECT
 export const owns = k => (S.owned || []).includes(k);
 export function weaponChoices() {
   const have = new Set((S.owned || []).map(k => CLASSES[k].family));
-  const missing = CLASS_KEYS.filter(k => !owns(k) && !have.has(CLASSES[k].family));
-  return missing.length ? missing : CLASS_KEYS.filter(k => !owns(k));
+  const hid = X.hiddenCls || [], missing = CLASS_KEYS.filter(k => !owns(k) && !hid.includes(k) && !have.has(CLASSES[k].family));
+  return missing.length ? missing : CLASS_KEYS.filter(k => !owns(k) && !hid.includes(k));
 }
 export function unlockClass(k) {
   if (owns(k) || !(S.unlockPicks > 0) || !weaponChoices().includes(k)) return false;
