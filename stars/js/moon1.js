@@ -206,7 +206,8 @@ registerZone('moon', seed => {
   scatter(26, [-260, 130, 40, 270], ['jackal', 'skitter', 'skitter', 'glasswing'], [1, 2], 0, { solo: true });
   scatter(12, [-200, -60, 60, 200], ['skitter', 'glasswing', 'glasswing'], [2, 2], 0, { solo: true });
   // the Scrap Fields
-  scatter(30, [110, 270, -50, 140], ['scrapdrone', 'scrapdrone', 'loader', 'skitter'], [2, 3], 1, { solo: true });
+  scatter(24, [110, 270, -50, 140], ['scrapdrone', 'scrapdrone', 'loader', 'skitter'], [2, 3], 1, { solo: true });
+  scatter(8, [110, 270, -50, 140], ['loader'], [2, 3], 1, { solo: true });   // always enough loaders for Tilly's errand
   // Glass Canyon: pairs on the rim, gangs of three on the floor
   scatter(14, [-270, -90, -190, 50], ['glasswing', 'skitter', 'ratthug'], [3, 3], 2, { solo: true });
   camp(7, [-250, -110, -180, 40], ['ratthug', 'ratgun'], [3, 4], 2, 'gc');
