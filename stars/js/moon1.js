@@ -7,6 +7,7 @@ import { S, WH, TAU, lerp, mulberry32, makeNoise, X } from './core.js';
 import { addChunked, propMat, worldGroup, addKinds } from './render.js';
 import * as R from './render.js';
 import * as M from './models.js';
+import { podGeo } from './flora8.js';
 import { build, P, T, Cone, Cyl, Box, Dod, Sph, Oct } from './models.js';
 import { figure } from './classmodels.js';
 import { H, HN, hgt, world, addWall, linkDoors, mergeBuilt, mat4, meshWithOutline, registerZone, ZONE_SIZE } from './world.js';
@@ -234,7 +235,7 @@ registerZone('moon', seed => {
     else if (r < .075) cacti.push([x, h - .1, z, rng() * 6.3, 0, 0, .7 + rng() * .8]);
     else if (r < .16) tufts.push([x, h - .15, z, rng() * 6.3, 0, 0, .25 + rng() * .3]);
   }
-  addChunked(M.rockGeo('#9a7a5a', '#7a5a42'), propMat, rocks, .04); addChunked(spireGeo(), propMat, spires, .04); addChunked(M.cactusGeo(), propMat, cacti, .04);
+  addChunked(M.rockGeo('#9a7a5a', '#7a5a42'), propMat, rocks, .04); addChunked(spireGeo(), propMat, spires, .04); addChunked(podGeo(), propMat, cacti, .04);
   addChunked(build([P(T(Dod(1), 0, .2, 0, 0, 0, 0, 1, .4, 1), 0, O, '#8a9a6a')]), propMat, tufts, .02);
   world.trees = [...spires.map(t => ({ x: t[0], z: t[2], r: .5 })), ...cacti.map(t => ({ x: t[0], z: t[2], r: .3 }))];
   world.minimap = minimapFrom(colorAt);

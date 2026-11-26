@@ -7,6 +7,7 @@ import { S, WH, TAU, lerp, mulberry32, makeNoise, chat, X } from './core.js';
 import { addChunked, propMat, addKinds } from './render.js';
 import * as R from './render.js';
 import * as M from './models.js';
+import { frostCoralGeo } from './flora8.js';
 import { build, P, T, Cone, Cyl, Box, Sph, Oct } from './models.js';
 import { H, HN, hgt, world, addWall, linkDoors, mergeBuilt, mat4, meshWithOutline, registerZone, ZONE_SIZE } from './world.js';
 import { groundMesh } from './zones.js';
@@ -157,7 +158,7 @@ registerZone('fort', seed => {
   for (let n = 0; n < 9000; n++) { const x = (rng() * 2 - 1) * (WH - 8), z = (rng() * 2 - 1) * (WH - 8), h = hgt(x, z);
     if (world.clearSpots.some(c => Math.hypot(c.x - x, c.z - z) < c.r - 12) || Math.abs(x - roadX(z)) < 5 && z > -150 && z < 160) continue; const r = rng();
     if (r < .05 && N.fbm(x * .01 + 20, z * .01, 2) > .5) pines.push([x, h - .2, z, rng() * 6.3, 0, 0, 1 + rng() * 1.3]); else if (r < .03 || h > 13 && r < .15) rocks.push([x, h - .3, z, rng() * 6.3, 0, 0, .7 + rng() * 1.8]); }
-  addChunked(M.pineGeo(true), propMat, pines, .04); addChunked(M.rockGeo('#8a9098', '#e8eef4'), propMat, rocks, .04);
+  addChunked(frostCoralGeo(), propMat, pines, .04); addChunked(M.rockGeo('#8a9098', '#e8eef4'), propMat, rocks, .04);
   world.trees = pines.map(t => ({ x: t[0], z: t[2], r: .4 }));
   world.minimap = minimapFrom(colorAt);
   return world;

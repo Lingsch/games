@@ -62,7 +62,7 @@ choose('dh_g2', [{ t: "▸ 'The smile is still on it. Go and fetch your plate.'"
 
 // ---------- cargo runs ----------
 export const GOODS = { water: ['Water', 6], ore: ['Refined ore', 10], salvage: ['Salvage', 8], parts: ['Machine parts', 14], med: ['Medical supplies', 16], lux: ['Luxuries', 24] };
-const FACT = { moon: { water: 1.5, ore: .9, salvage: .6, parts: 1.3, med: 1.4, lux: 1.2 }, halfway: { lux: 1.1 }, sunder: { water: 1.6, ore: 1.1, salvage: 1.1, parts: .8, med: 1.1, lux: .7 },
+export const FACT = { moon: { water: 1.5, ore: .9, salvage: .6, parts: 1.3, med: 1.4, lux: 1.2 }, halfway: { lux: 1.1 }, sunder: { water: 1.6, ore: 1.1, salvage: 1.1, parts: .8, med: 1.1, lux: .7 },
   cairn: { water: .6, ore: 1, salvage: 1.2, parts: 1.3, med: 1.5, lux: 1.4 }, aurelis: { water: 1, ore: 1.3, salvage: 1.3, parts: .7, med: .7, lux: 1.5 },
   cinder: { water: 1.6, ore: 1.4, salvage: .9, parts: 1.2, med: 1.3, lux: 1.5 }, hollow: { water: 1.3, ore: .5, salvage: .8, parts: 1.2, med: 1.5, lux: 1.4 }, vigil: { water: 1.4, ore: 1.2, salvage: .5, parts: 1.6, med: 1.9, lux: .8 } };
 export const price = (sys, g) => Math.max(1, Math.round(GOODS[g][1] * (FACT[sys]?.[g] || 1)));

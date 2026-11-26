@@ -7,6 +7,7 @@ import { S, WH, TAU, lerp, mulberry32, makeNoise, chat, X } from './core.js';
 import { addChunked, propMat, worldGroup, addKinds } from './render.js';
 import * as R from './render.js';
 import * as M from './models.js';
+import { podGeo } from './flora8.js';
 import { build, P, T, Cone, Cyl, Box, Dod, Sph, Oct } from './models.js';
 import { H, HN, hgt, world, addWall, linkDoors, mergeBuilt, mat4, meshWithOutline, registerZone, ZONE_SIZE } from './world.js';
 import { groundMesh } from './zones.js';
@@ -217,7 +218,7 @@ registerZone('sunder', seed => {
     else if (r < .06 && z < 120) cacti.push([x, h - .1, z, rng() * 6.3, 0, 0, .8 + rng()]);
     else if (r < .075) bones.push([x, h - .05, z, rng() * 6.3, 0, 0, .7 + rng() * .8]);
   }
-  addChunked(M.rockGeo('#b88a5a', '#8a5a3a'), propMat, rocks, .04); addChunked(M.cactusGeo(), propMat, cacti, .04);
+  addChunked(M.rockGeo('#b88a5a', '#8a5a3a'), propMat, rocks, .04); addChunked(podGeo('#b89a6a', '#ffd86a'), propMat, cacti, .04);
   addChunked(build([P(T(Sph(.2, 6, 5), 0, .15), 0, O, '#e8e0cc'), P(T(Cyl(.05, .05, .7, 4), .25, .05, .1, 0, 0, Math.PI / 2), 0, O, '#e8e0cc')]), propMat, bones, .02);
   world.trees = cacti.map(t => ({ x: t[0], z: t[2], r: .3 }));
   world.minimap = minimapFrom(colorAt);

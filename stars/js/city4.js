@@ -6,6 +6,7 @@ import { S, WH, TAU, lerp, mulberry32, makeNoise, chat, X } from './core.js';
 import { addChunked, propMat, addKinds } from './render.js';
 import * as R from './render.js';
 import * as M from './models.js';
+import { fanTreeGeo } from './flora8.js';
 import { build, P, T, Cone, Cyl, Box, Sph, Oct } from './models.js';
 import { H, HN, hgt, world, addWall, linkDoors, mergeBuilt, mat4, meshWithOutline, registerZone, ZONE_SIZE } from './world.js';
 import { groundMesh } from './zones.js';
@@ -157,7 +158,7 @@ registerZone('city', seed => {
   const trees = [];
   for (let n = 0; n < 700; n++) { const a = rng() * TAU, d = 8 + Math.sqrt(rng()) * (Gd.R + 16), x = Gd.x + Math.cos(a) * d, z = Gd.z + Math.sin(a) * d; if (onRoad(x, z) || Math.hypot(x - (Gd.x + 40), z - (Gd.z + 30)) < 12) continue; if (rng() < .35) trees.push([x, hgt(x, z) - .1, z, rng() * 6.3, 0, 0, 1.2 + rng() * 1.2]); }
   for (let z = -160; z < 110; z += 16) for (const s of LR) trees.push([s * 12, hgt(s * 12, z) - .1, z, rng() * 6.3, 0, 0, 1.3]);
-  addChunked(M.oakGeo(), propMat, trees, .04);
+  addChunked(fanTreeGeo(), propMat, trees, .04);
   world.trees = trees.map(t => ({ x: t[0], z: t[2], r: .4 }));
   world.minimap = minimapFrom(colorAt);
   return world;

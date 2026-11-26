@@ -428,7 +428,7 @@ export const BASE_NAMES = {
   legs: { plate: ['Greaves', 'Legplates'], leather: ['Leggings', 'Breeches'], cloth: ['Trousers', 'Kilt'] },
   feet: { plate: ['Sabatons', 'Warboots'], leather: ['Boots', 'Treads'], cloth: ['Slippers', 'Sandals'] },
 };
-const PREFIX = ['Worn', 'Sturdy', 'Fine', 'Polished', 'Militia', 'Wayfarer\'s', 'Harrow', 'Veteran\'s'];
+const PREFIX = ['Worn', 'Sturdy', 'Fine', 'Polished', 'Surplus', 'Spacer\'s', 'Dockyard', 'Veteran\'s'];
 const SUFFIX = [['of the Bear', 'sta'], ['of Might', 'pow'], ['of the Eagle', 'crit'], ['of Fortitude', 'sta'], ['of Power', 'pow'], ['of Precision', 'crit']];
 // weapon and off-hand types per class
 export const WTYPE = { bulwark: ['mace', 'shield'], cleric: ['staff', 'tome'], longwatch: ['bow', 'quiver'], elementalist: ['staff', 'orb'],

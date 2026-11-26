@@ -8,6 +8,7 @@ import { S, WH, TAU, lerp, mulberry32, makeNoise, chat, X } from './core.js';
 import { addChunked, propMat, addKinds, replaceKinds } from './render.js';
 import * as R from './render.js';
 import * as M from './models.js';
+import { fanTreeGeo } from './flora8.js';
 import { build, P, T, Cone, Cyl, Box, Sph, Oct, Dod } from './models.js';
 import { H, HN, hgt, world, addWall, linkDoors, mergeBuilt, mat4, meshWithOutline, registerZone, ZONE_SIZE } from './world.js';
 import { groundMesh } from './zones.js';
@@ -150,7 +151,7 @@ registerZone('front', seed => {
   // the Chamber: forty-one standing stones round a floor that is lit from underneath
   put(build([P(T(Cyl(8.6, 9, .5, 16), 0, .25), 0, O, '#1c1c22'), P(T(Cyl(7.6, 7.6, .1, 16), 0, .55), 0, O, '#ffffff', 1.4), ...Array.from({ length: 41 }, (_, k) => { const a = k / 41 * TAU; return P(T(Box(.9, 3, .6), Math.cos(a) * 12, 1.5, Math.sin(a) * 12, 0, -a), 0, O, k > 37 ? '#5a5a66' : '#22222a'); }), P(T(Oct(.9), 0, 3.4), 0, O, '#ffffff', 3.6)]), Ch.x, Ch.z);
   meshWithOutline(mergeBuilt(items), .05); linkDoors();
-  if (trees.length) addChunked(M.oakGeo(), propMat, trees, .04);
+  if (trees.length) addChunked(fanTreeGeo('#2e6a4a', '#8dffef', '#2a3a2e'), propMat, trees, .04);
   world.trees = trees.map(t => ({ x: t[0], z: t[2], r: .5 }));
   const enemyBase = path === 'justice' ? Im : path === 'dark' ? Rp : null;
   world.places = [{ name: 'The Republic Lines', x: Rp.x, z: Rp.z, R: Rp.R, kind: Hm === Rp ? 'town' : 'dungeon' }, { name: 'The Imperial Lines', x: Im.x, z: Im.z, R: Im.R, kind: Hm === Im ? 'town' : 'dungeon' }, { name: 'The Truce Ground', x: Tr.x, z: Tr.z, R: Tr.R, kind: 'town' },

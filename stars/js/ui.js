@@ -862,7 +862,7 @@ export function openInspect(t) {
     }
     if (t.team === 'npc' && !t.prop && !t.corpse) {
       const T = talkOf(talkKey(t));
-      const bio = T?.bio || (t.storyNpc ? (Array.isArray(VILLAGER_LINES[t.name]) ? 'One of the villagers of Little Hollin, getting on with life as best they can.' : VILLAGER_LINES[t.name] ? 'One of Little Hollin\'s residents. Not all of them are still breathing.' : '') : t.guard ? 'A member of the town guard, keeping the gates safe.' : t.vendor ? 'A merchant who sells supplies and buys whatever you bring back.' : '');
+      const bio = T?.bio || (t.storyNpc ? (Array.isArray(VILLAGER_LINES[t.name]) ? 'One of the people who live and work here, getting on with life as best they can.' : VILLAGER_LINES[t.name] ? 'One of Little Hollin\'s residents. Not all of them are still breathing.' : '') : t.guard ? 'A member of the town guard, keeping the gates safe.' : t.vendor ? 'A merchant who sells supplies and buys whatever you bring back.' : '');
       body.appendChild(el(`<div class="card"><h3>${esc(t.name)}</h3>${t.title ? `<p class="dim" style="margin:0 0 4px">${esc(Game.fill(t.title))}</p>` : ''}<p class="lore" style="margin:4px 0">${esc(Game.fill(bio || 'Nothing remarkable, at first glance.'))}</p></div>`));
       if (!t.bindstone) { const a = el('<div class="acts"><button class="pri">Talk</button></div>'); a.firstChild.onclick = () => { closeSheet(); interact(t); }; body.appendChild(a); }
     }
@@ -948,7 +948,7 @@ export function showTitle(view = 'home') {
   const PATHS = { smuggler: ['Smuggler', 'The free worlds', 'You inherit a grounded freighter and a debt on the frontier moon of Dustfall.', '#ffb347'], justice: ['Justice', 'The Republic and the order', 'A first-year novice of the lamp-keepers, posted to a freezing fort on the edge of Republic space.', '#6ad8ff'], dark: ['Dark', 'The Empire and the Dusk Covenant', 'A conscript who survived the Winnowing. Now an initiate of the Covenant on the furnace world of Cinder, where the other initiates would like your bunk.', '#ff4a3a'] };
   const heroes = Object.keys(PATHS).map(p => [p, Game.saveInfoFor(p)]).filter(x => x[1]);
   if (view === 'home') X.newPath = null;
-  const head = `<h1>Stars Beneath</h1><div class="sub">Build 7 · two thousand years after the Gravelord fell</div>`;
+  const head = `<h1>Stars Beneath</h1><div class="sub">Build 8 · two thousand years after the Gravelord fell</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${heroes.map(([p, i]) => `<button class="pri" data-a="cont" data-p="${p}">Continue<small>${esc(i.name)} · level ${i.lvl} ${CLASSES[i.cls]?.name || ''} · ${PATHS[p][0]}</small></button>`).join('')}
