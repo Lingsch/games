@@ -327,7 +327,7 @@ export function inspect(e) {
   const p = e.prop, h = S.hero; if (!p || dist(h, e) > 6) return null;
   if (p.node) { Craft.gather(e); save(); return null; }
   if (p.station) return { station: p.station };
-  if (p.use && X.propUse) { X.propUse(e); save(); return null; }
+  if (p.use && X.propUse && X.propUse(e) !== false) { save(); return null; }
   const q = needFor(p);
   let read = null;
   if (q) {
@@ -736,7 +736,7 @@ Cb.setHooks({
     return a;
   },
   onOverflow(p, over) { if (over > 0) S.vetXp = Math.min(40000, (S.vetXp || 0) + Math.round(over)); },
-  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : MAX_LVL),
+  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : X.gateCap ? X.gateCap(p) : MAX_LVL),
   onCapped(p) { if (cappedSaid) return; cappedSaid = true; chat('sys', null, `You have learned all this weapon can teach you, for now.`); },
   onYield(m, src) {
     // he only surrenders to your group, and only while you're on his quest

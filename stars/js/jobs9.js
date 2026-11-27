@@ -9,7 +9,7 @@ import { TALK, VILLAGER_LINES } from './dialogue.js';
 import * as Cb from './combat.js';
 import * as Game from './game.js';
 const pick = (a, r = Math.random) => a[(r() * a.length) | 0];
-const BAND = { moon: [1, 5], sunder: [6, 10], fort: [1, 5], city: [6, 10], cinder: [1, 5], hollow: [6, 10], front: [10, 15] };
+const BAND = { moon: [1, 5], sunder: [6, 10], fort: [1, 5], city: [6, 10], cinder: [1, 5], hollow: [6, 10], front: [10, 15], grave: [15, 20] };
 const DISP = {
   moon: ['job_moon', 'PEG-2', 'Port work board · walking', 'sdrone', [8, -12], "PEG-2 was the Dustfall port's notice board until somebody fitted it with legs so it could chase people who owed work. It has been cheerful about it for thirty years.",
     ["WORK IS AVAILABLE. Work is always available. This is the one thing Dustfall has plenty of.", "Hello, Captain! I have matched a job to the weapon you are carrying. I am very good at matching. Nobody ever says so."],
@@ -32,6 +32,9 @@ const DISP = {
   front: ['job_front', 'Runner Kip Sorrel', 'Truce Ground errands', 'villager2', [14, -10], "Kip Sorrel is fifteen, fast, and the only person on Lanthorn who carries messages for both armies. Mother Reave pays him in meals and he pays everybody else in gossip.",
     ["You want work? I've got loads. Both sides give me jobs they can't be seen doing. I'm sort of a secret. Don't tell anyone.", "Mother says I'm not to go past the fence. So I find people who can. That's you. Hello."],
     ["If you see my sister with the Republic medics, tell her I've eaten. She worries.", "Don't tell the generals it came from me. Either of them. They both think I'm theirs.", "And keep your head down in the middle. That's where it's worst."], ["You did it! I'll tell them. I'll tell both of them, separately, and get paid twice. Here's your half. Well. Your third.", "Brilliant. That's a whole day nobody's cross with me. Nearly a record.", "Done? Really? You're quicker than the last one. The last one's in the infirmary. Different reasons."]],
+  grave: ['job_grave', 'Tally-Mother Besk', 'Keelmoot work chalkboard', 'villager1', [-14, -10], "Besk has chalked up the Keelmoot's day-work for forty years on a slab of hull plate. She has never once written a job down wrong, and never once written a wage down right, in the breakers' favour.",
+    ["Work? Reef's full of it. Read the plate. If you can't read, I'll shout it.", "You've a weapon and two legs. That's two more qualifications than the last one had."],
+    ["Mind the seams. They're deeper than they look.", "Don't wake anything. If you wake something, wake it quietly.", "And if the yard asks, you never saw me."], ["Done? I'll rub it off the plate. Best sound there is, chalk coming off.", "That's fair work. Here's fair pay, near enough.", "Back in one piece. I'd bet against it. Lucky I only bet tea."]],
 };
 for (const [zone, [key, name, title, model, , bio, greet]] of Object.entries(DISP)) { GIVERS[key] = { name, title, model }; TALK[key] = { bio, greet, topics: [{ q: 'How does this work?', a: ["One job at a time, cut to whatever weapon you're carrying today. Finish it, report back, and there's another. There is always another.", "Change weapons and the work changes with you. Nobody here minds how many trades you're learning, so long as the thing gets done."] }] }; }
 

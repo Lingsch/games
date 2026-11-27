@@ -1,7 +1,7 @@
 // Game data: the four Milestone 1 classes, mobs, items, quests, fake-player names and chat.
 // Ability effects receive C (the combat API in combat.js), the user u, the target t and the ability.
 
-export const MAX_LVL = 20;
+export const MAX_LVL = 50;   // Stars Beneath Build 12: the road to 50, gated at 10 (weapons) and 20, 30, 40 (trials)
 export const xpNeed = L => Math.round(80 * L ** 1.7 + 120);
 export const GCD = 1.5;
 
