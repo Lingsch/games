@@ -408,6 +408,9 @@ export const MOBS = {
 // Build 4.4: enemies are tougher and hit harder across the board
 // From the MMO's Build 12: the early game bites. Levels 1-10 hit 20% harder with 30% more health, easing back to normal by 14.
 const early = (L, k) => L <= 10 ? k : L < 14 ? 1 + (k - 1) * (14 - L) / 4 : 1;
+// Carried over from the Single-Player MMO's Build 13.2: the balance knobs in one place. A dungeon boss takes a group of
+// four two to three minutes, a trash pack about half a minute, and the healer has to work.
+export const BAL = { bossHp: 18, raidBossHp: 80, namedHp: 8, bossDmg: 1.6, mobDmg: 1, mana: 1, manaCost: .6, castRegen: .006 };
 export const mobHp = L => (42 + 28 * L) * 1.5 * early(L, 1.3);
 export const mobDmg = L => (4 + 2.3 * L) * 1.75 * early(L, 1.2);
 export const mobXp = L => 18 + 13 * L + .9 * L * L;
@@ -431,7 +434,25 @@ export const BASE_NAMES = {
   feet: { plate: ['Sabatons', 'Warboots'], leather: ['Boots', 'Treads'], cloth: ['Slippers', 'Sandals'] },
 };
 const PREFIX = ['Worn', 'Sturdy', 'Fine', 'Polished', 'Surplus', 'Spacer\'s', 'Dockyard', 'Veteran\'s'];
-const SUFFIX = [['of the Long Haul', 'sta'], ['of Might', 'pow'], ['of the Marksman', 'crit'], ['of Fortitude', 'sta'], ['of Power', 'pow'], ['of Precision', 'crit']];
+const SUFFIX = [['of the Long Haul', 'sta'], ['of Might', 'pow'], ['of the Marksman', 'crit'], ['of Fortitude', 'sta'], ['of Power', 'pow'], ['of Precision', 'crit'], ['of the Afterburner', 'haste'], ['of Quick Hands', 'haste'],
+  ['of the Calm Pilot', 'spi'], ['of the Deep Cell', 'mreg'], ['of the Sidestep', 'dodge'], ['of the Guard', 'parry'], ['of the Bulkhead', 'block']];
+const RSUFFIX = [['of Heat Shielding', 'rfire'], ['of Cold Shielding', 'rfrost'], ['of the Dawn Ward', 'rshadow'], ['of the Filter', 'rnature'], ['of Grounding', 'rstorm'], ['of the Dusk Ward', 'rholy'], ['of the Null Field', 'rarcane']];
+// Carried over from the MMO's Build 13: secondary stats on gear. (Stars Beneath keeps a single Power stat: no Strength/Agility/Intellect split.)
+export const SEC_KEYS = ['haste', 'spi', 'mreg', 'dodge', 'parry', 'block', 'rfire', 'rfrost', 'rshadow', 'rnature', 'rstorm', 'rholy', 'rarcane'];
+export const RES_KEYS = ['rfire', 'rfrost', 'rshadow', 'rnature', 'rstorm', 'rholy', 'rarcane'];
+export const SCHOOL_RES = { fire: 'rfire', frost: 'rfrost', shadow: 'rshadow', nature: 'rnature', poison: 'rnature', earth: 'rnature', storm: 'rstorm', holy: 'rholy', arcane: 'rarcane' };
+export const STAT_NAMES = { sta: 'Stamina', pow: 'Power', crit: 'Crit', arm: 'Armor', haste: 'Haste', spi: 'Focus', mreg: 'Power regen', dodge: 'Dodge', parry: 'Parry', block: 'Block',
+  rfire: 'Heat resist', rfrost: 'Cold resist', rshadow: 'Dusk resist', rnature: 'Toxin resist', rstorm: 'Shock resist', rholy: 'Lamp resist', rarcane: 'Void resist' };
+export const PCT_STATS = new Set(['crit', 'haste', 'dodge', 'parry', 'block']);
+export function secondary(st, k, L, rarity, budget, it) {
+  if (k === 'block' && it && it.type !== 'shield') k = 'parry';
+  if (k === 'pow' || k === 'sta') st[k] = (st[k] || 0) + Math.round(budget * .4);
+  else if (PCT_STATS.has(k)) st[k] = +((st[k] || 0) + (1 + rarity + L * .15) * (k === 'crit' || k === 'haste' ? 1 : .8)).toFixed(1);
+  else if (k === 'spi') st.spi = (st.spi || 0) + Math.round(budget * .4);
+  else if (k === 'mreg') st.mreg = (st.mreg || 0) + Math.max(1, Math.round(budget * .15));
+  else if (RES_KEYS.includes(k)) st[k] = (st[k] || 0) + Math.round(budget * .6 + L * .5);
+  return st;
+}
 // weapon and off-hand types per class
 export const WTYPE = { bulwark: ['mace', 'shield'], cleric: ['staff', 'tome'], longwatch: ['bow', 'quiver'], elementalist: ['staff', 'orb'],
   wardancer: ['blade', 'sabre'], bladewarden: ['greatsword', 'charm'], monk: ['wraps', 'charm'], aegis: ['wand', 'relic'], lifebinder: ['staff', 'totem'], druid: ['staff', 'totem'],
@@ -451,11 +472,11 @@ export function randomGear(L, cls, rarityBoost = 0) {
   const armorType = slot === 'weapon' ? null : slot === 'off' ? (type === 'shield' ? 'plate' : null) : type;
   if (armorType) stats.arm = Math.round((armorType === 'plate' ? 3 : armorType === 'leather' ? 2 : 1) * (1 + L * .8) * (1 + rarity * .3));
   let name = base, suf = null;
-  if (rarity > 0) { suf = SUFFIX[(Math.random() * SUFFIX.length) | 0]; name = `${base} ${suf[0]}`; }
+  if (rarity > 0) { const SL = L >= 15 && Math.random() < .2 ? RSUFFIX : SUFFIX; suf = SL[(Math.random() * SL.length) | 0]; name = `${base} ${suf[0]}`; }
   else name = `${PREFIX[(Math.random() * PREFIX.length) | 0]} ${base}`;
   if (slot === 'weapon') { stats.pow = Math.round(budget * .7); stats.sta = Math.round(budget * .3); }
   else { stats.sta = Math.round(budget * .55); stats.pow = Math.round(budget * .35); }
-  if (suf) { stats[suf[1]] += suf[1] === 'crit' ? 0 : Math.round(budget * .4); if (suf[1] === 'crit') stats.crit = +(1 + rarity + L * .15).toFixed(1); }
+  if (suf) secondary(stats, suf[1], L, rarity, budget, { type });
   for (const k in stats) if (!stats[k]) delete stats[k];
   return makeItem({ name, slot, type, armorType, lvl: L, rarity, stats, value: Math.round((3 + L * 4) * (1 + rarity * 2)) });
 }

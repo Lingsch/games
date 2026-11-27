@@ -262,6 +262,10 @@ QUESTS.push(...V);
 // ---------- the armory trials: reach level 10 in a class, prove it, and take up a weapon from a family you're missing ----------
 GIVERS.armorer = { name: 'Master Corvin', title: 'Armory · class trials', model: 'guard' };
 for (const k of CLASS_KEYS) {
+  // from the MMO's Build 13.2: word from the armoury at level 10, so nobody hits 10 without knowing where to go
+  QUESTS.push({ id: 'sum_' + k, giver: 'armorer', cls: k, lvl: 10, needLvl: 99, name: 'Word from the Armoury', xp: 0, gold: 0, obj: { talk: true, what: 'Report to the armourer in any large port' },
+    say: ["You've gone as far as that weapon takes you on its own. Come and see me at the armoury when you're next in port."],
+    done: ["There you are. Got my message, then. Half the people I send for think it's a bill.", "Right. One weapon only takes you so far. Let's see about a second."] });
   QUESTS.push({ id: 'w_' + k, giver: 'armorer', cls: k, lvl: 10, needLvl: 10, unlock: true, name: `The ${CLASSES[k].name}'s Trial`, xp: qx(10, .45), gold: 25,
     obj: { anyMin: 9, n: 10, what: 'Defeat 10 enemies of level 9 or higher' },
     say: ["Ten levels as a {cls}, and you're still standing. Most people give up at four, usually because something ate them.",

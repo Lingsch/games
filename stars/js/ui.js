@@ -3,7 +3,7 @@ import * as THREE from './three.js';
 import { S, WH, TAU, clamp, dist, fct, chat, X } from './core.js';
 import { cam } from './render.js';
 import { world, hgt, regionAt, REGION_NAMES } from './world.js';
-import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, WTYPE, BASE_NAMES, SETS } from './data.js';
+import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, WTYPE, BASE_NAMES, SETS, STAT_NAMES, PCT_STATS, BOOK } from './data.js';
 import * as Sea from './sea.js';
 import { LORE, PERKS } from './story.js';
 import { TALK, VILLAGER_LINES, MOB_LORE } from './dialogue.js';
@@ -74,8 +74,12 @@ function showTip(i, el) {
 }
 function hideTip() { $('tip').classList.add('hide'); }
 let lastBarSig = '';
+// from the MMO's Build 13.1: a spell's rank shows on the bar: I as learned, II ten levels later, then Adept and Master from manuals
+const RK_ROMAN = ['', 'I', 'II', 'III', 'IV'], RK_COL = ['', '', '#4aa3ff', '#b35cff', '#ff9a2a'];
+export const spellTier = (h, ab) => !ab || !h ? 1 : rankOf(h, ab) + (BOOK.rank(h, ab) || 0);
+const rkBadge = t => t > 1 ? `<span class="rk" style="--rk:${RK_COL[t]}">${RK_ROMAN[t]}</span>` : '';
 function refreshKeys(force) {
-  const h = S.hero, bar = shownBar(), sig = S.heroCls + bar.join(',');
+  const h = S.hero, bar = shownBar(), sig = S.heroCls + bar.map(k => k + (k === 'attack' ? '' : spellTier(h, CLASSES[S.heroCls].abilities[k]))).join(',');
   if (force || sig !== lastBarSig) {
     lastBarSig = sig;
     // the bar is only as tall as it needs to be
@@ -89,6 +93,9 @@ function refreshKeys(force) {
       el.querySelector('.ic').textContent = key === 'attack' ? '⚔️' : CLASSES[S.heroCls].abilities[key].icon;
       el.querySelector('.lab').textContent = key === 'attack' ? 'Attack' : (X.abName ? X.abName(S.hero, CLASSES[S.heroCls].abilities[key]) : CLASSES[S.heroCls].abilities[key].name);
       el.style.setProperty('--c', key === 'attack' ? '#c9ccd2' : kindCol(CLASSES[S.heroCls].abilities[key]));
+      const t = key === 'attack' ? 1 : spellTier(h, CLASSES[S.heroCls].abilities[key]);
+      el.classList.toggle('rkup', t > 1); el.style.setProperty('--rk', RK_COL[t] || 'transparent');
+      let rb = el.querySelector('.rk'); if (t > 1) { if (!rb) { rb = document.createElement('span'); rb.className = 'rk'; el.appendChild(rb); } rb.textContent = RK_ROMAN[t]; } else rb?.remove();
     });
   }
   bar.forEach((key, i) => {
@@ -206,7 +213,7 @@ function onKey(ev, down) {
   if (k === 'escape') { if (!$('sheet').classList.contains('hide')) closeSheet(); else S.target = null; }
   if (k === 'f') doAct();
   if (k === 'm') { if (MapUI.isOpen()) MapUI.closeBig(); else openMap(); }
-  if (k === 'b') openBook('char'); if (k === 'l') openBook('quests'); if (k === 'o') openBook('social'); if (k === 'p') openBook('spells');
+  if (BOOK_KEYS[k] && !ev.ctrlKey && !ev.metaKey) { const t = BOOK_KEYS[k]; if (sheetOpen() && $('sheetIn').classList.contains('book') && bookTab === t) closeSheet(); else openBook(t); }
   if (k === 'x') toggleSit();
 }
 export function pollInput() {
@@ -261,6 +268,16 @@ const partyEls = [];
 function frameRes(e) { return e.resType === 'mana' ? `${Math.round(e.res)} / ${e.resMax}` : `${Math.round(e.res)} ${resName(e)}`; }
 // buff and debuff icons: debuffs get a red rim, long buffs about to run out fade and pulse
 const isDebuff = b => b.src && (b.src.mob || b.src.team === 'enemy') && !b.src.charmed;
+// from the MMO's Build 13.2: everything on your target, buffs and debuffs. Yours are outlined in gold.
+function abIcon(src, id) { const C = src?.cls && CLASSES[src.cls]; return C?.abilities?.[id]?.icon || null; }
+function targetBuffRow(t, h) {
+  return t.buffs.filter(b => b.id !== 'wardlock' && (b.dur > .5 || b.data.dot)).slice(0, 14).map(b => {
+    const base = b.id.split(':')[0], ic = BUFF_ICON[base] || abIcon(b.src, base) || (base === 'poison' ? '☣️' : b.data.dot ? '🔥' : b.data.hot ? '💚' : '•');
+    const mine = b.src === h || (b.src?.pet && b.src.pet.owner === h), bad = !!(b.data.dot || b.data.mez || b.data.stun || b.data.slow || b.data.snare || b.data.root || (b.src && b.src.team !== t.team && !isDebuff(b)));
+    const left = b.t < 60 ? Math.ceil(b.t) : '';
+    return `<span class="${mine ? 'mine' : bad ? 'deb' : 'good'}" title="${esc(base)}">${ic}${b.data.stacks ? b.data.stacks : ''}<i>${left}</i></span>`;
+  }).join('');
+}
 function buffRow(u, max) {
   return u.buffs.filter(b => (b.dur > 1 || isDebuff(b)) && !b.id.includes(':') && b.id !== 'wardlock').slice(0, max)
     .map(b => `<span class="${isDebuff(b) ? 'deb' : ''}${b.dur >= 60 && b.t < 30 ? ' low' : ''}">${BUFF_ICON[b.id] || '•'}${b.data.stacks ? b.data.stacks : ''}</span>`).join('');
@@ -318,6 +335,7 @@ function updateFrames() {
       if (Object.values(CLASSES[h.cls].abilities).some(a => a.behind) && !t.dead) info += Cb.behind(h, t) ? ' · behind ✓' : ' · get behind';
     }
     $('tgtInfo').textContent = info;
+    { const tb = $('tgtBuffs'), s = t.dead ? '' : targetBuffRow(t, h); if (tb && tb._s !== s) { tb.innerHTML = s; tb._s = s; } }
     const cast = t.mcast || t.casting, cb = $('tgtCast');
     cb.classList.toggle('hide', !cast);
     if (cast) { cb.firstElementChild.style.width = pct(cast.t, cast.total) + '%'; cb.lastElementChild.textContent = t.mcast ? (t.mcast.kind === 'heal' ? 'Healing chant' : 'Shadow bolt') : Cb.abilityOf(t, cast.key)?.name || ''; }
@@ -342,6 +360,7 @@ function updateFrames() {
   if (tr._s !== tq) { tr.innerHTML = tq; tr._s = tq; }
   // xp, cast bar
   $('xpFill').style.width = h.lvl >= MAX_LVL ? '100%' : pct(h.xp, xpNeed(h.lvl)) + '%';
+  { const cap = !!Game.capInfo() && h.xp >= xpNeed(h.lvl) - 1; if ($('xp')._c !== cap) { $('xp')._c = cap; $('xp').classList.toggle('capped', cap); } }
   const c = h.casting; $('castbar').classList.toggle('hide', !c);
   if (c) { $('castName').textContent = Cb.abilityOf(h, c.key).name + (c.tgt && c.tgt !== h ? ' → ' + c.tgt.name : ''); $('castFill').style.width = pct(c.t, c.total) + '%'; }
   $('hpotN').textContent = S.pots.hpot; $('mpotN').textContent = S.pots.mpot;
@@ -350,7 +369,7 @@ function updateFrames() {
   const qn = QUESTS.filter(q => S.quests[q.id]?.state === 'done').length;
   if (qn) $('bookBtn').dataset.n = qn; else delete $('bookBtn').dataset.n;
 }
-const BUFF_ICON = { scroll: '📜', mounted: '🏍️', guildbanner: '🏳️', fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
+const BUFF_ICON = { enrage: '💢', shield: '🛡️', scroll: '📜', mounted: '🏍️', guildbanner: '🏳️', fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
   focusmind: '🎯', wolfspirit: '🐺', markwild: '🐾', poisonblades: '🗡️', restsong: '🎼', hastesong: '🥁', haste: '⏩', ward: '🛡️', shelter: '🔯', renew: '🌱', rejuv: '🍃', wild: '🌳', regrowth: '🍀',
   bear: '🐻', cat: '🐆', chain: '🤺', untouch: '🌪️', crescendo: '🎺', empower: '💪', unbound: '🌋', treeoflife: '🌲', guard: '🛡️', evade: '💨', shadowstep: '🌑', fists: '👐', crescendo2: '🎶' };
 for (const c in CLASSES) for (const [k, a] of Object.entries(CLASSES[c].abilities)) if (!BUFF_ICON[k]) BUFF_ICON[k] = a.icon;
@@ -439,7 +458,7 @@ function updateMini() {
 
 // ---------- panels ----------
 let sheetRender = null;
-export function openSheet(title, render) { $('sheetTitle').textContent = title; sheetRender = render; $('sheet').classList.remove('hide'); refreshSheet(); }
+export function openSheet(title, render) { $('sheetIn').classList.remove('book'); $('sheetTitle').textContent = title; sheetRender = render; $('sheet').classList.remove('hide'); refreshSheet(); }
 export function refreshSheet() { if (!sheetRender) return; const st = $('sheetBody').scrollTop; $('sheetBody').innerHTML = ''; sheetRender($('sheetBody')); $('sheetBody').scrollTop = st; }
 export function closeSheet() { $('sheet').classList.add('hide'); sheetRender = null; swapPick = swapPick; }
 const sheetOpen = () => !$('sheet').classList.contains('hide');
@@ -447,21 +466,46 @@ function el(html) { const d = document.createElement('div'); d.innerHTML = html;
 Object.assign(X.ui, { el, esc, toast, openSheet, refreshSheet, closeSheet, openBook: t => openBook(t), openTalk: n => openTalk(n), refreshKeys: f => refreshKeys(f) });
 function itemHtml(it, cmp) {
   const rc = RARITY[it.rarity].c, s = it.stats;
-  const st = Object.entries(s).map(([k, v]) => { const dlt = cmp ? v - (cmp.stats[k] || 0) : 0; return `<span>${{ sta: 'Stamina', pow: 'Power', crit: 'Crit %', arm: 'Armor' }[k]} ${v}${cmp && dlt ? ` <i class="${dlt > 0 ? 'up' : 'down'}">${dlt > 0 ? '+' : ''}${Math.round(dlt * 10) / 10}</i>` : ''}</span>`; }).join('');
-  if (cmp) for (const k in cmp.stats) if (!(k in s)) { }
+  const ks = [...Object.keys(s)]; if (cmp) for (const k in cmp.stats) if (!(k in s) && cmp.stats[k]) ks.push(k);
+  const st = ks.map(k => { const v = s[k] || 0, dlt = cmp ? v - (cmp.stats[k] || 0) : 0; return `<span${v ? '' : ' class="dim"'}>${STAT_NAMES[k] || k} ${v}${PCT_STATS.has(k) ? '%' : ''}${cmp && dlt ? ` <i class="${dlt > 0 ? 'up' : 'down'}">${dlt > 0 ? '+' : ''}${Math.round(dlt * 10) / 10}</i>` : ''}</span>`; }).join('');
   return `<b>${esc(it.name)}</b> <span class="dim">· ${SLOT_NAMES[it.slot]}${it.armorType ? ' · ' + it.armorType : it.type && it.type !== it.slot ? ' · ' + it.type : ''} · L${it.lvl}${it.crafted ? ' · crafted' : ''}</span><div class="st">${st}</div>${it.desc ? `<div style="font-size:12px;color:#d8c890">${esc(it.desc)}</div>` : ''}${it.ench ? `<div class="dim" style="font-size:11.5px;color:#8affff">✨ ${esc(it.ench.name)}</div>` : ''}${it.set && SETS[it.set] ? `<div style="font-size:11.5px;color:#d8b24a">Set: ${esc(SETS[it.set].name)}. ${esc(SETS[it.set].desc)}</div>` : ''}`;
 }
 let bookTab = 'char';
+// from the MMO's Build 13.2: the Book, grouped the way the big MMOs do it: five groups, a sidebar with hotkeys on PC,
+// and on phones a row of groups with that group's pages under it.
+const BOOK_GROUPS = [['hero', '🧑‍🚀', 'Captain', ['char', 'classes', 'spells', 'deeds']], ['gear', '🎒', 'Gear', ['bags', 'trade']],
+  ['journal', '📜', 'Journal', ['quests', 'lore', 'rep']], ['group', '⚔️', 'Group', ['lfg', 'raid']], ['social', '📡', 'Social', ['social', 'guild']]];
+const TAB_ICON = { char: '🧍', classes: '🗡️', spells: '✨', deeds: '🏅', bags: '🎒', trade: '⚒️', quests: '📜', lore: '📖', rep: '🎖️', lfg: '🔍', raid: '🛡️', social: '💬', guild: '🏴' };
+export const BOOK_KEYS = { c: 'char', v: 'classes', b: 'bags', p: 'spells', l: 'quests', o: 'social', i: 'lfg', g: 'guild', u: 'rep' };
+const KEY_OF = Object.fromEntries(Object.entries(BOOK_KEYS).map(([k, t]) => [t, k.toUpperCase()]));
 export function openBook(tab) {
   if (tab) bookTab = tab;
   openSheet('Book', body => {
     const extra = X.book.filter(b => !b[3] || b[3]());
-    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Abilities'], ['quests', 'Quests'], ['bags', 'Bags'], ['trade', 'Trade'], ['lore', 'Lore'], ['social', 'Social'], ...extra].filter(t => !(X.hideTabs || []).includes(t[0])).map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
-    tabs.onclick = ev => { const t = ev.target.dataset.t; if (t) { bookTab = t; refreshSheet(); } };
-    body.appendChild(tabs);
-    const fns = { char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial, trade: tabTrade }; for (const b of extra) fns[b[0]] = b[2];
-    (fns[bookTab] || tabChar)(body);
+    const all = [['char', 'Character'], ['classes', 'Classes'], ['spells', 'Abilities'], ['quests', 'Quests'], ['bags', 'Bags'], ['trade', 'Trade'], ['lore', 'Lore'], ['social', 'Who\'s Online'], ...extra.map(b => [b[0], b[1]])].filter(t => !(X.hideTabs || []).includes(t[0]));
+    const name = Object.fromEntries(all), groups = BOOK_GROUPS.map(g => [...g.slice(0, 3), g[3].filter(k => name[k])]).filter(g => g[3].length);
+    const known = new Set(groups.flatMap(g => g[3])); for (const [k] of all) if (!known.has(k)) groups[0][3].push(k);
+    if (!name[bookTab]) bookTab = 'char';
+    const cur = groups.find(g => g[3].includes(bookTab));
+    $('sheetIn').classList.add('book'); $('sheetTitle').textContent = `${cur[2]} · ${name[bookTab]}`;
+    const item = k => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}"><span class="bi">${TAB_ICON[k] || '•'}</span><span class="bn">${name[k]}</span>${KEY_OF[k] ? `<kbd>${KEY_OF[k]}</kbd>` : ''}</button>`;
+    const nav = el(`<nav class="bk"><div class="bkSide">${groups.map(g => `<div class="bkG"><h4>${g[1]} ${g[2]}</h4>${g[3].map(item).join('')}</div>`).join('')}</div>
+      <div class="bkTop"><div class="bkGroups">${groups.map(g => `<button data-g="${g[0]}" class="${g === cur ? 'on' : ''}"><span>${g[1]}</span>${g[2]}</button>`).join('')}</div><div class="bkSubs">${cur[3].map(item).join('')}</div></div></nav>`);
+    nav.onclick = ev => { const b = ev.target.closest('button'); if (!b) return; if (b.dataset.t) bookTab = b.dataset.t; else if (b.dataset.g) bookTab = groups.find(g => g[0] === b.dataset.g)[3][0]; refreshSheet(); };
+    const main = el('<div class="bkMain"></div>'), wrap = el('<div class="bkWrap"></div>');
+    wrap.append(nav, main); body.appendChild(wrap);
+    const fns = { char: tabChar, classes: tabClasses, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial, trade: tabTrade }; for (const b of extra) fns[b[0]] = b[2];
+    (fns[bookTab] || tabChar)(main);
+    setTimeout(() => nav.querySelector('.bkSubs .on')?.scrollIntoView({ block: 'nearest', inline: 'center' }), 0);
   });
+}
+function tabClasses(body) {
+  const cap = Game.capInfo(), fams = FAMILIES.map(f => [f, Game.famBest(f)]);
+  body.appendChild(el(`<div class="card"><h3>Your classes</h3><p>Every class is a weapon. Equip a class's weapon below to play it; each class keeps its own level, gear and abilities.</p>
+    <div class="famrow">${fams.map(([f, L]) => `<div class="fam ${L >= (cap && !cap.trial ? cap.lvl : 0) ? 'ok' : 'miss'}"><span>${FAMILY_ICON[f]}</span><b>${X.fam?.[f] || f}</b><small>${L ? 'best level ' + L : 'none yet'}</small></div>`).join('')}</div>
+    ${cap ? `<p class="capnote">🔒 ${esc(Game.capText(cap))}</p>` : ''}
+    ${!S.unlockPicks && Game.weaponChoices().length && !Game.owns(Game.weaponChoices()[0]) ? `<p>New weapons come from the armourer in any large port: get a class to level 10, pass the trial, and choose one from a kind you don't carry yet.</p>` : ''}</div>`));
+  weaponRack(body);
 }
 // ---------- weapons: equip a class's weapon to play it ----------
 const WICON = { duskblade: '🩸', reliquary: '⚱️', duskknife: '🗡️', skullcase: '💀', lampblade: '🔆', lantern: '🏮', shortblade: '🗡️', cannon: '💥', injector: '💉', mace: '🔨', staff: '🪄', bow: '🏹', blade: '⚔️', greatsword: '🗡️', wraps: '👊', dagger: '🔪', rapier: '🤺', wand: '✨' };
@@ -532,7 +576,7 @@ function tabChar(body) {
     <div class="grid2" style="margin-top:6px"><div><div class="stat"><span>Health</span><span>${h.maxHp}</span></div><div class="stat"><span>${resName(h)}</span><span>${h.resMax}</span></div><div class="stat"><span>Power</span><span>${Math.round(h.power)}</span></div></div>
     <div><div class="stat"><span>Armor</span><span>${Math.round(h.armor)}</span></div><div class="stat"><span>Crit</span><span>${(h.crit * 100).toFixed(1)}%</span></div><div class="stat"><span>XP</span><span>${h.lvl >= MAX_LVL ? 'max' : Math.round(h.xp) + ' / ' + xpNeed(h.lvl)}</span></div></div></div>
     <p>Credits: ${S.gold}</p></div>`));
-  weaponRack(body);
+  { const b = el(`<div class="acts" style="margin:-2px 0 8px"><button data-a="cls">🗡️ Switch class (${CLASS_KEYS.filter(k => Game.owns(k)).length} owned)</button></div>`); b.onclick = () => { bookTab = 'classes'; refreshSheet(); }; body.appendChild(b); }
   // progression: just the numbers; the game doesn't explain itself
   { const fam = FAMILIES.map(f => { const b = Game.famBest(f); return `<span class="fam ${b >= 10 ? 'ok' : ''}">${{ Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔧' }[f]} ${f} ${b}</span>`; }).join('');
     body.appendChild(el(`<div class="card"><h3>Families</h3><div class="fams">${fam}</div></div>`));
@@ -574,7 +618,7 @@ function tabSpells(body) {
   const all = [['attack', { name: 'Auto Attack', icon: '⚔️', lvl: 1, kind: 'attack', desc: 'Toggle attacking your target with your weapon.' }], ...Object.entries(C.abilities).filter(([, a]) => a.lvl <= h.lvl)];
   for (const [k, ab] of all) {
     const lock = false, cost = k === 'attack' ? 0 : Cb.costOf(h, ab), onBar = bar.includes(k);
-    const card = el(`<div class="card sp ${lock ? 'lock' : ''}" style="${pendingSpell === k ? 'box-shadow:0 0 0 2px var(--acc)' : ''}"><div class="ic">${ab.icon}</div><div style="flex:1"><b>${esc(k === 'attack' ? ab.name : rankName(h, ab))}</b> <small>${ab.kind === 'ult' ? 'ULTIMATE' : ab.kind.toUpperCase()}</small> <p style="margin:2px 0">${esc(ab.desc)}</p><span class="dim" style="font-size:12px">${cost ? cost + ' ' + h.resType + ' · ' : ''}${ab.cast ? ab.cast + ' s cast' : 'Instant'}${ab.cd ? ' · ' + ab.cd + ' s cooldown' : ''}${onBar ? ' · on bar' : ''}</span></div></div>`);
+    const card = el(`<div class="card sp ${lock ? 'lock' : ''}" style="${pendingSpell === k ? 'box-shadow:0 0 0 2px var(--acc)' : ''}"><div class="ic" style="position:relative${!lock && k !== 'attack' && spellTier(h, ab) > 1 ? `;outline:2px solid ${RK_COL[spellTier(h, ab)]};outline-offset:1px;border-radius:8px` : ''}">${ab.icon}${!lock && k !== 'attack' ? rkBadge(spellTier(h, ab)) : ''}</div><div style="flex:1"><b>${esc(k === 'attack' ? ab.name : rankName(h, ab))}</b> <small>${ab.kind === 'ult' ? 'ULTIMATE' : ab.kind.toUpperCase()}</small> <p style="margin:2px 0">${esc(ab.desc)}</p><span class="dim" style="font-size:12px">${cost ? cost + ' ' + h.resType + ' · ' : ''}${ab.cast ? ab.cast + ' s cast' : 'Instant'}${ab.cd ? ' · ' + ab.cd + ' s cooldown' : ''}${onBar ? ' · on bar' : ''}</span></div></div>`);
     card.onclick = () => { pendingSpell = pendingSpell === k ? null : k; swapEdit = -1; refreshSheet(); };
     body.appendChild(card);
   }
@@ -683,10 +727,20 @@ function tabBags(body) {
   if (!S.bag.length) body.appendChild(el('<p class="dim">Your bags are empty.</p>'));
   const vend = S.ents.some(n => n.vendor && !n.dead && dist(S.hero, n) < 8), C0 = CLASSES[S.heroCls].abilities;
   if (vend && S.bag.some(it => it.junk)) { const b = el(`<div class="acts" style="margin:0 0 6px"><button>Sell all trade goods (${S.bag.filter(it => it.junk).reduce((a, it) => a + it.value, 0)}g)</button></div>`); b.querySelector('button').onclick = () => { P8.sellJunk(); refreshSheet(); }; body.appendChild(b); }
-  for (const it of S.bag) {
+  const G = Game.gearPrefs(), ups = new Set(S.bag.filter(it => Game.isUpgrade(it, G.focus)));
+  const gc = el(`<div class="card"><h3 style="margin:0 0 4px">Gear focus</h3><div class="seg" style="flex-wrap:wrap">${Game.FOCI.map(([k, n]) => `<button data-f="${k}" style="flex:1 0 auto;padding:0 8px" class="${G.focus === k ? 'on' : ''}">${n}</button>`).join('')}</div><p class="dim" style="font-size:12px;margin:4px 0">A ${esc(X.clsName ? X.clsName(S.hero) : CLASSES[S.heroCls].name)} draws everything from Power, whether it fires a rifle or carries the lamp. Health comes from Stamina.</p><div class="acts"><button class="pri" data-a="auto">Equip best ${ups.size ? `(${ups.size} upgrade${ups.size > 1 ? 's' : ''})` : ''}</button><button data-a="tog">Auto-equip loot: ${G.auto ? 'on' : 'off'}</button></div><h3 style="margin:8px 0 4px">Sort</h3><div class="seg" style="flex-wrap:wrap">${[['new', 'Newest'], ['up', 'Upgrades'], ['rarity', 'Rarity'], ['lvl', 'Level'], ['slot', 'Slot'], ['value', 'Value']].map(([k, n]) => `<button data-s="${k}" style="flex:1 0 auto;padding:0 8px" class="${G.sort === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>`);
+  gc.onclick = ev => { const b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.f) G.focus = b.dataset.f; if (b.dataset.s) G.sort = b.dataset.s; if (b.dataset.a === 'tog') G.auto = !G.auto;
+    if (b.dataset.a === 'auto') { const put = Game.autoEquip(G.focus); toast(put.length ? `You put on ${put.length > 2 ? put.length + ' pieces' : put.join(' and ')}.` : 'You are already wearing your best for that.'); }
+    Game.save(); refreshSheet(); };
+  body.appendChild(gc);
+  const W = Game.focusW(G.focus), SO = Game.GEAR_SLOTS, gearish = it => SO.includes(it.slot) && !it.junk && !it.book;
+  const order = { up: (a, b) => (ups.has(b) - ups.has(a)) || (Game.itemScore(b, W) - Game.itemScore(a, W)), rarity: (a, b) => (b.rarity || 0) - (a.rarity || 0) || (b.lvl || 0) - (a.lvl || 0), lvl: (a, b) => (b.lvl || 0) - (a.lvl || 0) || (b.rarity || 0) - (a.rarity || 0), slot: (a, b) => (SO.indexOf(a.slot) + 1 || 99) - (SO.indexOf(b.slot) + 1 || 99) || Game.itemScore(b, W) - Game.itemScore(a, W), value: (a, b) => (b.value || 0) - (a.value || 0) }[G.sort];
+  const list = order ? [...S.bag].sort((a, b) => (!!a.junk - !!b.junk) || (G.sort === 'value' ? 0 : gearish(b) - gearish(a)) || order(a, b)) : [...S.bag].reverse();
+  for (const it of list) {
     const ok = Game.canWear(S.heroCls, it), cur = S.gear[S.heroCls][it.slot], bk = it.book, why = bk && (bk.blank ? (X.blankOptions(S.hero, bk.rank).length ? null : 'None of your spells are ready for this rank.') : X.whyNot(S.hero, bk.cls, bk.key, bk.rank));
     const note = bk ? (why ? `<p style="font-size:12px;margin:2px 0">${esc(why)}</p>` : '') : it.junk ? '' : ok ? '' : `<p style="font-size:12px;margin:2px 0">A ${CLASSES[S.heroCls].name} can't use this.</p>`;
-    const c = el(`<div class="card it" style="--c:${RARITY[it.rarity].c}">${itemHtml(it, ok ? cur : null)}${note}<div class="acts">${ok ? '<button data-a="eq">Equip</button>' : ''}${bk && !why ? '<button data-a="study">Study</button>' : ''}${vend ? `<button data-a="sell">Sell ${it.value}g</button>` : ''}${S.party.length > 1 ? '<button data-a="give">Give…</button>' : ''}${Craft.skill('enchanting') !== null && it.rarity >= 1 ? '<button data-a="de">Disenchant</button>' : ''}</div></div>`);
+    const c = el(`<div class="card it" style="--c:${RARITY[it.rarity].c}">${ups.has(it) ? '<span style="float:right;color:#7fd35a;font-weight:700;font-size:12px">▲ upgrade</span>' : ''}${itemHtml(it, ok ? cur : null)}${note}<div class="acts">${ok ? '<button data-a="eq">Equip</button>' : ''}${bk && !why ? '<button data-a="study">Study</button>' : ''}${vend ? `<button data-a="sell">Sell ${it.value}g</button>` : ''}${S.party.length > 1 ? '<button data-a="give">Give…</button>' : ''}${Craft.skill('enchanting') !== null && it.rarity >= 1 ? '<button data-a="de">Disenchant</button>' : ''}</div></div>`);
     c.onclick = ev => {
       const a = ev.target.dataset.a;
       if (a === 'eq') { Game.equip(it); refreshSheet(); }
@@ -956,7 +1010,7 @@ export function showTitle(view = 'home') {
   const PATHS = { smuggler: ['Smuggler', 'The free worlds', 'You inherit a grounded freighter and a debt on the frontier moon of Dustfall.', '#ffb347'], justice: ['Justice', 'The Republic and the order', 'A first-year novice of the lamp-keepers, posted to a freezing fort on the edge of Republic space.', '#6ad8ff'], dark: ['Dark', 'The Empire and the Dusk Covenant', 'A conscript who survived the Winnowing. Now an initiate of the Covenant on the furnace world of Cinder, where the other initiates would like your bunk.', '#ff4a3a'] };
   const heroes = Object.keys(PATHS).map(p => [p, Game.saveInfoFor(p)]).filter(x => x[1]);
   if (view === 'home') X.newPath = null;
-  const head = `<h1>Stars Beneath</h1><div class="sub">Build 12 · two thousand years after the Gravelord fell</div>`;
+  const head = `<h1>Stars Beneath</h1><div class="sub">Build 12.1 · two thousand years after the Gravelord fell</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${heroes.map(([p, i]) => `<button class="pri" data-a="cont" data-p="${p}">Continue<small>${esc(i.name)} · level ${i.lvl} ${CLASSES[i.cls]?.name || ''} · ${PATHS[p][0]}</small></button>`).join('')}
@@ -1047,6 +1101,7 @@ export function init() {
   $('sheetX').onclick = closeSheet;
   $('sheet').addEventListener('pointerdown', e => { if (e.target.id === 'sheet') closeSheet(); });
   $('bookBtn').onclick = () => openBook();
+  $('meLvl').style.cursor = 'pointer'; $('meLvl').title = 'Your classes'; $('meLvl').onclick = ev => { ev.stopPropagation(); openBook('classes'); };
   $('menuBtn').onclick = openMenu;
   $('mini').onclick = openMap;
   MapUI.bind({ objText, questMark, toast }); MapUI.init(); applySettings();

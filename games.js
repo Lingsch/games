@@ -29,7 +29,7 @@ window.GAMES = [
   {
     title: "Stars Beneath",
     folder: "stars",
-    version: "Build 12",
+    version: "Build 12.1",
     updated: "November 2026",
     kind: "Space opera MMO, solo",
     blurb: "The same world, two thousand years on. Three paths: a smuggler with an inherited freighter and a debt, a novice of the lamp-keepers on a freezing border fort, or an initiate of the Empire's Dusk Covenant. Recruit a crew, take the helm, and find out why the stars are going out.",

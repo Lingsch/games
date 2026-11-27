@@ -97,8 +97,9 @@ export function mobAI(m, dt) {
   if (M.aquatic && t && depthAt(t.x, t.z) < 1.2) { m.threat.delete(t); t = topThreat(m); }
   if (!t) { m.evading = true; m.target = null; return; }
   m.target = t;
-  const leash = m.dungeon ? 34 : 50;
-  if (dist(m, m.home) > leash) { m.evading = true; m.target = null; return; }
+  // from the MMO's Build 13.2: a boss only gives up when the whole fight has been dragged away from home
+  const leash = (m.boss || m.named ? 1.6 : 1) * (m.dungeon ? 34 : 50);
+  if (dist(m, m.home) > leash && dist(t, m.home) > leash * .8) { m.evading = true; m.target = null; return; }
   if (M.flee && !m.fled && m.hp < m.maxHp * .15) { m.fled = true; m.fleeT = 5; if (dist(m, S.hero) < 40) chat('say', m.name, pick(['I yield— no!', 'Run!', 'Not like this!'])); return; }
   if (X.mobSmart && !m.boss && !m.boss2 && X.mobSmart(m, t, dt, M)) return;
   if ((m.boss || m.boss2) && bossAI(m, t, dt)) return;
@@ -118,9 +119,11 @@ export function mobAI(m, dt) {
   }
   const rng = M.range + t.r;
   const dd = dist(m, t);
-  if (dd > rng || (M.ranged && blocked(m.x, m.z, t.x, t.z))) {
+  // from the MMO's Build 13.2: a crowd of melee enemies used to jostle at the edge of reach and never swing; now they ring the target
+  const reach = M.ranged ? rng : rng + 1.4;
+  if (dd > reach || (M.ranged && blocked(m.x, m.z, t.x, t.z))) {
     // spread out around the target so they don't stack
-    const slot = (m.id % 7) / 7 * TAU, off = M.ranged ? 0 : 1;
+    const slot = (m.id % 7) / 7 * TAU, off = M.ranged ? 0 : Math.max(1, rng * .7);
     goTo(m, t.x + Math.sin(slot) * off, t.z + Math.cos(slot) * off, dt, Math.max(.3, rng - .6));
     return;
   }
