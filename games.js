@@ -19,7 +19,7 @@ window.GAMES = [
   {
     title: "Single-Player MMO",
     folder: "mmo",
-    version: "Build 13",
+    version: "Build 13.1",
     updated: "November 2026",
     kind: "Tab-target MMO, solo",
     blurb: "The same world, a hundred years after the summoner wars. Four peoples, sixteen classes that split in two at level 20, and a chase for three keys to the door below the Last Lamp. Climb to the sky lands, where the makers of Vhorun are knocking at the Gate of Stars. Build a fortune, take on hard modes, and keep your friends.",

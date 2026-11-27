@@ -3,7 +3,7 @@ import * as THREE from './three.js';
 import { S, WH, TAU, clamp, dist, fct, chat, X } from './core.js';
 import { cam } from './render.js';
 import { world, hgt, regionAt, REGION_NAMES } from './world.js';
-import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, WTYPE, BASE_NAMES, SETS, STAT_NAMES, PCT_STATS, mainsOf } from './data.js';
+import { CLASSES, CLASS_KEYS, FAMILIES, MOBS, QUESTS, GIVERS, ELEMENTS, RARITY, SLOTS, SLOT_NAMES, POTIONS, xpNeed, defaultBar, MAX_LVL, roleOf, rankOf, rankName, BOOK, WTYPE, BASE_NAMES, SETS, STAT_NAMES, PCT_STATS, mainsOf } from './data.js';
 import * as Sea from './sea.js';
 import { LORE, PERKS } from './story.js';
 import { TALK, VILLAGER_LINES, MOB_LORE } from './dialogue.js';
@@ -48,6 +48,10 @@ function buildKeys() {
     box.appendChild(b); keyEls.push(b);
   }
 }
+// a spell's rank: I as learned, II ten levels later, then Adept and Master from tomes
+const RK_ROMAN = ['', 'I', 'II', 'III', 'IV'], RK_COL = ['', '', '#4aa3ff', '#b35cff', '#ff9a2a'];
+export const spellTier = (h, ab) => !ab || !h ? 1 : rankOf(h, ab) + (BOOK.rank(h, ab) || 0);
+const rkBadge = t => t > 1 ? `<span class="rk" style="--rk:${RK_COL[t]}">${RK_ROMAN[t]}</span>` : '';
 function barOf() { return S.bar[S.heroCls] || (S.bar[S.heroCls] = defaultBar(S.heroCls)); }
 // the bar shows only what you've learned, packed in your chosen order
 function shownBar() {
@@ -74,7 +78,7 @@ function showTip(i, el) {
 function hideTip() { $('tip').classList.add('hide'); }
 let lastBarSig = '';
 function refreshKeys(force) {
-  const h = S.hero, bar = shownBar(), sig = S.heroCls + bar.join(',');
+  const h = S.hero, bar = shownBar(), sig = S.heroCls + bar.map(k => k + (k === 'attack' ? '' : spellTier(h, CLASSES[S.heroCls].abilities[k]))).join(',');
   if (force || sig !== lastBarSig) {
     lastBarSig = sig;
     // the bar is only as tall as it needs to be
@@ -88,6 +92,9 @@ function refreshKeys(force) {
       el.querySelector('.ic').textContent = key === 'attack' ? '⚔️' : CLASSES[S.heroCls].abilities[key].icon;
       el.querySelector('.lab').textContent = key === 'attack' ? 'Attack' : CLASSES[S.heroCls].abilities[key].name;
       el.style.setProperty('--c', key === 'attack' ? '#c9ccd2' : kindCol(CLASSES[S.heroCls].abilities[key]));
+      const t = key === 'attack' ? 1 : spellTier(h, CLASSES[S.heroCls].abilities[key]);
+      el.classList.toggle('rkup', t > 1); el.style.setProperty('--rk', RK_COL[t] || 'transparent');
+      let rb = el.querySelector('.rk'); if (t > 1) { if (!rb) { rb = document.createElement('span'); rb.className = 'rk'; el.appendChild(rb); } rb.textContent = RK_ROMAN[t]; } else rb?.remove();
     });
   }
   bar.forEach((key, i) => {
@@ -574,7 +581,7 @@ function tabSpells(body) {
   const all = [['attack', { name: 'Auto Attack', icon: '⚔️', lvl: 1, kind: 'attack', desc: 'Toggle attacking your target with your weapon.' }], ...Object.entries(C.abilities).filter(([, a]) => a.lvl <= h.lvl)];
   for (const [k, ab] of all) {
     const lock = false, cost = k === 'attack' ? 0 : Cb.costOf(h, ab), onBar = bar.includes(k);
-    const card = el(`<div class="card sp ${lock ? 'lock' : ''}" style="${pendingSpell === k ? 'box-shadow:0 0 0 2px var(--acc)' : ''}"><div class="ic">${ab.icon}</div><div style="flex:1"><b>${esc(k === 'attack' ? ab.name : rankName(h, ab))}</b> <small>${ab.kind === 'ult' ? 'ULTIMATE' : ab.kind.toUpperCase()}</small> <p style="margin:2px 0">${esc(ab.desc)}</p><span class="dim" style="font-size:12px">${cost ? cost + ' ' + h.resType + ' · ' : ''}${ab.cast ? ab.cast + ' s cast' : 'Instant'}${ab.cd ? ' · ' + ab.cd + ' s cooldown' : ''}${onBar ? ' · on bar' : ''}</span></div></div>`);
+    const card = el(`<div class="card sp ${lock ? 'lock' : ''}" style="${pendingSpell === k ? 'box-shadow:0 0 0 2px var(--acc)' : ''}"><div class="ic" style="position:relative${!lock && k !== 'attack' && spellTier(h, ab) > 1 ? `;outline:2px solid ${RK_COL[spellTier(h, ab)]};outline-offset:1px;border-radius:8px` : ''}">${ab.icon}${!lock && k !== 'attack' ? rkBadge(spellTier(h, ab)) : ''}</div><div style="flex:1"><b>${esc(k === 'attack' ? ab.name : rankName(h, ab))}</b> <small>${ab.kind === 'ult' ? 'ULTIMATE' : ab.kind.toUpperCase()}</small> <p style="margin:2px 0">${esc(ab.desc)}</p><span class="dim" style="font-size:12px">${cost ? cost + ' ' + h.resType + ' · ' : ''}${ab.cast ? ab.cast + ' s cast' : 'Instant'}${ab.cd ? ' · ' + ab.cd + ' s cooldown' : ''}${onBar ? ' · on bar' : ''}</span></div></div>`);
     card.onclick = () => { pendingSpell = pendingSpell === k ? null : k; swapEdit = -1; refreshSheet(); };
     body.appendChild(card);
   }
@@ -964,7 +971,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.1 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
