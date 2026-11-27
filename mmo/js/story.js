@@ -262,6 +262,10 @@ QUESTS.push(...V);
 // ---------- the armory trials: reach level 10 in a class, prove it, and take up a weapon from a family you're missing ----------
 GIVERS.armorer = { name: 'Master Corvin', title: 'Armory · class trials', model: 'guard' };
 for (const k of CLASS_KEYS) {
+  // Build 13.2: the runner's summons, so nobody hits level 10 without knowing where to go
+  QUESTS.push({ id: 'sum_' + k, giver: 'armorer', cls: k, lvl: 10, needLvl: 99, name: 'A Summons from the Armory', xp: 0, gold: 0, obj: { talk: true, what: 'Report to Master Corvin at the armory in {town}' },
+    say: ["Master Corvin's compliments, and would you come to the armory? He says you're ready for another weapon."],
+    done: ["There you are! The runner found you, then. Good lad, Pim. He only got lost twice.", "Right. You've gone as far as one weapon can take you on its own. Let's see about a second."] });
   QUESTS.push({ id: 'w_' + k, giver: 'armorer', cls: k, lvl: 10, needLvl: 10, unlock: true, name: `The ${CLASSES[k].name}'s Trial`, xp: qx(10, .45), gold: 25,
     obj: { anyMin: 9, n: 10, what: 'Defeat 10 enemies of level 9 or higher' },
     say: ["Ten levels as a {cls}, and you're still standing. Most people give up at four, usually because something ate them.",

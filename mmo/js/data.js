@@ -416,6 +416,9 @@ export const MOBS = {
 // Build 4.4: enemies are tougher and hit harder across the board
 // Build 12: the early game bites. Levels 1-10 hit 20% harder with 30% more health, easing back to normal by 14.
 const early = (L, k) => L <= 10 ? k : L < 14 ? 1 + (k - 1) * (14 - L) / 4 : 1;
+// Build 13.2: the balance knobs, in one place. Tuned by simulated fights against pacing targets from the big MMOs:
+// a dungeon boss takes a group of four about two to three minutes, trash packs about half a minute, and the healer has to work.
+export const BAL = { bossHp: 18, raidBossHp: 80, namedHp: 8, bossDmg: 1.6, mobDmg: 1, mana: 1, manaCost: .6, castRegen: .006 };
 export const mobHp = L => (42 + 28 * L) * 1.5 * early(L, 1.3);
 export const mobDmg = L => (4 + 2.3 * L) * 1.75 * early(L, 1.2);
 export const mobXp = L => 18 + 13 * L + .9 * L * L;

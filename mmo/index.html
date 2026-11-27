@@ -47,6 +47,7 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 #me .bar{margin-top:2px}
 #buffs{display:flex;gap:2px;flex-wrap:wrap;margin-top:3px}#buffs:empty{display:none}
 .pbuffs{display:flex;gap:1px;flex-wrap:wrap;margin-top:2px}.pbuffs:empty{display:none}.pbuffs span{font-size:9.5px;line-height:12px;border-radius:3px;background:rgba(255,255,255,.08);padding:0 1px}
+.pbuffs.tb span{position:relative;padding-right:2px}.pbuffs.tb span.mine{box-shadow:inset 0 0 0 1px #ffd34d;background:rgba(255,211,77,.16)}.pbuffs.tb span.good{box-shadow:inset 0 0 0 1px #5ad07a;background:rgba(90,208,122,.14)}.pbuffs.tb i{font:700 7.5px "Alegreya Sans";font-style:normal;color:#fff;margin-left:1px;vertical-align:top}
 #buffs span.deb,.pbuffs span.deb{box-shadow:inset 0 0 0 1px #ff4a3a;background:rgba(255,60,40,.18)}#buffs span.low,.pbuffs span.low{animation:blow 1s infinite}@keyframes blow{50%{opacity:.35}}
 #buffs span{font-size:11px;line-height:15px;border-radius:4px;background:rgba(255,255,255,.08);padding:0 2px}
 #party{position:fixed;top:calc(var(--st) + 56px);left:var(--sl);width:112px;display:flex;flex-direction:column;gap:2px}
@@ -131,7 +132,7 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 #castbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + var(--barH) + 100px);width:200px;padding:3px 6px;text-align:center;font-size:11.5px}
 #castbar .bar{margin-top:2px}#castbar i{background:var(--acc)}
 #xp{position:fixed;left:var(--sl);right:var(--sr);bottom:calc(var(--sb) + var(--barH) + 3px);height:3px}
-#xp i{background:#b884ff}
+#xp i{background:#b884ff}#xp.capped i{background:repeating-linear-gradient(90deg,#b884ff 0 6px,#6a4a9a 6px 9px)}#xp.capped::after{content:'🔒';position:absolute;right:0;top:-13px;font-size:10px}
 #hot{position:fixed;left:var(--sl);right:var(--sr);bottom:var(--sb);display:flex;gap:5px;justify-content:center}
 #cycle{width:40px;height:var(--barH);min-height:0;padding:0;font-size:16px;line-height:1;background:var(--plate);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 #cycle small{font-size:8.5px;color:var(--dim)}
@@ -173,6 +174,26 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 #sheetHead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 #sheetHead h2{flex:1;margin:0;font:700 17px Cinzel,serif;color:var(--acc)}
 #sheetBody{overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;flex:1}
+/* Build 13.2: the Book's grouped navigation */
+#sheetIn.book{width:min(920px,100%)}
+.bkWrap{display:block}.bk .bkSide{display:none}
+.bk .bkTop{position:sticky;top:0;z-index:3;background:#161b1f;padding-bottom:6px;margin-bottom:4px;border-bottom:1px solid var(--line)}
+.bkGroups{display:flex;gap:4px}.bkGroups button{flex:1;min-height:46px;padding:2px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font:600 11px "Alegreya Sans";border-radius:10px}
+.bkGroups button span{font-size:17px;line-height:1}.bkGroups button.on{background:var(--acc);color:#1a1208}
+.bkSubs{display:flex;gap:4px;overflow-x:auto;margin-top:6px;scrollbar-width:none;-webkit-overflow-scrolling:touch}.bkSubs::-webkit-scrollbar{display:none}
+.bkSubs button{flex:0 0 auto;min-height:34px;padding:0 11px;font-size:12.5px;border-radius:17px;display:flex;align-items:center;gap:5px}.bkSubs button.on{background:var(--acc);color:#1a1208}
+.bk kbd{display:none}
+@media(min-aspect-ratio:4/3) and (min-width:760px){
+  #sheetIn.book{height:88vh;max-height:88vh}
+  .bkWrap{display:grid;grid-template-columns:178px 1fr;gap:14px;align-items:start}
+  .bk .bkTop{display:none}.bk .bkSide{display:block;position:sticky;top:0;max-height:calc(88vh - 70px);overflow:auto;padding-right:4px;border-right:1px solid var(--line)}
+  .bkG h4{margin:6px 0 3px;font:700 11px Cinzel,serif;color:var(--dim);letter-spacing:.04em;text-transform:uppercase}.bkG:first-child h4{margin-top:0}
+  .bkSide button{width:100%;min-height:30px;padding:0 8px;display:flex;align-items:center;gap:7px;font-size:13px;text-align:left;border-radius:8px;background:transparent;border-color:transparent;margin-bottom:1px}
+  .bkSide button:hover{background:rgba(255,255,255,.06)}.bkSide button.on{background:var(--acc);color:#1a1208}
+  .bkSide .bn{flex:1}.bk kbd{display:inline-block;font:600 10px "Alegreya Sans";color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:0 4px;line-height:15px}.bkSide button.on kbd{color:#1a1208;border-color:rgba(0,0,0,.3)}
+}
+.famrow{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin:6px 0}.fam{border:1px solid var(--line);border-radius:8px;padding:4px;text-align:center;display:flex;flex-direction:column;gap:1px}.fam span{font-size:16px}.fam b{font-size:12px}.fam small{font-size:10px;color:var(--dim)}.fam.ok{border-color:#5ad07a}.fam.miss{border-color:#ff9a3a;background:rgba(255,154,58,.08)}
+.capnote{color:#ffcf8a !important}
 .tabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}.tabs button{flex:1 0 auto;padding:0 7px;min-height:34px;font-size:12.5px}.tabs button.on{background:var(--acc);color:#1a1208}
 .card{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;background:rgba(255,255,255,.03)}
 .card h3{margin:0 0 3px;font:700 14px Cinzel,serif}
@@ -260,6 +281,7 @@ h3.qt{margin:4px 0 6px;font:700 15px Cinzel,serif}h3.qt .dim{font:500 12px 'Aleg
     <div class="bar tall"><i id="tgtHp" style="background:var(--hp)"></i><span id="tgtHpT"></span></div>
     <div class="bar thin hide" id="tgtResW"><i id="tgtRes"></i></div>
     <div id="tgtSub"><span id="tgtInfo"></span><span id="tgtWeak"></span></div>
+    <div class="pbuffs tb" id="tgtBuffs"></div>
     <div class="bar hide" id="tgtCast"><i></i><span></span></div>
     <div id="tot"></div>
     <div id="tgtBtns"></div>
@@ -299,6 +321,7 @@ await import("./js/main.js");
 if (window.RodSync) RodSync.arm();
 </script>
 </body></html>
+
 
 
 

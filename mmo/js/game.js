@@ -350,6 +350,12 @@ export const lockedAt10 = () => FAMILIES.some(f => famBest(f) < 10);
 export const lockedAt20 = () => FAMILIES.some(f => famBest(f) < 20);
 export const lockedAt25 = () => FAMILIES.some(f => famBest(f) < 25);
 export const lockedAt30 = () => FAMILIES.some(f => famBest(f) < 30);
+// Build 13.2: which families still have to catch up before this class can grow past its level
+export function capInfo(p = S.hero) {
+  if (!p) return null; const L = [10, 20, 25, 30].find(n => p.lvl === n && FAMILIES.some(f => famBest(f) < n));
+  if (!L) return null; return { lvl: L, missing: FAMILIES.filter(f => famBest(f) < L) };
+}
+export const capText = c => `Your ${CLASSES[S.heroCls].name} can't grow past level ${c.lvl} until you also have a ${c.missing.join(', a ').replace(/, a ([^,]*)$/, ' and a $1')} at level ${c.lvl}. The experience you earn now is saved as veteran experience, and it doubles what your other classes earn until it runs out.`;
 export const raidReady = () => FAMILIES.every(f => famBest(f) >= 20);
 export const perksOpen = () => CLASS_KEYS.filter(k => levelOf(k) >= 10);
 export const xpBoost = () => Math.min(.6, .2 * CLASS_KEYS.filter(k => k !== S.heroCls && levelOf(k) >= 10).length);
@@ -502,6 +508,9 @@ function makeFakes(saved, zone = 'vale') {
   const names = [...FAKE_NAMES, 'Brinehart', 'Saltjaw', 'Kelpie', 'Wavecrest', 'Anchora', 'Tidewalker', 'Gullet', 'Mariner', 'Coralyn', 'Riptide', 'Barnacle', 'Seafoam', 'Squallbringer', 'Marlow', 'Pearlie', 'Drift', 'Skiff', 'Harpoona', 'Undertow', 'Galeheart', 'Selkie', 'Foghorn', 'Bilgewater', 'Sternmast']
     .filter(n => !used.has(n)).sort(() => Math.random() - .5);
   const n = saved ? saved.length : zone === 'coast' ? 24 : 30;
+  // Build 13.2: with thirty-odd lands the name list ran dry, and some fake players were nameless. Make more when it does.
+  const A = ['Ash', 'Bram', 'Cor', 'Dun', 'El', 'Fen', 'Gar', 'Hal', 'Isen', 'Jor', 'Kel', 'Lor', 'Mor', 'Nym', 'Os', 'Pell', 'Quin', 'Ros', 'Sil', 'Thal', 'Ul', 'Vey', 'Wyn', 'Yar', 'Zor'], Bz = ['a', 'ric', 'wyn', 'is', 'mere', 'dor', 'ra', 'lin', 'ath', 'el', 'ius', 'ka', 'wen', 'ard', 'ette', 'mund'];
+  for (let g = 0; names.length < n + 8 && g < 2000; g++) { const nm = A[(Math.random() * A.length) | 0] + Bz[(Math.random() * Bz.length) | 0]; if (!used.has(nm) && !names.includes(nm)) names.push(nm); }
   const byRole = r => CLASS_KEYS.filter(k => CLASSES[k].role === r);
   const tw = world.town, areas = (world.huntAreas || [{ area: 0 }, { area: 1 }, { area: 2 }, { area: 3 }]);
   for (let i = 0; i < n; i++) {
@@ -602,6 +611,14 @@ export function switchClass(cls) {
   save(); return true;
 }
 
+// Build 13.2: at level 10 a runner brings word from Master Corvin, so you know where to take up a new weapon
+export function summonArmory() {
+  const k = S.heroCls, q = QUESTS.find(x => x.id === 'sum_' + k);
+  if (!q || S.hero.lvl < 10 || S.quests[q.id] || ['active', 'done', 'turned'].includes(S.quests['w_' + k]?.state) || !weaponChoices().length) return;
+  S.quests[q.id] = { state: 'done', n: 0 };
+  chat('sys', null, `A runner in armory colours catches up with you, out of breath. "Master Corvin's compliments, and would you come and see him at the armory in ${world.names?.town || 'town'}? He says you're ready for another weapon."`);
+  X.ui?.toast?.('New quest: A Summons from the Armory'); save();
+}
 // ---------- quests ----------
 export const questsFor = giver => QUESTS.filter(q => (q.giver === giver || q.turnTo === giver) && (!q.cls || q.cls === S.heroCls));
 export const turnToOf = q => q.turnTo || q.giver;
@@ -790,7 +807,7 @@ Cb.setHooks({
   },
   onOverflow(p, over) { if (over > 0) S.vetXp = Math.min(40000, (S.vetXp || 0) + Math.round(over)); },
   lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : lockedAt20() && p.lvl >= 20 ? 20 : lockedAt25() && p.lvl >= 25 ? 25 : lockedAt30() && p.lvl >= 30 ? 30 : MAX_LVL),
-  onCapped(p) { if (cappedSaid) return; cappedSaid = true; chat('sys', null, `You have learned all this weapon can teach you, for now.`); },
+  onCapped(p) { if (cappedSaid) return; cappedSaid = true; const c = capInfo(p); chat('sys', null, c ? capText(c) : 'You have learned all this weapon can teach you, for now.'); if (c) X.ui?.toast?.(`Level ${c.lvl} is as far as this class goes for now`); summonArmory(); },
   onYield(m, src) {
     // he only surrenders to your group, and only while you're on his quest
     const q = QUESTS.find(q => q.obj.named === m.named && q.obj.yield), st = q && S.quests[q.id];
@@ -832,6 +849,7 @@ Cb.setHooks({
     if (p.isHero) {
       S.classes[S.heroCls] = { lvl: p.lvl, xp: p.xp };
       chat('sys', null, `You reached level ${p.lvl}!`);
+      if (p.lvl === 10) setTimeout(summonArmory, 2500);
       if (p.lvl === 10) { chat('sys', null, `Your ${CLASSES[p.cls].name} unlocked a perk: ${PERKS[p.cls].name} (${PERKS[p.cls].desc}) Slot it in Book → Character. Every other class now earns xp faster.`); }
       refreshAcct();
       const nw = Object.values(CLASSES[p.cls].abilities).filter(a => a.lvl === p.lvl);

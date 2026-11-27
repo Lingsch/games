@@ -212,7 +212,7 @@ function onKey(ev, down) {
   if (k === 'escape') { if (!$('sheet').classList.contains('hide')) closeSheet(); else S.target = null; }
   if (k === 'f') doAct();
   if (k === 'm') { if (MapUI.isOpen()) MapUI.closeBig(); else openMap(); }
-  if (k === 'b') openBook('char'); if (k === 'l') openBook('quests'); if (k === 'o') openBook('social'); if (k === 'p') openBook('spells');
+  if (BOOK_KEYS[k] && !ev.ctrlKey && !ev.metaKey) { const t = BOOK_KEYS[k]; if (sheetOpen() && $('sheetIn').classList.contains('book') && bookTab === t) closeSheet(); else openBook(t); }
   if (k === 'x') toggleSit();
 }
 export function pollInput() {
@@ -271,6 +271,16 @@ function buffRow(u, max) {
   return u.buffs.filter(b => (b.dur > 1 || isDebuff(b)) && !b.id.includes(':') && b.id !== 'wardlock').slice(0, max)
     .map(b => `<span class="${isDebuff(b) ? 'deb' : ''}${b.dur >= 60 && b.t < 30 ? ' low' : ''}">${BUFF_ICON[b.id] || '•'}${b.data.stacks ? b.data.stacks : ''}</span>`).join('');
 }
+// Build 13.2: everything on your target, buffs and debuffs, like the hero's own row. Yours are outlined in gold.
+function abIcon(src, id) { const C = src?.cls && CLASSES[src.cls]; return C?.abilities?.[id]?.icon || null; }
+function targetBuffRow(t, h) {
+  return t.buffs.filter(b => b.id !== 'wardlock' && (b.dur > .5 || b.data.dot)).slice(0, 14).map(b => {
+    const base = b.id.split(':')[0], ic = BUFF_ICON[base] || abIcon(b.src, base) || (base === 'poison' ? '☣️' : b.data.dot ? '🔥' : b.data.hot ? '💚' : '•');
+    const mine = b.src === h || (b.src?.pet && b.src.pet.owner === h), bad = !!(b.data.dot || b.data.mez || b.data.stun || b.data.slow || b.data.snare || b.data.root || (b.src && b.src.team !== t.team && !isDebuff(b)));
+    const left = b.t < 60 ? Math.ceil(b.t) : '';
+    return `<span class="${mine ? 'mine' : bad ? 'deb' : 'good'}" title="${esc(base)}">${ic}${b.data.stacks ? b.data.stacks : ''}<i>${left}</i></span>`;
+  }).join('');
+}
 function updateFrames() {
   const h = S.hero;
   { const tt = Game.heroTitle(); const nm = tt ? (tt.startsWith('of ') || tt.startsWith('the ') ? `${h.name} ${tt}` : `${h.name} ${tt}`) : h.name; if ($('meName').textContent !== nm) $('meName').textContent = nm; } $('meLvl').textContent = `${h.lvl} ${X.clsName ? X.clsName(h) : CLASSES[h.cls].name}`;
@@ -324,6 +334,7 @@ function updateFrames() {
       if (Object.values(CLASSES[h.cls].abilities).some(a => a.behind) && !t.dead) info += Cb.behind(h, t) ? ' · behind ✓' : ' · get behind';
     }
     $('tgtInfo').textContent = info;
+    { const tb = $('tgtBuffs'), s = t.dead ? '' : targetBuffRow(t, h); if (tb._s !== s) { tb.innerHTML = s; tb._s = s; } }
     const cast = t.mcast || t.casting, cb = $('tgtCast');
     cb.classList.toggle('hide', !cast);
     if (cast) { cb.firstElementChild.style.width = pct(cast.t, cast.total) + '%'; cb.lastElementChild.textContent = t.mcast ? (t.mcast.kind === 'heal' ? 'Healing chant' : 'Shadow bolt') : Cb.abilityOf(t, cast.key)?.name || ''; }
@@ -348,6 +359,7 @@ function updateFrames() {
   if (tr._s !== tq) { tr.innerHTML = tq; tr._s = tq; }
   // xp, cast bar
   $('xpFill').style.width = h.lvl >= MAX_LVL ? '100%' : pct(h.xp, xpNeed(h.lvl)) + '%';
+  { const cap = !!Game.capInfo() && h.xp >= xpNeed(h.lvl) - 1; if ($('xp')._c !== cap) { $('xp')._c = cap; $('xp').classList.toggle('capped', cap); } }
   const c = h.casting; $('castbar').classList.toggle('hide', !c);
   if (c) { $('castName').textContent = Cb.abilityOf(h, c.key).name + (c.tgt && c.tgt !== h ? ' → ' + c.tgt.name : ''); $('castFill').style.width = pct(c.t, c.total) + '%'; }
   $('hpotN').textContent = S.pots.hpot; $('mpotN').textContent = S.pots.mpot;
@@ -356,7 +368,7 @@ function updateFrames() {
   const qn = QUESTS.filter(q => S.quests[q.id]?.state === 'done').length;
   if (qn) $('bookBtn').dataset.n = qn; else delete $('bookBtn').dataset.n;
 }
-const BUFF_ICON = { scroll: '📜', mounted: '🐎', guildbanner: '🏳️', fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
+const BUFF_ICON = { enrage: '💢', shield: '🛡️', scroll: '📜', mounted: '🐎', guildbanner: '🏳️', fed: '🍖', elixir: '🧪', frenzy: '😡', boneshield: '🦴', webbed: '🕸️', shout: '🎺', iron: '⚙️', fort: '🛐', inner: '🔆', eagle: '🦅', trueshot: '🎖️', kindle: '🕯️', eward: '🔮', shieldwall: '🧱', unbreak: '⛰️', moon: '🌙', deadeye: '👁️', slow: '🐌', root: '📌',
   focusmind: '🎯', wolfspirit: '🐺', markwild: '🐾', poisonblades: '🗡️', restsong: '🎼', hastesong: '🥁', haste: '⏩', ward: '🛡️', shelter: '🔯', renew: '🌱', rejuv: '🍃', wild: '🌳', regrowth: '🍀',
   bear: '🐻', cat: '🐆', chain: '🤺', untouch: '🌪️', crescendo: '🎺', empower: '💪', unbound: '🌋', treeoflife: '🌲', guard: '🛡️', evade: '💨', shadowstep: '🌑', fists: '👐', crescendo2: '🎶' };
 for (const c in CLASSES) for (const [k, a] of Object.entries(CLASSES[c].abilities)) if (!BUFF_ICON[k]) BUFF_ICON[k] = a.icon;
@@ -388,11 +400,11 @@ function updatePlates(dt) {
   while (plates.length < list.length) { const d = document.createElement('div'); d.className = 'np'; box.appendChild(d); plates.push(d); }
   const placed = [];
   plates.forEach((d, i) => {
-    const e = list[i]; if (!e) { d.style.display = 'none'; return; }
+    const e = list[i]; if (!e || !e.name) { d.style.display = 'none'; return; }
     const s = screenOf(e, (e.mob ? 2.1 : 2.25) * (e.boss ? 1.4 : 1));
     if (s.behind || s.x < -50 || s.x > innerWidth + 50) { d.style.display = 'none'; return; }
     // nudge labels up so close neighbours don't print over each other
-    const w = Math.min(160, e.name.length * 6.5 + 10), hh = 14;
+    const w = Math.min(160, (e.name || '').length * 6.5 + 10), hh = 14;
     let y = s.y;
     for (let tries = 0; tries < 6; tries++) { const hit = placed.find(p => Math.abs(p.x - s.x) < (p.w + w) / 2 && Math.abs(p.y - y) < hh); if (!hit) break; y = hit.y - hh; }
     placed.push({ x: s.x, y, w });
@@ -445,7 +457,7 @@ function updateMini() {
 
 // ---------- panels ----------
 let sheetRender = null;
-export function openSheet(title, render) { $('sheetTitle').textContent = title; sheetRender = render; $('sheet').classList.remove('hide'); refreshSheet(); }
+export function openSheet(title, render) { $('sheetIn').classList.remove('book'); $('sheetTitle').textContent = title; sheetRender = render; $('sheet').classList.remove('hide'); refreshSheet(); }
 export function refreshSheet() { if (!sheetRender) return; const st = $('sheetBody').scrollTop; $('sheetBody').innerHTML = ''; sheetRender($('sheetBody')); $('sheetBody').scrollTop = st; }
 export function closeSheet() { $('sheet').classList.add('hide'); sheetRender = null; swapPick = swapPick; }
 const sheetOpen = () => !$('sheet').classList.contains('hide');
@@ -459,16 +471,41 @@ function itemHtml(it, cmp) {
   return `<b>${esc(it.name)}</b> <span class="dim">· ${SLOT_NAMES[it.slot]}${it.armorType ? ' · ' + it.armorType : it.type && it.type !== it.slot ? ' · ' + it.type : ''} · L${it.lvl}${it.crafted ? ' · crafted' : ''}</span><div class="st">${st}</div>${it.desc ? `<div style="font-size:12px;color:#d8c890">${esc(it.desc)}</div>` : ''}${it.ench ? `<div class="dim" style="font-size:11.5px;color:#8affff">✨ ${esc(it.ench.name)}</div>` : ''}${it.set && SETS[it.set] ? `<div style="font-size:11.5px;color:#d8b24a">Set: ${esc(SETS[it.set].name)}. ${esc(SETS[it.set].desc)}</div>` : ''}`;
 }
 let bookTab = 'char';
+// Build 13.2: the Book, regrouped the way the big MMOs do it (FFXIV's main menu, WoW's micro-menu):
+// five groups, a sidebar on PC with hotkeys, and on phones a row of groups with that group's pages under it.
+const BOOK_GROUPS = [['hero', '🧙', 'Hero', ['char', 'classes', 'spells', 'talents', 'looks', 'deeds']], ['gear', '🎒', 'Gear', ['bags', 'trade', 'market']],
+  ['journal', '📜', 'Journal', ['quests', 'lore', 'rep', 'trials']], ['group', '⚔️', 'Group', ['friends', 'comp', 'lfg', 'raid', 'bg', 'war']], ['social', '🏰', 'Social', ['social', 'guild', 'home']]];
+const TAB_ICON = { char: '🧍', classes: '🗡️', spells: '✨', talents: '🌳', looks: '👘', deeds: '🏅', bags: '🎒', trade: '⚒️', market: '⚖️', quests: '📜', lore: '📖', rep: '🎖️', trials: '⏱️', friends: '💛', comp: '🐾', lfg: '🔍', raid: '🛡️', bg: '⚔️', war: '🚩', social: '💬', guild: '🏰', home: '🏠' };
+export const BOOK_KEYS = { c: 'char', v: 'classes', b: 'bags', p: 'spells', n: 'talents', l: 'quests', o: 'friends', i: 'lfg', g: 'guild', k: 'trade', u: 'rep', h: 'home' };
+const KEY_OF = Object.fromEntries(Object.entries(BOOK_KEYS).map(([k, t]) => [t, k.toUpperCase()]));
 export function openBook(tab) {
   if (tab) bookTab = tab;
   openSheet('Book', body => {
     const extra = X.book.filter(b => !b[3] || b[3]());
-    const tabs = el(`<div class="tabs">${[['char', 'Character'], ['spells', 'Spells'], ['quests', 'Quests'], ['bags', 'Bags'], ['trade', 'Trade'], ['lore', 'Lore'], ['social', 'Social'], ...extra].map(([k, n]) => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}">${n}</button>`).join('')}</div>`);
-    tabs.onclick = ev => { const t = ev.target.dataset.t; if (t) { bookTab = t; refreshSheet(); } };
-    body.appendChild(tabs);
-    const fns = { char: tabChar, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial, trade: tabTrade }; for (const b of extra) fns[b[0]] = b[2];
-    (fns[bookTab] || tabChar)(body);
+    const all = [['char', 'Character'], ['classes', 'Classes'], ['spells', 'Spells'], ['quests', 'Quests'], ['bags', 'Bags'], ['trade', 'Professions'], ['lore', 'Lore'], ['social', 'Who\'s Online'], ...extra.map(b => [b[0], b[1]])];
+    const name = Object.fromEntries(all), groups = BOOK_GROUPS.map(g => [...g.slice(0, 3), g[3].filter(k => name[k])]);
+    const known = new Set(groups.flatMap(g => g[3])); for (const [k] of all) if (!known.has(k)) groups[0][3].push(k);
+    if (!name[bookTab]) bookTab = 'char';
+    const cur = groups.find(g => g[3].includes(bookTab));
+    $('sheetIn').classList.add('book'); $('sheetTitle').textContent = `${cur[2]} · ${name[bookTab]}`;
+    const item = k => `<button data-t="${k}" class="${bookTab === k ? 'on' : ''}"><span class="bi">${TAB_ICON[k] || '•'}</span><span class="bn">${name[k]}</span>${KEY_OF[k] ? `<kbd>${KEY_OF[k]}</kbd>` : ''}</button>`;
+    const nav = el(`<nav class="bk"><div class="bkSide">${groups.map(g => `<div class="bkG"><h4>${g[1]} ${g[2]}</h4>${g[3].map(item).join('')}</div>`).join('')}</div>
+      <div class="bkTop"><div class="bkGroups">${groups.map(g => `<button data-g="${g[0]}" class="${g === cur ? 'on' : ''}"><span>${g[1]}</span>${g[2]}</button>`).join('')}</div><div class="bkSubs">${cur[3].map(item).join('')}</div></div></nav>`);
+    nav.onclick = ev => { const b = ev.target.closest('button'); if (!b) return; if (b.dataset.t) bookTab = b.dataset.t; else if (b.dataset.g) bookTab = groups.find(g => g[0] === b.dataset.g)[3][0]; refreshSheet(); };
+    const main = el('<div class="bkMain"></div>'), wrap = el('<div class="bkWrap"></div>');
+    wrap.append(nav, main); body.appendChild(wrap);
+    const fns = { char: tabChar, classes: tabClasses, spells: tabSpells, quests: tabQuests, bags: tabBags, lore: tabLore, social: tabSocial, trade: tabTrade }; for (const b of extra) fns[b[0]] = b[2];
+    (fns[bookTab] || tabChar)(main);
+    setTimeout(() => nav.querySelector('.bkSubs .on')?.scrollIntoView({ block: 'nearest', inline: 'center' }), 0);
   });
+}
+function tabClasses(body) {
+  const h = S.hero, cap = Game.capInfo(), fams = FAMILIES.map(f => [f, Game.famBest(f)]);
+  body.appendChild(el(`<div class="card"><h3>Your classes</h3><p>Every class is a weapon. Equip a class's weapon below to play it; each class keeps its own level, gear and spells.</p>
+    <div class="famrow">${fams.map(([f, L]) => `<div class="fam ${L >= (cap?.lvl || 0) ? 'ok' : 'miss'}"><span>${FAMILY_ICON[f]}</span><b>${f}</b><small>${L ? 'best level ' + L : 'none yet'}</small></div>`).join('')}</div>
+    ${cap ? `<p class="capnote">🔒 ${esc(Game.capText(cap))}</p>` : ''}
+    ${!S.unlockPicks && Game.weaponChoices().length && !Game.owns(Game.weaponChoices()[0]) ? `<p>New weapons come from <b>Master Corvin</b> at the armory in ${esc(world.names?.town || 'town')}: get a class to level 10, pass his trial, and he'll let you choose one from a family you don't have yet.</p>` : ''}</div>`));
+  weaponRack(body);
 }
 // ---------- weapons: equip a class's weapon to play it ----------
 const WICON = { mace: '🔨', staff: '🪄', bow: '🏹', blade: '⚔️', greatsword: '🗡️', wraps: '👊', dagger: '🔪', rapier: '🤺', wand: '✨' };
@@ -539,7 +576,7 @@ function tabChar(body) {
     <div class="grid2" style="margin-top:6px"><div><div class="stat"><span>Health</span><span>${h.maxHp}</span></div><div class="stat"><span>${h.resType}</span><span>${h.resMax}</span></div><div class="stat"><span>Power</span><span>${Math.round(h.power)}</span></div></div>
     <div><div class="stat"><span>Armor</span><span>${Math.round(h.armor)}</span></div><div class="stat"><span>Crit</span><span>${(h.crit * 100).toFixed(1)}%</span></div><div class="stat"><span>XP</span><span>${h.lvl >= MAX_LVL ? 'max' : Math.round(h.xp) + ' / ' + xpNeed(h.lvl)}</span></div></div></div>
     <p>Gold: ${S.gold}</p></div>`));
-  weaponRack(body);
+  { const b = el(`<div class="acts" style="margin:-2px 0 8px"><button data-a="cls">🗡️ Switch class (${CLASS_KEYS.filter(k => Game.owns(k)).length} owned)</button></div>`); b.onclick = () => { bookTab = 'classes'; refreshSheet(); }; body.appendChild(b); }
   // progression: just the numbers; the game doesn't explain itself
   { const fam = FAMILIES.map(f => { const b = Game.famBest(f); return `<span class="fam ${b >= 10 ? 'ok' : ''}">${{ Fighter: '🛡️', Healer: '💚', Rogue: '🗡️', Mage: '🔮' }[f]} ${f} ${b}</span>`; }).join('');
     body.appendChild(el(`<div class="card"><h3>Families</h3><div class="fams">${fam}</div></div>`));
@@ -971,7 +1008,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.1 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.2 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
@@ -1058,6 +1095,7 @@ export function init() {
   $('sheetX').onclick = closeSheet;
   $('sheet').addEventListener('pointerdown', e => { if (e.target.id === 'sheet') closeSheet(); });
   $('bookBtn').onclick = () => openBook();
+  $('meLvl').style.cursor = 'pointer'; $('meLvl').title = 'Your classes'; $('meLvl').onclick = ev => { ev.stopPropagation(); openBook('classes'); };
   $('menuBtn').onclick = openMenu;
   $('mini').onclick = openMap;
   MapUI.bind({ objText, questMark, toast }); MapUI.init(); applySettings();

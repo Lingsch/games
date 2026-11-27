@@ -63,7 +63,7 @@ export function writeTo(n) {
 }
 
 // ---------- personal stories: three chapters each ----------
-const STORIES = {
+export const STORIES = {
   sibling: { t1: 'Family Business', t2: 'The Ones Who Took Them', t3: 'Home Again',
     s1: n => [`${n} has a younger sister called Wenna, who ran off two years ago to join a company of sellswords. A letter came this morning: Wenna is in trouble, and the company won't let her go.`, `"I know it's not your problem," ${n} says. "But you're the best fighter I know, and I don't know who else to ask."`],
     rival: n => [`The Blackwater Company`, `Captain Drace of the Blackwater Company`, 'bandit2'],
