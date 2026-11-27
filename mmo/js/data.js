@@ -418,7 +418,7 @@ export const MOBS = {
 const early = (L, k) => L <= 10 ? k : L < 14 ? 1 + (k - 1) * (14 - L) / 4 : 1;
 // Build 13.2: the balance knobs, in one place. Tuned by simulated fights against pacing targets from the big MMOs:
 // a dungeon boss takes a group of four about two to three minutes, trash packs about half a minute, and the healer has to work.
-export const BAL = { bossHp: 18, raidBossHp: 80, namedHp: 8, bossDmg: 1.6, mobDmg: 1, mana: 1, manaCost: .6, castRegen: .006 };
+export const BAL = { bossHp: 18, raidBossHp: 80, namedHp: 8, grpHp: .55, bossDmg: 1.6, mobDmg: 1, wildDmg: 1.2, mana: 1, manaCost: .6, castRegen: .006 };
 export const mobHp = L => (42 + 28 * L) * 1.5 * early(L, 1.3);
 export const mobDmg = L => (4 + 2.3 * L) * 1.75 * early(L, 1.2);
 export const mobXp = L => 18 + 13 * L + .9 * L * L;
@@ -620,7 +620,7 @@ const NEW_SPELLS = {
   },
   longwatch: {
     multishot: { name: 'Multi-Shot', icon: '🎇', lvl: 12, kind: 'attack', cost: 30, cd: 8, range: 32, tgt: 'enemy', desc: 'Shoots the target and two enemies near it.',
-      fx: (C, u, t) => { const L = C.enemiesNear(u, t, 10).sort((a, b) => C.d(a, t) - C.d(b, t)).slice(0, 3); for (const e of L) C.shoot(u, e, C.pw(u) * 1.0 + 8); } },
+      fx: (C, u, t) => { const L = C.nearAll(u, t, 10).sort((a, b) => C.d(a, t) - C.d(b, t)).slice(0, 3); for (const e of L) C.shoot(u, e, C.pw(u) * 1.0 + 8); } },
     rapid: { name: 'Rapid Fire', icon: '⏩', lvl: 16, kind: 'util', cd: 45, gcd: false, tgt: 'self', desc: 'Shoot 50% faster for 12 seconds.', fx: (C, u) => C.buff(u, 'rapid', 12, { haste: .5 }, u) },
   },
   elementalist: {

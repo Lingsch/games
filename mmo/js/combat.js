@@ -62,7 +62,7 @@ export function recalc(e) {
     const M = MOBS[e.mob], L = e.lvl;
     let hpM = M.hpM * (e.elite ? 3.5 : 1) * (e.named && !e.boss ? (e.boss2 ? 14 : BAL.namedHp) : 1) * (e.boss ? (M.raidBoss || e.worldBoss ? BAL.raidBossHp : BAL.bossHp) : 1);
     e.maxHp = Math.round(mobHp(L) * hpM * (e.hpMul || 1));
-    e.power = mobDmg(L) * BAL.mobDmg * M.dmgM * (e.elite ? 1.35 : 1) * (e.named ? 1.5 : 1) * (e.boss ? (M.raidBoss || e.worldBoss ? 1.6 : BAL.bossDmg) : 1) * (1 + buffSum(e, 'pow')) * (e.dmgMul || 1);
+    e.power = mobDmg(L) * BAL.mobDmg * (wild(e) ? BAL.wildDmg : 1) * M.dmgM * (e.elite ? 1.35 : 1) * (e.named ? 1.5 : 1) * (e.boss ? (M.raidBoss || e.worldBoss ? 1.6 : BAL.bossDmg) : 1) * (1 + buffSum(e, 'pow')) * (e.dmgMul || 1);
     e.armor = L * 5; e.crit = .05; e.dodge = .03; e.parry = 0;
     if (e.pet && e.charmed) e.power *= 1.1;
   } else if (e.pet) recalcPet(e);
@@ -85,6 +85,11 @@ export const inCombat = e => S.time - e.combatT < 6;
 export const d = (a, b) => dist(a, b);
 // Rank II spells hit 35% harder: the multiplier is set while a spell's effect runs
 let curRank = 1;
+// Build 13.3: WoW's AoE soft cap. An area spell hits everything, but past 5 targets each one takes sqrt(5 / n) of the damage,
+// so 20 enemies take about half each. Only the hero's side is capped; enemy AoE on you is not.
+const AOE_CAP = 5; let aoeN = 0, fxSrc = null;
+const aoeMul = src => src === fxSrc && aoeN > AOE_CAP ? Math.sqrt(AOE_CAP / aoeN) : 1;
+const aoeNear = (u, c, r) => { const L = enemiesNear(u, c, r); if (u === fxSrc && u.team !== 'enemy') aoeN = Math.max(aoeN, L.length); return L; };
 export const pw = e => e.power * curRank;
 export const ownerOf = e => e && e.pet ? e.pet.owner : e;
 export function partyOf(e) {
@@ -107,11 +112,26 @@ export function addThreat(mob, src, amt) {
   if (!mob.tagged) mob.tagged = own.inParty ? 'party' : own.fake?.group ? own.fake.group : own;
   if (!mob.engaged) engage(mob, src);
 }
+// Build 13.3: a normal open-world mob is tuned for one person; against your group it gets tougher (+55% health per extra member, up to 4),
+// so one takes 8-12 seconds for a group of four and about 11 alone. Elites, named and bosses are already built for groups.
+// an ordinary open-world mob: not a boss, named, elite, pet, dungeon trash or a boss's add
+const wild = m => m.mob && m.spawn && !m.spawn.dungeon && !m.dungeon && !m.boss && !m.boss2 && !m.named && !m.elite && !m.pet;
+export function groupScale(m) {
+  if (m.grpK || m.charmed || !wild(m)) return;
+  const n = Math.min(4, S.party.filter(p => !p.dead && p.cls).length), k = 1 + BAL.grpHp * (n - 1);
+  if (k <= 1) return;
+  const f = m.hp / m.maxHp; m.grpK = k; m.hpMul = (m.hpMul || 1) * k; recalc(m); m.hp = m.maxHp * f;
+}
+export function ungroupScale(m) { if (!m.grpK) return; m.hpMul /= m.grpK; m.grpK = 0; recalc(m); m.hp = Math.min(m.hp, m.maxHp); }
 // a mob that enters combat calls the rest of its camp
 function engage(mob, src) {
   mob.engaged = true;
-  const M = MOBS[mob.mob];
-  if (mob.camp && (M.social || String(mob.camp).startsWith('pk'))) for (const o of S.ents) if (o !== mob && !o.dead && o.camp === mob.camp && !o.engaged && dist(o, mob) < (M.social || 4) + 10) { o.threat.set(src, 1); o.combatT = S.time; o.engaged = true; }
+  const M = MOBS[mob.mob], ours = ownerOf(src).inParty;
+  if (ours) groupScale(mob);
+  // Build 13.3: a linked pack always comes together, however you pull it
+  const link = mob.spawn?.link;
+  if (link) for (const o of S.ents) if (o !== mob && !o.dead && !o.engaged && !o.evading && o.spawn?.link === link && dist(o, mob) < 22) { o.threat.set(src, 1); o.combatT = S.time; o.engaged = true;  if (ours) groupScale(o); }
+  if (mob.camp && (M.social || String(mob.camp).startsWith('pk'))) for (const o of S.ents) if (o !== mob && !o.dead && o.camp === mob.camp && !o.engaged && dist(o, mob) < (M.social || 4) + 10) { o.threat.set(src, 1); o.combatT = S.time; o.engaged = true; if (ours) groupScale(o); }
 }
 export function topThreat(mob) {
   let best = null, bv = -1;
@@ -134,7 +154,7 @@ function ultCharge(u, n) { if (u.cls) u.ult = Math.min(100, u.ult + n); }
 // ---------- damage and healing ----------
 export function damage(src, tgt, amt, school = 'phys', opts = {}) {
   if (!tgt || tgt.dead || tgt.evading || tgt.immune) return 0;
-  let crit = false, mult = 1;
+  let crit = false, mult = aoeMul(src);
   const M = tgt.mob ? MOBS[tgt.mob] : null;
   if (M) {
     if (school === M.weak) mult *= 1.5;
@@ -260,10 +280,12 @@ export const rooted = e => e.buffs.some(b => b.data.root);
 // ---------- projectiles ----------
 export const projectiles = [];
 export function shoot(u, t, amt, opts = {}) {
+  amt *= aoeMul(u);
   if (hasBuff(u, 'moon')) opts = { ...opts, sureCrit: true };
   projectiles.push({ kind: 'arrow', src: u, tgt: t, x: u.x, y: u.y + 1.3, z: u.z, amt, school: 'phys', opts, spd: 45 });
 }
 export function bolt(u, t, amt, school, opts = {}) {
+  amt *= aoeMul(u);
   projectiles.push({ kind: 'bolt', src: u, tgt: t, x: u.x, y: u.y + 1.6, z: u.z, amt, school, opts, spd: 30 });
 }
 export function chain(u, t, amt, school, n) {
@@ -319,7 +341,14 @@ export function interrupt(t) { if (t.mcast) { t.mcast = null; floatText(t, 'Inte
 export function stun(u, t, dur) { if (IMMUNE(t)) { floatText(t, 'Immune', '#cfcfcf'); return; } buff(t, 'stun', dur, { stun: 1 }, u); t.mcast = null; addThreat(t, u, 5); }
 export function mez(u, t, dur) {
   if (IMMUNE(t)) { floatText(t, 'Immune', '#cfcfcf'); return; }
+  // Build 13.3: one caster can keep at most 2 enemies asleep with single-target spells (like FFXI and EQ2 crowd control, it buys
+  // time on a big pull rather than switching it off); a third sleep wakes the oldest. Mass sleep is the cooldown for a bad pull.
+  if (!(u === fxSrc && aoeN > 1)) {
+    const held = S.ents.filter(e => e !== t && !e.dead && e.buffs.some(b => b.id === 'mez' && b.src === u && !b.mass)).sort((a, b) => a.buffs.find(x => x.id === 'mez').t - b.buffs.find(x => x.id === 'mez').t);
+    while (held.length >= 2) { const o = held.shift(); o.buffs = o.buffs.filter(b => b.id !== 'mez'); floatText(o, 'Woke up', '#e0b0ff'); }
+  }
   buff(t, 'mez', dur, { mez: 1 }, u); t.mcast = null; addThreat(t, u, 8);
+  { const b = t.buffs.find(x => x.id === 'mez'); if (b) b.mass = u === fxSrc && aoeN > 1; }
   if (u.isHero || t === S.target) floatText(t, 'Mesmerized', '#e0b0ff');
 }
 export function fear(u, t, dur) { if (IMMUNE(t)) { floatText(t, 'Immune', '#cfcfcf'); return; } addThreat(t, u, 5); t.fleeT = dur; t.target = u; floatText(t, 'Terrified', '#c08aff'); }
@@ -386,7 +415,7 @@ export function shift(u, form, data) {
 }
 export function leapTo(u, t) { const a = angTo(t, u), r = (t.r || .5) + 1.2; u.x = t.x + Math.sin(a) * r; u.z = t.z + Math.cos(a) * r; u.y = hgt(u.x, u.z); u.yaw = angTo(u, t); R.burst(u.x, u.y + .4, u.z, 16, [.9, .8, .6], 2.5, .5, .5); }
 export function stepBehind(u, t) { const r = (t.r || .5) + 1.3; u.x = t.x - Math.sin(t.yaw) * r; u.z = t.z - Math.cos(t.yaw) * r; u.y = hgt(u.x, u.z); u.yaw = t.yaw; R.burst(u.x, u.y + 1, u.z, 20, [.4, .3, .6], 2, .6, .6); }
-export const C = { leapTo, stepBehind, pw, damage, heal, gain, taunt, dropThreat, buff, partyBuff, enemiesNear, partyOf, d, revive, shoot, bolt, chain, fxRing, leap, weakOf,
+export const C = { leapTo, stepBehind, pw, damage, heal, gain, taunt, dropThreat, buff, partyBuff, enemiesNear: aoeNear, nearAll: enemiesNear, partyOf, d, revive, shoot, bolt, chain, fxRing, leap, weakOf,
   hot, dot, poison, poisonStacks, clearPoison, ward, interrupt, stun, mez, fear, summon, petsOf, recalcPet, charm, mirror, teleport, consumeHot, harvest, feign, shift, chainOf };
 
 // ---------- using abilities ----------
@@ -450,8 +479,8 @@ function finish(e, key, tt) {
   if (ab.kind === 'ult') e.ult = 0;
   e.lastCast = S.time; e.anim.atk = 1; e.sit = false;
   if (ab.tgt === 'enemy' && tt && !e.autoOn && (CLASSES[e.cls].res !== 'mana' || e.cls === 'bard' || hasBuff(e, 'cat') || hasBuff(e, 'bear'))) { e.target = tt; e.autoOn = true; }
-  if (key === 'aimed' && hasBuff(e, 'deadeye')) { e.buffs = e.buffs.filter(b => b.id !== 'deadeye'); curRank = rankMul(e, ab); try { CLASSES.longwatch.abilities.aimed.fx(C, e, tt); } finally { curRank = 1; } const p = projectiles[projectiles.length - 1]; if (p) p.opts = { ...p.opts, sureCrit: true }; }
-  else { curRank = rankMul(e, ab); try { ab.fx(C, e, tt, ab); } finally { curRank = 1; } }
+  if (key === 'aimed' && hasBuff(e, 'deadeye')) { e.buffs = e.buffs.filter(b => b.id !== 'deadeye'); curRank = rankMul(e, ab); fxSrc = e; aoeN = 0; try { CLASSES.longwatch.abilities.aimed.fx(C, e, tt); } finally { curRank = 1; fxSrc = null; aoeN = 0; } const p = projectiles[projectiles.length - 1]; if (p) p.opts = { ...p.opts, sureCrit: true }; }
+  else { curRank = rankMul(e, ab); fxSrc = e; aoeN = 0; try { ab.fx(C, e, tt, ab); } finally { curRank = 1; fxSrc = null; aoeN = 0; } }
   if (ab.kind === 'attack' || ab.kind === 'util') { if (tt && tt !== e && tt.mob && !tt.engaged) addThreat(tt, e, 1); }
   const col = SC[ab.school || (ab.kind === 'heal' ? 'holy' : 'phys')] || SC.phys;
   R.burst(e.x, e.y + 1.6, e.z, 8, col, 1.5, .5, .4);

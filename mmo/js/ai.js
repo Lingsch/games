@@ -68,7 +68,7 @@ export function mobAI(m, dt) {
     const home = goTo(m, m.home.x, m.home.z, dt, 1.2, 1.6) || Math.hypot(m.x - m.home.x, m.z - m.home.z) < 2;
     if (home || m.evadeT > 7) {
       if (!home) { m.x = m.home.x; m.z = m.home.z; m.y = hgt(m.x, m.z); m.rx = m.x; m.rz = m.z; }
-      m.evading = false; m.evadeT = 0; m.hp = m.maxHp; m.threat.clear(); m.engaged = false; m.tagged = null; m.buffs = []; m.target = null; m.fled = false; Cb.recalc(m);
+      m.evading = false; m.evadeT = 0; Cb.ungroupScale(m); m.hp = m.maxHp; m.threat.clear(); m.engaged = false; m.tagged = null; m.buffs = []; m.target = null; m.fled = false; Cb.recalc(m);
     }
     m.hp = Math.min(m.maxHp, m.hp + m.maxHp * .3 * dt);
     return;
@@ -607,9 +607,8 @@ export function companionAI(e, dt) {
       stopMove(e, dt); return;
     }
     e.sit = false;
-    if (dist(e, t) > 3.2) { goTo(e, t.x, t.z, dt, 2.4, .85); return; }
-    face(e, t, dt); e.target = t;
-    if (!tryUse(e, PULL_AB[e.cls], t)) { Cb.addThreat(t, e, 10); e.anim.atk = 1; }
+    // Build 13.3: pull from range and bring it back to the group, so a loose pack comes one at a time
+    const home = ord.wait || hero; e.pull = { phase: 'go', tgt: t, spot: { x: home.x, z: home.z } }; e.target = t;
     return;
   }
   if (!inFight && ord && ord.mode === 'clear' && ord.tank === e) {
@@ -617,9 +616,7 @@ export function companionAI(e, dt) {
     const t = left[0];
     if (t) {
       e.sit = false;
-      if (dist(e, t) > 3.2) { goTo(e, t.x, t.z, dt, 2.4, .9); return; }
-      face(e, t, dt); e.target = t;
-      if (!tryUse(e, PULL_AB[e.cls], t)) { Cb.addThreat(t, e, 10); e.anim.atk = 1; }
+      e.pull = { phase: 'go', tgt: t, spot: { x: hero.x, z: hero.z } }; e.target = t;
       return;
     }
   }
@@ -628,7 +625,8 @@ export function companionAI(e, dt) {
     // something is hitting me: go and stand by the tank so it can be taken off me (never run away from it)
     const tankP = group.find(p => isTank(p) && !p.dead && p !== e);
     const onMe = role !== 'tank' && tankP && foes.some(f => f.target === e && !cc(f) && dist(f, e) < 8);
-    if (onMe && dist(e, tankP) > 3.5) {
+    // Build 13.2: but only if the way to the tank is clear of sleeping packs; otherwise hold ground, fight, and let the tank come
+    if (onMe && dist(e, tankP) > 3.5 && dist(e, tankP) < 24 && pathClear(e, tankP.x, tankP.z)) {
       if (role === 'healer' && hpPct(e) > .35 && healerTurn(e, group, true)) { stopMove(e, dt); return; }
       goTo(e, tankP.x, tankP.z, dt, 2.5); return;
     }
@@ -751,6 +749,16 @@ function engageable(t, group, e) {
   // a ranged enemy shooting at us from where it stands: after a moment, go and get it
   if (t.target && group.includes(t.target) && S.time - (t.seenT || (t.seenT = S.time)) > 3) return true;
   return false;
+}
+// is the straight line from e to (x, z) clear of enemies that aren't in the fight yet?
+export function pathClear(e, x, z) {
+  const dx = x - e.x, dz = z - e.z, L2 = dx * dx + dz * dz || 1;
+  for (const m of S.ents) {
+    if (!m.mob || m.dead || m.engaged || m.charmed || m.team !== 'enemy' || Math.abs(m.x - e.x) > 70 || Math.abs(m.z - e.z) > 70) continue;
+    const t = Math.max(0, Math.min(1, ((m.x - e.x) * dx + (m.z - e.z) * dz) / L2)), px = e.x + dx * t, pz = e.z + dz * t;
+    if (Math.hypot(m.x - px, m.z - pz) < (MOBS[m.mob]?.aggro || 12) + 2) return false;
+  }
+  return true;
 }
 function groupCenter(group, not) { let x = 0, z = 0, n = 0; for (const p of group) if (p !== not && !p.dead) { x += p.x; z += p.z; n++; } return n ? { x: x / n, z: z / n } : { x: (not || S.hero).x, z: (not || S.hero).z }; }
 // healers and ranged stand at range on the far side from the tank (out of the cleave)

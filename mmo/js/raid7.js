@@ -199,7 +199,7 @@ function distribute(m, mode) {
     const it = r.it, fakes = S.party.filter(p => !p.isHero && !p.dead);
     let winner = null, line = '';
     if (mode === 'needgreed') {
-      const need = fakes.filter(p => wants(p, it) && Math.random() < .8), greed = fakes.filter(p => !need.includes(p) && Math.random() < .35);
+      const need = fakes.filter(p => X.allyNeeds ? X.allyNeeds(p, it) : wants(p, it)), greed = fakes.filter(p => !need.includes(p) && Math.random() < .35);
       const all = [...need.map(p => ({ p, kind: 'need', n: irnd(1, 100) })), ...greed.map(p => ({ p, kind: 'greed', n: irnd(1, 100) }))];
       if (r.mine && r.mine !== 'pass') all.push({ p: S.hero, kind: r.mine, n: irnd(1, 100) });
       const best = all.sort((a, b) => (a.kind === 'need' ? 0 : 1) - (b.kind === 'need' ? 0 : 1) || b.n - a.n)[0];

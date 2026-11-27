@@ -317,12 +317,13 @@ function updateFrames() {
     tf.classList.remove('hide');
     const con = t.mob ? Cb.conColor(h.lvl, t.lvl) : t.team === 'npc' ? '#ffd34d' : CLASSES[t.cls]?.color || '#fff';
     $('tgtName').textContent = (t.cls ? roleIcon(t.cls) + ' ' : '') + t.name + (t.dead ? ' (dead)' : ''); $('tgtName').style.color = con;
-    $('tgtLvl').textContent = t.team === 'npc' ? '' : (t.boss ? 'Boss ' : t.named ? 'Named ' : t.elite ? 'Elite ' : '') + (t.lvl ? 'L' + t.lvl : '');
+    const pk = t.mob && !t.boss && !t.engaged ? packOf(t).length : 1;
+    $('tgtLvl').textContent = t.team === 'npc' ? '' : (t.boss ? 'Boss ' : t.named ? 'Named ' : t.elite ? 'Elite ' : '') + (t.lvl ? 'L' + t.lvl : '') ;
     $('tgtHp').parentElement.classList.toggle('hide', t.team === 'npc');
     $('tgtHp').style.width = pct(t.hp, t.maxHp) + '%'; $('tgtHpT').textContent = t.team === 'npc' ? '' : t.mob ? Math.round(pct(t.hp, t.maxHp)) + '%' : `${Math.ceil(t.hp)} / ${t.maxHp}`;
     $('tgtResW').classList.toggle('hide', !t.cls); if (t.cls) { $('tgtRes').style.width = pct(t.res, t.resMax) + '%'; $('tgtRes').style.background = RES_COL[t.resType]; }
     let info = '';
-    if (t.mob) { const M = MOBS[t.mob]; info = [M.undead ? 'Undead' : M.beast ? 'Beast' : M.human ? 'Humanoid' : 'Monster', t.evading ? 'Evading' : ''].filter(Boolean).join(' · '); $('tgtWeak').innerHTML = M.weak ? `Weak ${ELEMENTS[M.weak]}${M.resist ? ' Resists ' + ELEMENTS[M.resist] : ''}` : ''; }
+    if (t.mob) { const M = MOBS[t.mob]; info = [!t.boss && !t.dead ? conCheck(t) + (pk > 1 ? ' ⛓' + pk : '') : M.undead ? 'Undead' : M.beast ? 'Beast' : M.human ? 'Humanoid' : 'Monster', t.evading ? 'Evading' : ''].filter(Boolean).join(' · '); $('tgtWeak').innerHTML = M.weak ? `Weak ${ELEMENTS[M.weak]}${M.resist ? ' Resists ' + ELEMENTS[M.resist] : ''}` : ''; }
     else if (t.cls) { info = `${CLASSES[t.cls].name}${t.fake?.guild ? ' · <' + t.fake.guild + '>' : ''}`; $('tgtWeak').textContent = t.fake?.friend ? '★ Friend' : ''; }
     else if (t.pet) { info = 'Serves ' + t.pet.owner.name; $('tgtWeak').textContent = ''; }
     else { $('tgtWeak').textContent = ''; info = t.title || ''; }
@@ -462,7 +463,7 @@ export function refreshSheet() { if (!sheetRender) return; const st = $('sheetBo
 export function closeSheet() { $('sheet').classList.add('hide'); sheetRender = null; swapPick = swapPick; }
 const sheetOpen = () => !$('sheet').classList.contains('hide');
 function el(html) { const d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild || d; }
-Object.assign(X.ui, { el, esc, toast, openSheet, refreshSheet, closeSheet, openBook: t => openBook(t), openTalk: n => openTalk(n), refreshKeys: f => refreshKeys(f) });
+Object.assign(X.ui, { rkBadge, spellTier, el, esc, toast, openSheet, refreshSheet, closeSheet, openBook: t => openBook(t), openTalk: n => openTalk(n), refreshKeys: f => refreshKeys(f) });
 function itemHtml(it, cmp) {
   const rc = RARITY[it.rarity].c, s = it.stats;
   if (s?.pow && it.slot !== 'recipe') Game.splitStats?.(it);
@@ -887,6 +888,16 @@ function openSay() {
 }
 // ---------- inspecting someone ----------
 const PERSONA_TXT = { chill: 'Easygoing, and plays for the fun of it.', tryhard: 'Wants every fight to be perfect, and every drop.', joker: "Never manages to stay serious for more than a minute.", newbie: 'Still learning the ropes, and asks a lot of questions.', veteran: 'Has seen it all, and will happily tell you about it.', grumpy: 'Complains about everything, and shows up every single time.', friendly: 'One of your oldest friends.' };
+// Build 13.3: FFXI's check. Level gap first, then a bump for an elite and for a linked pack bigger than your group can comfortably take.
+const CON_NAMES = ['Too Weak', 'Easy Prey', 'Decent Challenge', 'Even Match', 'Tough', 'Very Tough', 'Incredibly Tough'];
+export const packOf = t => t?.spawn?.link ? S.ents.filter(o => o.mob && !o.dead && o.spawn?.link === t.spawn.link && Math.hypot(o.x - t.x, o.z - t.z) < 22) : t ? [t] : [];
+export function conCheck(t) {
+  const d = t.lvl - S.hero.lvl, n = packOf(t).length, grp = S.party.filter(p => !p.dead).length;
+  let i = d <= -6 ? 0 : d <= -3 ? 1 : d < 0 ? 2 : d === 0 ? 3 : d <= 2 ? 4 : d <= 4 ? 5 : 6;
+  if (t.elite || t.named) i++;
+  if (n >= 3 && n > grp) i++; if (n >= 4 && grp <= 2) i++;
+  return CON_NAMES[Math.min(6, i)];
+}
 function conText(t) {
   const d = t.lvl - S.hero.lvl;
   if (d <= -3) return ['#9a9a9a', 'should be an easy fight'];
@@ -901,7 +912,8 @@ export function openInspect(t) {
     if (t.mob) {
       const M = MOBS[t.mob], [col, con] = conText(t);
       const tags = [t.boss ? 'Boss' : t.boss2 ? 'Mini-boss' : t.named ? 'Named' : t.elite ? 'Elite' : null, M.undead ? 'Undead' : M.beast ? 'Beast' : M.human ? 'Humanoid' : null].filter(Boolean).join(' · ');
-      body.appendChild(el(`<div class="card"><h3 style="color:${col}">Level ${t.lvl} ${esc(t.name)}</h3><p style="margin:2px 0">${esc(S.hero.name)}, this ${con}.${tags ? ` <span class="dim">${tags}.</span>` : ''}</p>
+      const pk = packOf(t).length, pkTxt = pk > 1 ? ` Linked with ${pk - 1} other${pk > 2 ? 's' : ''}: pull one and they all come. Sleep or root one and kill the rest.` : t.spawn?.loose ? ' Loose pack: a careful ranged pull from far off takes just this one.' : '';
+      body.appendChild(el(`<div class="card"><h3 style="color:${col}">Level ${t.lvl} ${esc(t.name)}</h3><p style="margin:2px 0">${esc(S.hero.name)}, this ${con}. <b>${conCheck(t)}</b>.${pkTxt}${tags ? ` <span class="dim">${tags}.</span>` : ''}</p>
         <p class="lore" style="margin:6px 0">${esc(Game.fill(MOB_LORE[t.mob] || 'Little is known about this creature.'))}</p>
         <p class="dim" style="margin:2px 0">Health ${Math.round(t.hp)} / ${t.maxHp}.${M.weak ? ` Weak to ${M.weak}.` : ''}${M.resist ? ` Resists ${M.resist}.` : ''}${M.caster ? ' Casts spells from range.' : ''}${M.healer ? ' Heals its allies.' : ''}</p></div>`));
       return;
@@ -912,6 +924,7 @@ export function openInspect(t) {
       body.appendChild(el(`<div class="card"><h3>${fam} ${esc(t.name)}</h3><p style="margin:2px 0">Level ${t.lvl} ${esc(C.name)} · ${esc(C.family)} · ${esc(C.role === 'dps' ? 'damage' : C.role)}</p>
         ${f?.guild ? `<p class="dim" style="margin:2px 0">&lt;${esc(f.guild)}&gt;</p>` : ''}${f ? `<p style="margin:4px 0">${esc(PERSONA_TXT[f.bff ? 'friendly' : f.persona] || '')}</p>` : ''}${rel ? `<p class="dim" style="margin:2px 0">${rel}</p>` : ''}
         <p class="dim" style="margin:4px 0 0">Health ${Math.round(t.hp)} / ${t.maxHp} · Power ${Math.round(t.power)} · Armor ${Math.round(t.armor)}</p></div>`));
+      if (t.fake && (t.inParty || X.isCompanion?.(t)) && X.allyInspect) { X.allyInspect(t, body); return; }
       if (f && !t.inParty && !t.dead) { const a = el(`<div class="acts"><button class="pri">Invite to group</button><button>${f.friend ? 'Unfriend' : 'Add friend'}</button></div>`); a.children[0].onclick = () => { Game.invite(t); closeSheet(); }; a.children[1].onclick = () => { Game.befriend(t); refreshSheet(); }; body.appendChild(a); }
       return;
     }
@@ -1008,7 +1021,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.2 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.3 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
@@ -1112,7 +1125,7 @@ export function init() {
   $('tgtX').addEventListener('pointerup', clearTgt); $('tgtX').onclick = clearTgt;
   $('tgtBtns').onclick = ev => {
     const a = ev.target.dataset.a, t = S.target; if (!a || !t) return;
-    if (a === 'inv') Game.invite(t); if (a === 'fr') Game.befriend(t); if (a === 'kick') Game.kick(t); if (a === 'talk') interact(t); if (a === 'loot') openLoot(t); if (a === 'insp') openInspect(t);
+    if (a === 'inv') Game.invite(t); if (a === 'fr') Game.befriend(t); if (a === 'kick') Game.kick(t); if (a === 'talk') interact(t); if (a === 'loot') openLoot(t); if (a === 'insp') openInspect(t); if (a === 'trade') X.openTrade?.(t);
     $('tgtBtns')._s = null;
   };
   // the long-press callout menu on iOS

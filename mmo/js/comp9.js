@@ -34,6 +34,15 @@ X.compTake = (who, it) => {
   chat('loot', null, `${who.name} puts on ${it.name}.`); chat('party', who.name, pick(['ty!! that\'s an upgrade', 'ooh shiny, thanks', 'putting it on now', 'nice, much better than what I had']));
   return true;
 };
+// Build 13.2: would this ally roll Need? A tome they can study, or gear that's a real upgrade on what they wear. No dice-rolling about it.
+X.allyNeeds = (p, it) => {
+  if (!p || !it || p.isHero) return false;
+  if (it.book) return !!X.canStudy?.(p, it);
+  if (it.slot === 'collect' || it.slot === 'recipe' || it.junk || !it.stats || !Game.canWear(p.cls, it)) return false;
+  if (isFriend(p)) { const cur = doll(p.name)[it.slot]; return cur ? score(it, p.cls) > score(cur, p.cls) * 1.02 : (it.lvl || 1) >= p.lvl - 5; }
+  return (it.lvl || 1) >= p.lvl - 3 && (it.rarity || 0) >= 1;
+};
+export const dollOf = doll, friendOf = isFriend, gearScore = score;
 export function giveTo(who, it) { S.bag = S.bag.filter(x => x !== it); if (!X.compTake(who, it)) Game.addToBag(it, true); Game.save(); }
 export function takeBack(who, slot) { const d = doll(who.name), it = d[slot]; if (!it) return; if (!Game.addToBag(it, true)) { X.ui.toast("Your bags are full."); return; } delete d[slot]; refit(who); Game.save(); }
 

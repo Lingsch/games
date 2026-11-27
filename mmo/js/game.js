@@ -94,26 +94,52 @@ function startWorld(opts = {}) {
   S.running = true;
   for (const f of X.zone) f(zone);
 }
-// Build 4.4: more enemies everywhere. Most spawns get a partner standing close by (dungeons a bit fewer).
+// Build 4.4: more enemies everywhere. Dungeons still give most spawns a partner standing close by.
+// Build 13.3: the open world follows EverQuest 2's linked encounters instead. Loose spawns become packs of 2 to 4 that fight together
+// (pull one, the pack comes), about 1 pack in 7 is loose enough to split with a careful ranged pull, big camps are cut into linked
+// groups of up to 4, and overall there are about 20% fewer enemies than before.
 function densify(zone) {
   let a = (S.seed ^ (zone.length * 2654435761)) >>> 0;
   const rng = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  const add = [];
-  for (const sp of world.spawns) {
-    if (sp.named || sp.ph || sp.boss || sp.boss2 || sp.gate || sp.elite) continue;
-    if (rng() > (sp.dungeon || zone === 'fleet' ? .5 : .8)) continue;
+  const special = sp => sp.named || sp.ph || sp.boss || sp.boss2 || sp.gate || sp.elite || sp.when || sp.raid;
+  const add = [], drop = new Set(), open = zone !== 'fleet' && !world.underwater;
+  const free = world.spawns.filter(sp => !sp.dungeon && !sp.camp && !special(sp));
+  const camped = world.spawns.filter(sp => !sp.dungeon && sp.camp && !special(sp));
+  // what the old rule would have made, so the new one lands about 20% under it
+  const before = [...camped, ...free].reduce((n, sp) => n + 1 + (open ? .8 : .5) * (1 + (sp.lvl[1] <= 11 ? .35 : 0)), 0);
+  // big camps: trim one in five, then link them in groups of up to 4 by who stands next to whom
+  const byCamp = new Map(); for (const sp of camped) { if (!byCamp.has(sp.camp)) byCamp.set(sp.camp, []); byCamp.get(sp.camp).push(sp); }
+  let campLeft = 0, li = 0;
+  for (const [c, list] of byCamp) {
+    let keep = list;
+    if (open && list.length >= 6) keep = list.filter((sp, i) => i % 5 !== 4 || !(drop.add(sp)));
+    campLeft += keep.length;
+    if (!open || keep.length <= 4) { if (open) for (const sp of keep) sp.link = 'lk' + zone + c; continue; }
+    const cx = keep.reduce((t, sp) => t + sp.x, 0) / keep.length, cz = keep.reduce((t, sp) => t + sp.z, 0) / keep.length;
+    keep.sort((p, q) => Math.atan2(p.x - cx, p.z - cz) - Math.atan2(q.x - cx, q.z - cz));
+    const groups = Math.ceil(keep.length / 4);
+    keep.forEach((sp, i) => { sp.link = 'lk' + zone + c + '_' + Math.floor(i * groups / keep.length); });
+  }
+  // loose spawns: some go, the rest become linked packs of 2-4
+  const per = 2.7, p = Math.min(1, Math.max(.2, (before * .8 - campLeft) / Math.max(1, free.length * per)));
+  for (const sp of free) {
+    if (open && rng() > p) { drop.add(sp); continue; }
+    if (!open) { if (rng() > .5) continue; }
+    const r = rng(), size = !open ? 2 : r < .45 ? 2 : r < .85 ? 3 : 4, loose = open && rng() < .15, id = 'lk' + zone + 'p' + (li++);
+    if (open && !loose) { sp.camp = sp.camp || id; sp.link = id; } else if (open) sp.loose = true;
     const wet = depthAt(sp.x, sp.z) > .5;
-    for (let k = 0; k < 6; k++) {
+    for (let n = 1; n < size; n++) for (let k = 0; k < 6; k++) {
       const ang = rng() * TAU, d = 2.6 + rng() * 2.4, x = sp.x + Math.sin(ang) * d, z = sp.z + Math.cos(ang) * d;
       if ((depthAt(x, z) > .5) !== wet && !world.underwater) continue;
-      // Build 12: in the early game the partner is a real pack: they fight together, and some packs are three strong
-      const early = sp.lvl[1] <= 11 && !sp.dungeon;
-      if (early) { sp.camp = sp.camp || 'pk' + zone + add.length; }
-      add.push({ ...sp, x, z, y: hgt(x, z), alive: null, timer: 0 });
-      if (early && rng() < .35) { const a2 = ang + 2.1; add.push({ ...sp, x: sp.x + Math.sin(a2) * d, z: sp.z + Math.cos(a2) * d, y: hgt(sp.x + Math.sin(a2) * d, sp.z + Math.cos(a2) * d), alive: null, timer: 0 }); }
-      break;
+      add.push({ ...sp, x, z, y: hgt(x, z), alive: null, timer: 0 }); break;
     }
   }
+  // dungeons keep the old rule
+  for (const sp of world.spawns) {
+    if (!sp.dungeon || special(sp) || rng() > .5) continue;
+    for (let k = 0; k < 6; k++) { const ang = rng() * TAU, d = 2.6 + rng() * 2.4, x = sp.x + Math.sin(ang) * d, z = sp.z + Math.cos(ang) * d; add.push({ ...sp, x, z, y: hgt(x, z), alive: null, timer: 0 }); break; }
+  }
+  if (drop.size) world.spawns = world.spawns.filter(sp => !drop.has(sp));
   world.spawns.push(...add);
 }
 // ---------- your two friends: always your level, always the roles you're missing ----------

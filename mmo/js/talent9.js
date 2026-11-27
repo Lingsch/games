@@ -82,6 +82,8 @@ const subOf = (cls, key) => SUBS[cls]?.find(s => s[0] === key);
 // which new class the hero chose for each class, and the points spent
 const T = () => (S.ext.tal = S.ext.tal || {});
 export const chosen = cls => T()[cls]?.sub || null;
+// Build 13.3: what an ally's specialization is, for the inspect window
+X.allySpec = e => { const sk = e?.isHero ? chosen(e.cls) : S.ext?.allySub?.[e?.name]; const s = sk && subOf(e.cls, sk); return s ? { name: s[1], desc: s[2], stats: s[4] } : null; };
 X.clsName = e => { const sub = e?.isHero ? chosen(e.cls) : S.ext?.allySub?.[e?.name]; const s = sub && subOf(e.cls, sub); return s ? s[1] : CLASSES[e.cls].name; };
 
 // add the signature abilities to each class: only the hero who chose that new class ever sees them

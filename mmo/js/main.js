@@ -58,6 +58,7 @@ import './vt13.js';
 import './craft13.js';
 import './hard11.js';
 import './script13.js';
+import './ally13.js';
 import * as P8 from './party8.js';
 import './heroic7.js';
 import './ach7.js';

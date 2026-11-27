@@ -7,7 +7,7 @@
 import { S, X, chat, dist, pick } from './core.js';
 import { CLASSES, MOBS } from './data.js';
 import * as Cb from './combat.js';
-import { aiHooks, tryUse, ready, isTank, isHealer, cc, hpPct, stopMove, goTo, groupFoes, meleeClass } from './ai.js';
+import { aiHooks, tryUse, ready, isTank, isHealer, cc, hpPct, stopMove, goTo, groupFoes, meleeClass, pathClear } from './ai.js';
 
 // read each class's abilities once and sort out what they're good for
 const src = ab => { try { return ab.fx ? ab.fx.toString() : ''; } catch (e) { return ''; } };
@@ -74,7 +74,7 @@ aiHooks.position = (e, dt, g) => {
   }
   // don't wake the next pack: step back from a sleeping enemy you're standing too close to
   const idle = S.ents.find(m => m.mob && !m.dead && !m.engaged && !m.charmed && !m.bg && !m.pvp && m.team === 'enemy' && dist(m, e) < (MOBS[m.mob]?.aggro || 12) * .7 + 1);
-  if (idle && foes.some(f => dist(f, e) < 30)) { const a = Math.atan2(e.x - idle.x, e.z - idle.z); e.posTo = { x: e.x + Math.sin(a) * 4, z: e.z + Math.cos(a) * 4 }; e.posT = .6; if (!e.wakeSaid || S.time - e.wakeSaid > 30) { e.wakeSaid = S.time; said(e, ['Careful, there\'s another pack right there.', 'Backing off, don\'t want to pull those.'], .4); } return true; }
+  if (idle && foes.some(f => dist(f, e) < 30)) { const a = Math.atan2(e.x - idle.x, e.z - idle.z); e.posTo = { x: e.x + Math.sin(a) * 4, z: e.z + Math.cos(a) * 4 }; if (!pathClear(e, e.posTo.x, e.posTo.z)) { const c = g.find(p => isTank(p) && !p.dead) || S.hero; e.posTo = { x: (e.x + c.x) / 2, z: (e.z + c.z) / 2 }; } e.posT = .6; if (!e.wakeSaid || S.time - e.wakeSaid > 30) { e.wakeSaid = S.time; said(e, ['Careful, there\'s another pack right there.', 'Backing off, don\'t want to pull those.'], .4); } return true; }
   return false;
 };
 

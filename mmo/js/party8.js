@@ -67,7 +67,7 @@ let rolls = [], rollId = 0, box = null;
 function resolve(r, mine) {
   rolls = rolls.filter(x => x !== r);
   const it = r.it, mates = S.party.filter(p => !p.isHero && !p.dead);
-  const need = mates.filter(p => wants(p, it) && Math.random() < .8), greed = mates.filter(p => !need.includes(p) && Math.random() < .35);
+  const need = mates.filter(p => X.allyNeeds ? X.allyNeeds(p, it) : wants(p, it)), greed = mates.filter(p => !need.includes(p) && Math.random() < .35);
   const all = [...need.map(p => ({ p, kind: 'need', n: irnd(1, 100) })), ...greed.map(p => ({ p, kind: 'greed', n: irnd(1, 100) }))];
   if (mine && mine !== 'pass') all.push({ p: S.hero, kind: mine, n: irnd(1, 100) });
   all.sort((a, b) => (a.kind === 'need' ? 0 : 1) - (b.kind === 'need' ? 0 : 1) || b.n - a.n);
