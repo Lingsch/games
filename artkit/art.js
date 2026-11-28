@@ -3,7 +3,7 @@
 import { initLight } from './light.js';
 import { initFx } from './fx.js';
 import { initUi } from './ui.js';
-export const ART_VERSION = '1';
+export const ART_VERSION = '2';
 export function initArt(G) {
   const { SET } = G;
   if (SET.art === undefined) SET.art = 1;

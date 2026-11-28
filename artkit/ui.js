@@ -3,7 +3,7 @@
 import { EMOJI, PLACED, SCHOOL, KIND } from './iconmap.js';
 export function initUi(G) {
   const { S, CLASSES, theme, SET } = G;
-  const root = document.documentElement, url = n => `url("${G.base}icons/${n}.svg")`;
+  const root = document.documentElement, url = n => `url("${G.base}icons/${n}.svg?v=${G.version}")`;
   const RX = /\p{Extended_Pictographic}️?(?:‍\p{Extended_Pictographic}️?)*/gu;
   const ABILITY = theme.icons || {};
   let on = false, link = null, obs = null;
@@ -63,13 +63,13 @@ export function initUi(G) {
     for (const x of list) swap(x);
     if (n.querySelector) settingsRow(n);
   }
-  // Settings → Graphics gets the switch for the whole layer, and the credit the pictographs ask for
+  // Settings → Graphics gets the switch for the whole layer, and a line saying what it does
   function settingsRow(n) {
     const b = n.querySelector('button[data-o="gfx"]'); if (!b) return;
     const seg = b.parentElement, card = seg.parentElement; if (card.querySelector('[data-o="art"]')) return;
     const p = document.createElement('p'); p.className = 'setl'; p.textContent = 'New art';
     const s = document.createElement('div'); s.className = 'seg'; s.innerHTML = `<button data-o="art" data-v="1" class="${SET.art ? 'on' : ''}">On</button><button data-o="art" data-v="0" class="${SET.art ? '' : 'on'}">Off</button>`;
-    const c = document.createElement('p'); c.className = 'artnote'; c.innerHTML = 'New art adds sun shadows, glow, weather, combat effects and the interface skin. Pictographs: <a href="https://game-icons.net" target="_blank" rel="noopener" style="color:inherit">game-icons.net</a> (Lorc, Delapouite and others, CC BY 3.0).';
+    const c = document.createElement('p'); c.className = 'artnote'; c.textContent = 'New art adds sun shadows, glow, weather, combat effects, new models and the interface skin.';
     seg.after(p, s, c);
   }
   function revert() { document.querySelectorAll('.pic').forEach(p => p.replaceWith(document.createTextNode(p.textContent))); document.querySelectorAll('[style*="--pc"]').forEach(e => e.style.removeProperty('--pc')); }
@@ -81,7 +81,7 @@ export function initUi(G) {
     if (!r) {
       r = { cv: null }; imgs.set(key, r);
       const im = new Image(); im.onload = () => { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d'); g.drawImage(im, 0, 0, 64, 64); g.globalCompositeOperation = 'source-in'; g.fillStyle = col || '#fff'; g.fillRect(0, 0, 64, 64); r.cv = cv; };
-      im.src = `${G.base}icons/${icon}.svg`;
+      im.src = `${G.base}icons/${icon}.svg?v=${G.version}`;
     }
     return r.cv;
   }

@@ -23,4 +23,4 @@ Everything visual that is not game rules lives here, so the games can keep chang
 - A new zone gets the default grade. To give it its own, add its zone key to the game's `art/theme.js`.
 - New models, zones and effects need nothing: shadows and lighting pick them up as they are built.
 
-See `CREDITS.md` for the pictographs' licence.
+The pictographs are our own. They are drawn in code: `draw/glyphs.mjs` holds the base shapes, `draw/specs.mjs` says which shapes and marks each name gets, and `node artkit/draw/build.mjs` writes `icons/`. Nothing in this folder comes from an icon library or asset pack.

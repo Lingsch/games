@@ -1,6 +1,6 @@
 // Which pictograph stands in for each emoji the games use, and the colour it is drawn in.
 // The games still write emoji; the interface skin swaps each for its pictograph as it appears.
-// To change one, change its name here: the names are the files in artkit/icons/ (from game-icons.net, see CREDITS.md).
+// To change one, change its name here: the names are the files in artkit/icons/ (all drawn in artkit/draw/, see the README).
 const W = '#e9dcc0', STEEL = '#b9c7d8', FIRE = '#ff9a4a', ICE = '#9fe6ff', STORM = '#c9b8ff', EARTH = '#d8b27a', HOLY = '#ffe9a0', DARK = '#c08aff',
   LIFE = '#8fe07a', BLOOD = '#ff6a5a', GOLD = '#ffd34d', POISON = '#a8e85a', WATER = '#6fc0ff', PINK = '#ff9ad0';
 export const EMOJI = {
