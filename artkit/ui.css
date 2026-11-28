@@ -1,0 +1,103 @@
+/* Art layer, part 3: the interface skin. Loaded only while the art is on; every rule is scoped to html.art,
+   so the game's own styles are untouched. Two looks share one structure: fantasy (bronze on dark leather)
+   and scifi (cyan light on dark glass). Sizes and positions are the game's own; only the surface changes. */
+html.art{--a1:rgba(46,35,24,.93);--a2:rgba(19,15,11,.95);--edge:#6f5631;--edge2:#c9a25a;--hi:rgba(255,232,186,.2);--glow:rgba(224,176,64,.0);--rad:6px;--krad:8px;
+  --btn1:rgba(96,74,44,.62);--btn2:rgba(40,31,20,.78);--on1:#f3cf6c;--on2:#b9832a;--onink:#1c1307;--panel1:#261d14;--panel2:#15110c;--card:rgba(255,232,186,.045);--cardline:rgba(190,150,84,.3);
+  --plate:rgba(24,19,14,.9);--line:rgba(214,176,110,.26);--acc:#e8b949;--ink:#f1e4c6;--dim:#b9a987;--cut:none}
+html.art.art-scifi{--a1:rgba(12,26,44,.86);--a2:rgba(4,10,20,.9);--edge:#1f6f8c;--edge2:#52e0ff;--hi:rgba(120,230,255,.22);--glow:rgba(64,216,255,.28);--rad:2px;--krad:3px;
+  --btn1:rgba(26,70,96,.6);--btn2:rgba(8,22,36,.8);--on1:#7af0ff;--on2:#1aa6c8;--onink:#021018;--panel1:#0c1a2a;--panel2:#060d17;--card:rgba(120,220,255,.05);--cardline:rgba(80,200,240,.28);
+  --plate:rgba(8,18,30,.88);--line:rgba(96,214,255,.26);--acc:#5fe3ff;--ink:#dff6ff;--dim:#8fb4c4;
+  --cut:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
+
+/* pictographs: a masked block that takes the colour it is given */
+.pic{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.2em;background:var(--pc,currentColor) !important;padding:0 !important;border-radius:0 !important;box-shadow:none !important;-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat;flex:none}
+.pic .pe{display:none}
+
+/* plates, frames and bars */
+html.art .plate,html.art #cmds button,html.art #mapbtns button,html.art #util button,html.art #cycle{background:linear-gradient(180deg,var(--a1),var(--a2));border:1px solid var(--edge);border-radius:var(--rad);
+  box-shadow:inset 0 1px 0 var(--hi),inset 0 0 0 1px rgba(0,0,0,.45),0 2px 7px rgba(0,0,0,.55),0 0 10px var(--glow);-webkit-backdrop-filter:none;backdrop-filter:none}
+html.art #me,html.art #tgt{border-color:var(--edge2)}
+html.art #me::before,html.art #tgt::before,html.art #me::after,html.art #tgt::after{content:"";position:absolute;width:7px;height:7px;background:var(--edge2);transform:rotate(45deg);box-shadow:0 0 0 1px #000,0 0 6px var(--glow)}
+html.art #me::before,html.art #tgt::before{left:-4px;top:calc(50% - 4px)}html.art #me::after,html.art #tgt::after{right:-4px;top:calc(50% - 4px)}
+html.art.art-scifi #me,html.art.art-scifi #tgt,html.art.art-scifi #castbar,html.art.art-scifi .pf{clip-path:var(--cut)}
+html.art.art-scifi #me::before,html.art.art-scifi #me::after,html.art.art-scifi #tgt::before,html.art.art-scifi #tgt::after{display:none}
+html.art .fname{text-shadow:0 1px 2px #000}html.art .fname b{color:var(--ink)}html.art .fname small{color:var(--acc)}
+html.art .bar{background:rgba(0,0,0,.62);border-radius:2px;box-shadow:inset 0 1px 2px rgba(0,0,0,.9),0 0 0 1px rgba(0,0,0,.75),0 0 0 1.5px color-mix(in srgb,var(--edge) 70%,transparent)}
+html.art .bar i{background-image:linear-gradient(180deg,rgba(255,255,255,.42),rgba(255,255,255,.06) 42%,rgba(0,0,0,.28)) !important;box-shadow:inset -1px 0 0 rgba(255,255,255,.35)}
+html.art .bar span{text-shadow:0 1px 1px #000,0 0 3px #000,0 0 3px #000}
+html.art .pf{background:linear-gradient(90deg,color-mix(in srgb,var(--c) 24%,var(--a2)),var(--a2) 55%);border-radius:var(--rad);box-shadow:inset 0 0 0 1px var(--edge),inset 0 1px 0 var(--hi),0 1px 5px rgba(0,0,0,.5);-webkit-backdrop-filter:none;backdrop-filter:none}
+html.art .pf.sel{box-shadow:inset 0 0 0 1px var(--edge),0 0 0 1.5px var(--edge2),0 0 10px color-mix(in srgb,var(--edge2) 60%,transparent)}
+html.art #buffs>span,html.art .pbuffs>span{background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.6));box-shadow:inset 0 0 0 1px var(--line);border-radius:3px}
+html.art .pbuffs.tb>span.mine{box-shadow:inset 0 0 0 1px #ffd34d,0 0 5px rgba(255,211,77,.5)}
+html.art #cmds button.on,html.art button.pri,html.art .tabs button.on,html.art .seg button.on,html.art .bkGroups button.on,html.art .bkSubs button.on,html.art .bkSide button.on,html.art .fpick button.on,html.art #act{
+  background:linear-gradient(180deg,var(--on1),var(--on2));color:var(--onink);border-color:color-mix(in srgb,var(--on1) 70%,#fff);box-shadow:inset 0 1px 0 rgba(255,255,255,.5),0 1px 6px rgba(0,0,0,.5),0 0 10px var(--glow);text-shadow:0 1px 0 rgba(255,255,255,.3)}
+html.art #mini{border:2px solid var(--edge2);box-shadow:0 0 0 1px #000,0 0 0 3px var(--a2),0 0 0 4px var(--edge),0 3px 10px rgba(0,0,0,.6),0 0 14px var(--glow)}
+html.art #zone{color:var(--ink);text-shadow:0 1px 2px #000,0 0 4px #000}
+html.art #tgtX{background:linear-gradient(180deg,var(--btn1),var(--btn2));border-color:var(--edge)}
+html.art #castbar{border-color:var(--edge2)}html.art #castbar i{background:linear-gradient(90deg,var(--on2),var(--on1)) !important;box-shadow:0 0 8px var(--on1)}
+html.art #xp{height:4px;box-shadow:0 0 0 1px rgba(0,0,0,.8)}html.art #xp i{background:linear-gradient(90deg,#7a4ad0,#d0a2ff);box-shadow:0 0 6px #b884ff}
+html.art #xp.capped::after{content:"";width:11px;height:11px;top:-14px;background:var(--acc);-webkit-mask:var(--lock) center/contain no-repeat;mask:var(--lock) center/contain no-repeat}
+
+/* the bar: each key is a framed tile with its pictograph lit in the colour of its school */
+html.art .k,html.art #cycle{border-radius:var(--krad);border:1px solid #0c0906;
+  background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--pc,var(--c,#777)) 38%,#16110c),#0c0907 82%);
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pc,var(--c,#777)) 55%,var(--edge)),inset 0 0 0 2.5px rgba(0,0,0,.55),inset 0 3px 3px 1px var(--hi),0 2px 6px rgba(0,0,0,.65)}
+html.art .k .ic{font-size:calc(var(--key) * .56);line-height:1;display:flex;margin-top:-3px}
+html.art .k .ic .pic,html.art .sp .ic .pic,html.art .cls .ic .pic,html.art #barEdit .pic{background:linear-gradient(180deg,#fff,var(--pc,currentColor) 50%,color-mix(in srgb,var(--pc,currentColor) 62%,#000)) !important;filter:drop-shadow(0 1px 1px rgba(0,0,0,.9)) drop-shadow(0 0 3px color-mix(in srgb,var(--pc,currentColor) 55%,transparent))}
+html.art .k .lab{bottom:0;left:0;right:0;padding:3px 2px 1px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.82) 45%);font-size:7px;letter-spacing:.02em}
+html.art .k .sw{background:conic-gradient(rgba(4,3,2,.78) var(--p),transparent 0)}
+html.art .k .num{font:800 14px Cinzel,serif;color:#fff;text-shadow:0 1px 0 #000,0 0 4px #000}
+html.art .k.on{box-shadow:inset 0 0 0 2px var(--on1),0 0 10px color-mix(in srgb,var(--on1) 70%,transparent)}
+html.art .k.ultk{box-shadow:inset 0 0 0 1.5px #ffd34d,inset 0 0 0 2.5px rgba(0,0,0,.55),inset 0 0 12px rgba(255,211,77,.25),0 2px 6px rgba(0,0,0,.65)}
+html.art .k.rkup{outline:none;box-shadow:inset 0 0 0 1.5px var(--rk),inset 0 0 0 2.5px rgba(0,0,0,.55),inset 0 0 9px color-mix(in srgb,var(--rk) 45%,transparent),0 2px 6px rgba(0,0,0,.65)}
+html.art .k .uf{height:3px;background:linear-gradient(90deg,#c08a2a,#ffe48a);box-shadow:0 0 6px #ffd34d}
+html.art .rk{border-radius:2px;font-family:Cinzel,serif;box-shadow:0 0 0 1px rgba(0,0,0,.6)}
+html.art #cycle{font-size:calc(var(--key) * .5);--pc:#c9665a}html.art #cycle small{font-size:8px;color:var(--dim)}
+html.art #util button{font-size:17px;min-width:36px;min-height:32px}html.art #util button small{color:#fff;text-shadow:0 1px 1px #000,0 0 3px #000}
+html.art #joy{border-color:color-mix(in srgb,var(--edge2) 55%,transparent);background:radial-gradient(circle,rgba(0,0,0,.05),rgba(0,0,0,.35));box-shadow:inset 0 0 12px rgba(0,0,0,.4)}
+html.art #joy i{background:radial-gradient(circle at 40% 35%,color-mix(in srgb,var(--edge2) 85%,#fff),var(--edge));box-shadow:0 2px 6px rgba(0,0,0,.6);opacity:.8}
+
+/* names over heads, and the numbers that fly out of a fight */
+html.art .np{text-shadow:0 1px 0 #000,0 0 3px #000,0 0 5px rgba(0,0,0,.8)}
+html.art .np .pic{width:1em;height:1em;vertical-align:-.14em;filter:drop-shadow(0 1px 1px #000)}
+html.art .np .bar{width:50px;height:5px}
+html.art .np .mk{text-shadow:0 0 8px #ffd34d,0 1px 0 #000;animation:artbob 1.4s ease-in-out infinite}
+@keyframes artbob{50%{transform:translateY(-3px)}}
+html.art .ft{font:800 16px Cinzel,"Alegreya Sans",serif;-webkit-text-stroke:.7px rgba(0,0,0,.85);paint-order:stroke fill;text-shadow:0 2px 0 rgba(0,0,0,.9),0 0 7px currentColor}
+html.art .ft.big{font-size:27px;animation:artpop .3s cubic-bezier(.2,1.9,.4,1)}
+@keyframes artpop{0%{transform:translate(-50%,-50%) scale(2.2)}100%{transform:translate(-50%,-50%) scale(1)}}
+html.art #toast{letter-spacing:.08em;text-shadow:0 2px 0 #000,0 0 14px rgba(0,0,0,.9),0 0 22px color-mix(in srgb,var(--acc) 50%,transparent)}
+html.art #chat{text-shadow:0 1px 0 #000,0 0 3px #000,0 0 6px rgba(0,0,0,.7)}
+
+/* panels: the Book, shops, talk, settings, the title */
+html.art button{background:linear-gradient(180deg,var(--btn1),var(--btn2));border:1px solid var(--edge);border-radius:var(--rad);box-shadow:inset 0 1px 0 var(--hi);text-shadow:0 1px 1px rgba(0,0,0,.7)}
+html.art #sheetIn{background:linear-gradient(180deg,var(--panel1),var(--panel2));border:1px solid var(--edge2);box-shadow:inset 0 0 0 1px rgba(0,0,0,.6),inset 0 0 0 2px color-mix(in srgb,var(--edge) 60%,transparent),0 10px 40px rgba(0,0,0,.7),0 0 24px var(--glow)}
+html.art #sheetHead{border-bottom:1px solid var(--cardline);padding-bottom:7px;position:relative}
+html.art #sheetHead::after{content:"";position:absolute;left:0;bottom:-1px;width:64px;height:2px;background:linear-gradient(90deg,var(--edge2),transparent)}
+html.art #sheetHead h2,html.art .card h3,html.art #bmTop b{background:linear-gradient(180deg,color-mix(in srgb,var(--on1) 55%,#fff),var(--acc));-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;letter-spacing:.03em}
+html.art .card h3{-webkit-text-fill-color:var(--ink);color:var(--ink);background:none}
+html.art .bk .bkTop{background:var(--panel1)}
+html.art .card{background:linear-gradient(180deg,var(--card),transparent);border:1px solid var(--cardline);border-radius:var(--rad);box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
+html.art .card.it,html.art .it{background:linear-gradient(90deg,color-mix(in srgb,var(--c) 15%,transparent),transparent 62%),linear-gradient(180deg,var(--card),transparent)}
+html.art .it b{text-shadow:0 0 8px color-mix(in srgb,var(--c) 45%,transparent)}
+html.art .cls .ic,html.art .sp .ic,html.art #barEdit button{border-radius:var(--krad);border:1px solid #0c0906;background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--pc,var(--c,#888)) 34%,#16110c),#0c0907 82%);
+  box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--pc,var(--c,#888)) 50%,var(--edge)),inset 0 0 0 2.5px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center}
+html.art .sp .ic{width:38px;height:38px;flex:none}
+html.art .stat{border-bottom-color:var(--cardline)}
+html.art .say{background:linear-gradient(180deg,var(--card),transparent);border-color:var(--cardline)}html.art .opt{background:linear-gradient(180deg,var(--btn1),var(--btn2))}
+html.art .opt.hl{border-color:var(--edge2);box-shadow:inset 0 1px 0 var(--hi),0 0 8px color-mix(in srgb,var(--edge2) 35%,transparent)}
+html.art #tip{background:linear-gradient(180deg,var(--panel1),var(--panel2));border:1px solid var(--edge2);box-shadow:0 4px 16px rgba(0,0,0,.7)}
+html.art .roll{background:linear-gradient(180deg,var(--panel1),var(--panel2));border-radius:var(--rad)}
+html.art #title{background:radial-gradient(ellipse at 50% 38%,rgba(8,10,14,.12),rgba(6,7,10,.86))}
+html.art #titleIn h1{background:linear-gradient(180deg,#fff6d8,var(--on1) 48%,var(--on2));-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent;filter:drop-shadow(0 3px 8px rgba(0,0,0,.75));letter-spacing:.04em;font-size:34px}
+html.art .tmenu button{box-shadow:inset 0 1px 0 var(--hi),0 3px 12px rgba(0,0,0,.5)}
+html.art #death .plate{border-color:#a8362c;box-shadow:0 0 40px rgba(200,40,30,.35),inset 0 1px 0 var(--hi)}
+html.art input[type=text],html.art textarea,html.art .fsel,html.art .sayf input{background:rgba(0,0,0,.45);border-color:var(--edge);border-radius:var(--rad)}
+html.art #sceneCap b{letter-spacing:.06em}
+html.art .bkGroups button span{font-size:19px}html.art .bkSide button .pic,html.art .bkSubs button .pic{font-size:15px}
+html.art .fam span{font-size:20px}html.art .wpn .wi,html.art .wpick .wi{font-size:24px}
+html.art .artnote{font-size:11px;color:var(--dim);margin:6px 0 0}
+html.art.art-scifi .ft,html.art.art-scifi .k .num,html.art.art-scifi .rk{font-family:Orbitron,"Exo 2",sans-serif}
+html.art.art-scifi .k,html.art.art-scifi #cycle,html.art.art-scifi .cls .ic,html.art.art-scifi .sp .ic,html.art.art-scifi #barEdit button{background:radial-gradient(circle at 50% 30%,color-mix(in srgb,var(--pc,var(--c,#4ad)) 30%,#06121e),#03080f 82%);clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+html.art.art-scifi #titleIn h1{background:linear-gradient(180deg,#f2fdff,var(--on1) 50%,var(--on2));-webkit-background-clip:text;background-clip:text;letter-spacing:.12em}
+html.art.art-scifi .bar{border-radius:0}html.art.art-scifi #mini{box-shadow:0 0 0 1px #000,0 0 0 3px var(--a2),0 0 0 4px var(--edge),0 0 16px var(--glow)}

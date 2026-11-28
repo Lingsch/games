@@ -211,6 +211,9 @@
   function arm() {
     booted = true;
     if (armed) return; armed = true;
+    // The art layer (lighting, effects, interface skin; see artkit/) loads from each game's own index.html.
+    // If a rebuilt index.html has lost that line, load it from here so the art does not quietly vanish.
+    try { if ((G.game === "mmo" || G.game === "stars") && !window.__ART) setTimeout(function () { if (window.__ART) return; var s = document.createElement("script"); s.type = "module"; s.src = "art/art.js"; document.head.appendChild(s); }, 3000); } catch (e) { }
     document.addEventListener("visibilitychange", function () { if (document.hidden) flush(); else syncOnce({ quiet: true }); });
     addEventListener("pagehide", flush);
   }

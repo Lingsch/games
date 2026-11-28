@@ -318,6 +318,7 @@ h3.qt{margin:4px 0 6px;font:700 15px Cinzel,serif}h3.qt .dim{font:500 12px 'Aleg
 // Save sync first (so the newest save is in place), then the game.
 if (window.RodSync) { try { await RodSync.start({ game: "mmo", keys: ["ossuary-mmo-1"] }); } catch (e) { console.warn(e); } }
 await import("./js/main.js");
+try { await import("./art/art.js"); } catch (e) { console.warn("art layer", e); }   // the art layer: lighting, effects, interface skin (see artkit/)
 if (window.RodSync) RodSync.arm();
 </script>
 </body></html>
