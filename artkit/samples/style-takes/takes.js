@@ -1,10 +1,12 @@
 import * as THREE from '../../../vendor/three.module.min.js';
 // Three takes on one style: the same knight, wizard and wolf, designed from scratch, at three sets of proportions.
+const C = { head: .19, torso: .52, leg: .62, sw: .29, limb: .1, hand: 1.6, foot: 1.7, eye: 1.15, pauld: 1.25, weap: 1.15, line: .015, facet: 1, sat: 1.05 };
 const TAKES = [
-  { name: 'A  Bold heroes', sub: 'tall, broad, heavy armour, oversized weapons', head: .155, torso: .62, leg: .84, sw: .36, limb: .085, hand: 1.5, foot: 1.5, eye: .95, pauld: 1.55, weap: 1.35, line: .011, facet: 0, sat: 1 },
-  { name: 'B  Storybook', sub: 'big heads, big eyes, small simple bodies', head: .3, torso: .4, leg: .4, sw: .2, limb: .062, hand: 1.25, foot: 1.35, eye: 1.9, pauld: .95, weap: 1.0, line: .014, facet: 0, sat: 1.12 },
-  { name: 'C  Chunky carved', sub: 'in between: thick limbs, big hands, faceted like carved wood', head: .215, torso: .5, leg: .6, sw: .29, limb: .1, hand: 1.75, foot: 1.7, eye: 1.45, pauld: 1.25, weap: 1.15, line: .017, facet: 1, sat: 1.05 },
+  { ...C, face: 1, name: 'C1  Hooded eyes', sub: 'narrow eyes under heavy lids, long face, strong jaw' },
+  { ...C, face: 2, name: 'C2  Simple dark eyes', sub: 'no whites at all: the brows and mouth do the acting' },
+  { ...C, face: 3, name: 'C3  Open eyes, adult features', sub: 'larger eyes, but with lids, cheekbones and a real nose' },
 ];
+const shade = (c, k) => '#' + new THREE.Color(c).multiplyScalar(k).getHexString();
 const ramp = new THREE.DataTexture(new Uint8Array([70, 70, 70, 255, 150, 150, 150, 255, 215, 215, 215, 255, 255, 255, 255, 255]), 4, 1); ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true;
 let S, uLine = { value: .012 };
 const mats = new Map();
@@ -29,21 +31,28 @@ const J = (p, x, y, z, rx = 0, ry = 0, rz = 0) => { const g = new THREE.Group();
 const ext = (pts, d, bev = .01) => { const s = new THREE.Shape(); pts.forEach((p, i) => i ? s.lineTo(p[0], p[1]) : s.moveTo(p[0], p[1])); const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: bev > 0, bevelThickness: bev, bevelSize: bev, bevelSegments: 2 }); g.translate(0, 0, -d / 2); return g; };
 
 function face(p, R, o) {
-  const skin = mat(o.skin), dk = mat('#2a1c14'), wh = mat('#fbf7ee');
-  A(p, sph(R), skin, 0, 0, 0, 0, 0, 0, 1, 1.06, 1);
-  A(p, sph(R * .62), skin, 0, -R * .52, R * .16, 0, 0, 0, o.jaw || 1, .7, .95);                 // jaw and chin
-  const er = Math.min(R * .4, R * .17 * S.eye), ex = Math.max(R * .36, er * 1.04), ey = R * .1, ez = R * .84;
+  const skin = mat(o.skin), sk2 = mat(shade(o.skin, .8)), dk = mat('#2a1c14'), wh = mat('#fbf7ee'), F = S.face, hair = mat(o.hair);
+  A(p, sph(R), skin, 0, R * .1, 0, 0, 0, 0, .9, 1.14, .97);                                       // skull, taller than it is wide
+  A(p, sph(R * .7), skin, 0, -R * .52, R * .1, 0, 0, 0, (o.jaw || 1) * 1.08, .66, .95);           // square jaw
+  A(p, sph(R * .3), skin, 0, -R * .9, R * .4, 0, 0, 0, 1.15, .6, .8);                            // chin
+  if (o.stubble) A(p, sph(R * .72), mat(o.stubble), 0, -R * .6, R * .08, 0, 0, 0, (o.jaw || 1) * 1.1, .6, .97, false);
+  const er = R * (F === 2 ? .11 : F === 1 ? .125 : .165), ex = R * .36, ey = R * .22, ez = R * .8;
   for (const s of [-1, 1]) {
-    A(p, sph(er), wh, s * ex, ey, ez, 0, s * .25, 0, 1, 1.15, .5);
-    A(p, sph(er * .62), mat(o.iris), s * ex * .97, ey - er * .05, ez + er * .34, 0, 0, 0, 1, 1.1, .4, false);
-    A(p, sph(er * .34), dk, s * ex * .96, ey - er * .05, ez + er * .47, 0, 0, 0, 1, 1.1, .35, false);
-    A(p, sph(er * .16), mat('#ffffff', 1), s * ex * .96 - er * .22, ey + er * .28, ez + er * .56, 0, 0, 0, 1, 1, .4, false);
-    A(p, box(R * .44, R * .1, R * .12), mat(o.hair), s * ex, ey + er * 1.3 + R * .06, ez + R * .02, 0, 0, -s * o.brow + (s > 0 ? (o.brow2 || 0) : 0));
-    A(p, sph(R * .2), skin, s * R * .98, R * .02, -R * .05, 0, 0, 0, .45, 1, .75);               // ears
+    A(p, sph(R * .28), skin, s * R * .56, -R * .12, R * .58, 0, 0, 0, 1, .6, .7, false);          // cheekbone
+    if (F === 2) { A(p, sph(er), dk, s * ex, ey, ez + R * .04, 0, s * .2, -s * .1, 1.35, .8, .45, false); A(p, sph(er * .22), mat('#ffffff', 1), s * ex - er * .3, ey + er * .2, ez + R * .04 + er * .45, 0, 0, 0, 1, 1, .4, false); }
+    else { A(p, sph(er), wh, s * ex, ey, ez, 0, s * .25, 0, 1.3, F === 1 ? .62 : .8, .45);
+      A(p, sph(er * .6), mat(o.iris), s * ex * .97, ey, ez + er * .3, 0, 0, 0, 1, 1, .4, false); A(p, sph(er * .3), dk, s * ex * .96, ey, ez + er * .42, 0, 0, 0, 1, 1, .35, false);
+      A(p, sph(er * .13), mat('#ffffff', 1), s * ex * .96 - er * .2, ey + er * .18, ez + er * .5, 0, 0, 0, 1, 1, .4, false); }
+    A(p, sph(er * 1.35), sk2, s * ex, ey + er * (F === 3 ? .78 : .62), ez - er * .15, 0, s * .25, -s * .14, 1.3, .5, .62, false);   // upper lid
+    A(p, box(R * .5, R * .13, R * .17), hair, s * ex * 1.02, ey + er * 1.05 + R * .07, ez + R * .05, 0, s * .2, -s * o.brow + (s > 0 ? (o.brow2 || 0) : 0));
+    A(p, sph(R * .2), skin, s * R * .9, R * .04, -R * .05, 0, 0, 0, .45, 1.1, .75);                // ears
   }
-  A(p, sph(R * .15), mat(o.nose || o.skin), 0, -R * .16, R * 1.0, 0, 0, 0, 1, 1.05, 1.2);
-  if (o.mouth === 'grin') A(p, tor(R * .26, R * .035, Math.PI * .8), dk, 0, -R * .34, R * .82, .25, 0, Math.PI * 1.1, 1, 1, 1, false);
-  else A(p, box(R * .36, R * .05, R * .06), dk, R * .03, -R * .5, R * .86, 0, 0, o.mouth === 'smirk' ? .14 : 0, 1, 1, 1, false);
+  A(p, box(R * .15, R * .5, R * .2), skin, 0, R * .02, R * .93, -.22, 0, 0, 1, 1, 1, false);       // bridge of the nose
+  A(p, sph(R * .17), mat(o.nose || shade(o.skin, .9)), 0, -R * .24, R * 1.04, 0, 0, 0, 1.15, .85, 1.05);
+  A(p, box(R * .44, R * .05, R * .06), dk, R * .02, -R * .56, R * .82, 0, 0, o.mouth === 'smirk' ? .1 : o.mouth === 'grin' ? 0 : -.04, 1, 1, 1, false);
+  if (o.mouth === 'grin') for (const s of [-1, 1]) A(p, box(R * .1, R * .05, R * .06), dk, s * R * .25 + R * .02, -R * .52, R * .8, 0, 0, s * .6, 1, 1, 1, false);
+  A(p, sph(R * .12), sk2, R * .02, -R * .68, R * .78, 0, 0, 0, 1.4, .5, .6, false);                 // lower lip
+  if (o.scar) A(p, box(R * .05, R * .62, R * .04), mat(shade(o.skin, 1.18)), -R * .5, R * .12, R * .78, 0, -.5, .28, 1, 1, 1, false);
 }
 function hand(p, r, m) { const k = r * S.hand; A(p, sph(k), m, 0, 0, 0, 0, 0, 0, .95, 1.1, 1); A(p, sph(k * .5), m, k * .7, k * .2, k * .5, 0, 0, 0, .8, 1.2, .8); }
 
@@ -79,12 +88,12 @@ function knight() {
       A(B, ext(sp, .06, .02), red, 0, 0, 0, 0, 0, 0, k, k, 1); A(B, ext(sp, .03, .012), st, 0, 0, -.03, 0, 0, 0, k * 1.08, k * 1.08, 1);
       A(B, box(k * .12, k * 1.0, .03), gold, 0, -k * .03, .045); A(B, box(k * .8, k * .12, .03), gold, 0, k * .2, .045); A(B, sph(k * .12), gold, 0, k * .2, .05, 0, 0, 0, 1, 1, .5); }
   }
-  A(g, cyl(R * .5, R * .62, R * .5), sd, 0, sh + R * .1, 0);                                    // gorget
-  const Hd = J(g, 0, sh + R * 1.05, 0, .04, -.18, 0); face(Hd, R, { skin: '#e8b48a', iris: '#3f7fd0', hair: '#5a371c', brow: .28, mouth: 'smirk', jaw: 1.15 });
-  A(Hd, dome(R * 1.13, .5), st, 0, R * .1, -R * .02, -.12); A(Hd, tor(R * 1.1, R * .09), gold, 0, R * .2, -R * .04, Math.PI / 2 - .12, 0, 0);
+  A(g, cyl(R * .5, R * .62, R * .5), sd, 0, sh + R * .1, 0); A(g, cyl(R * .4, R * .44, R * .5), mat('#d9a47c'), 0, sh + R * .45, 0);                                    // gorget
+  const Hd = J(g, 0, sh + R * 1.3, 0, .04, -.18, 0); face(Hd, R, { skin: '#d9a47c', iris: '#3f7fd0', hair: '#4a2e18', brow: .24, mouth: 'smirk', jaw: 1.18, stubble: '#b88a68', scar: 1 });
+  A(Hd, dome(R * 1.1, .5), st, 0, R * .5, -R * .04, -.1); A(Hd, tor(R * 1.07, R * .08), gold, 0, R * .58, -R * .06, Math.PI / 2 - .1, 0, 0);
   for (const s of [-1, 1]) A(Hd, ext([[-.5, .5], [.5, .5], [.4, -.5], [-.1, -.8]], .1, .03), st, s * R * 1.02, -R * .2, R * .12, 0, s * 1.35, 0, R * .7, R * .9, R);
-  A(Hd, box(R * .14, R * .7, R * .1), st, 0, R * .32, R * 1.03, -.1);
-  for (let i = 0; i < 6; i++) A(Hd, sph(R * (.3 - i * .025)), red, 0, R * (1.25 - i * i * .03), -R * (i * .26 - .25), 0, 0, 0, .55, 1, 1);   // plume
+  A(Hd, box(R * .11, R * .42, R * .08), st, 0, R * .5, R * 1.0, -.1);
+  for (let i = 0; i < 6; i++) A(Hd, sph(R * (.3 - i * .025)), red, 0, R * (1.65 - i * i * .03), -R * (i * .26 - .25), 0, 0, 0, .55, 1, 1);   // plume
   return g;
 }
 function wizard() {
@@ -106,7 +115,7 @@ function wizard() {
     else { A(H, sph(.11), mat('#ffb347', 1), 0, -.2, .05); A(H, sph(.15), mat('#ff7a2a'), 0, -.2, .05, 0, 0, 0, 1, 1, 1, false).material = new THREE.MeshBasicMaterial({ color: '#ff7a2a', transparent: true, opacity: .35 });
       for (let i = 0; i < 5; i++) A(H, fac(new THREE.OctahedronGeometry(.03)), mat('#ffd98a', 1), Math.cos(i * 1.26) * .22, -.2 + Math.sin(i * 2.1) * .1, .05 + Math.sin(i * 1.26) * .22); }
   }
-  const Hd = J(g, 0, sh + R * .95, 0, 0, .22, .05); face(Hd, R, { skin: '#e8b48a', iris: '#6a4bc9', hair: '#f1ece0', brow: -.12, brow2: .35, mouth: 'grin', nose: '#dd9a78' });
+  A(g, cyl(R * .38, R * .42, R * .5), mat('#e0ac86'), 0, sh + R * .25, 0); const Hd = J(g, 0, sh + R * 1.2, 0, 0, .22, .05); face(Hd, R, { skin: '#e0ac86', iris: '#6a4bc9', hair: '#f1ece0', brow: -.1, brow2: .3, mouth: 'grin', nose: '#cf9070' });
   A(Hd, cone(R * .7, R * 1.9, 9), wh, 0, -R * 1.25, R * .5, Math.PI + .28, 0, 0, 1, 1, .6); for (const s of [-1, 1]) { A(Hd, sph(R * .32), wh, s * R * .42, -R * .5, R * .78, 0, 0, s * .5, 1.3, .6, .6); A(Hd, sph(R * .4), wh, s * R * .92, R * .1, -R * .1, 0, 0, 0, .5, 1.1, 1); }
   const Hat = J(Hd, 0, R * .55, -R * .05, -.16, 0, .1); A(Hat, cyl(R * 2.0, R * 2.1, R * .09, 18), robe2, 0, 0, 0); A(Hat, tor(R * 2.05, R * .06), trim, 0, 0, 0, Math.PI / 2);
   A(Hat, cyl(R * .72, R * 1.05, R * .9, 14), robe, 0, R * .45, 0); A(Hat, cyl(R * 1.04, R * 1.07, R * .2, 14), trim, 0, R * .14, 0);
@@ -134,16 +143,18 @@ function wolf() {
   const T = J(B, 0, .12, -.6, -2.1, 0, 0); A(T, lathe([[.01, 0], [.07, .06], [.13, .3], [.1, .5], [.01, .66]], 10), fur, 0, 0, 0); A(T, cone(.09, .22, 8), fur2, 0, .58, 0);
   return g;
 }
-const W = 1100, H = 620, r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(W, H); r.setPixelRatio(1.5); r.outputColorSpace = THREE.SRGBColorSpace;
+const W = 1100, H = 560, r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(W, H); r.setPixelRatio(1.5); r.outputColorSpace = THREE.SRGBColorSpace;
 for (const t of TAKES) {
   S = t; uLine.value = t.line; mats.clear();
   const sc = new THREE.Scene(); sc.background = new THREE.Color('#aeb9c6'); sc.add(new THREE.HemisphereLight('#ffffff', '#8a7a6a', 1.5)); const d = new THREE.DirectionalLight('#fff4e0', 2.6); d.position.set(-3, 5, 6); sc.add(d);
   const gr = new THREE.Mesh(new THREE.CircleGeometry(9, 40), new THREE.MeshBasicMaterial({ color: '#8fa07a' })); gr.rotation.x = -Math.PI / 2; sc.add(gr);
   [[knight, -1.5, .3], [wizard, .15, -.25], [wolf, 1.8, -1.05]].forEach(([f, x, ry]) => { const m = f(); m.position.x = x; m.rotation.y = ry; sc.add(m);
     const sh = new THREE.Mesh(new THREE.CircleGeometry(f === wolf ? .75 : .5, 24), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: .22 })); sh.rotation.x = -Math.PI / 2; sh.position.set(x, .005, 0); sc.add(sh); });
-  const cam = new THREE.PerspectiveCamera(30, W / H, .1, 50); cam.position.set(0, 1.5, 6.6); cam.lookAt(.05, 1.02, 0);
-  r.render(sc, cam);
-  const box = document.createElement('div'); box.style.cssText = 'position:relative;width:' + W + 'px;margin:0 0 6px'; const im = new Image(); im.src = r.domElement.toDataURL(); im.style.cssText = 'display:block;width:' + W + 'px';
-  const cp = document.createElement('div'); cp.style.cssText = 'position:absolute;left:18px;top:12px;font:700 34px Georgia,serif;color:#1a120c'; cp.innerHTML = t.name + '<div style="font:400 20px Georgia,serif">' + t.sub + '</div>'; box.append(im, cp); document.body.append(box);
+  const box = document.createElement('div'); box.style.cssText = 'position:relative;width:' + W + 'px;margin:0 0 8px;display:flex;flex-wrap:wrap';
+  for (const [w, h, pos, at, fov] of [[1100, 400, [0, 1.35, 7.2], [.1, .98, 0], 21], [550, 400, [-1.05, 1.5, 1.75], [-1.48, 1.4, 0], 27], [550, 400, [-.2, 1.47, 1.8], [.15, 1.4, 0], 27]]) {
+    r.setSize(w, h); const cam = new THREE.PerspectiveCamera(fov, w / h, .1, 50); cam.position.set(...pos); cam.lookAt(...at); r.render(sc, cam);
+    const im = new Image(); im.src = r.domElement.toDataURL(); im.style.cssText = 'display:block;width:' + w + 'px;height:' + h + 'px'; box.append(im);
+  }
+  const cp = document.createElement('div'); cp.style.cssText = 'position:absolute;left:16px;top:10px;font:700 30px Georgia,serif;color:#1a120c'; cp.innerHTML = t.name + '<div style="font:400 18px Georgia,serif">' + t.sub + '</div>'; box.append(cp); document.body.append(box);
 }
 window.__done = 1;
