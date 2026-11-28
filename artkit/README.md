@@ -24,3 +24,21 @@ Everything visual that is not game rules lives here, so the games can keep chang
 - New models, zones and effects need nothing: shadows and lighting pick them up as they are built.
 
 The pictographs are our own. They are drawn in code: `draw/glyphs.mjs` holds the base shapes, `draw/specs.mjs` says which shapes and marks each name gets, and `node artkit/draw/build.mjs` writes `icons/`. Nothing in this folder comes from an icon library or asset pack.
+
+## Models (art steps 3 and 4)
+
+`rig.js` and `creatures.js` rebuild the games' character models while the game runs. Nothing in the games' own
+model files changes, and a model added to a game later is rebuilt the same way with no work here.
+
+- **People** (anything with two arms and a head): rounded, shaped torso; thighs and shins with a knee that bends;
+  upper arms and forearms with an elbow that bends; hands, boots and feet; a head with eyes, brows, nose, ears and
+  hair when the head is bare. Colours, sizes, hats, weapons, cloaks and trinkets are carried over from the game's
+  model. Large armour blocks are rounded off. Cloaks trail when their wearer moves.
+- **Four-legged beasts**: shaped body with shoulder and haunch, two-part legs with paws that trot in diagonal pairs,
+  a muzzle with a jaw that opens on a bite, a tail that swings.
+- **Everything else that moves**: blocks become rounded forms and long blocks become tapered limbs.
+- Static props (furniture, ore, signs) are left alone until art step 6.
+
+The pose code is the `CALC` text at the top of `rig.js`. It keeps the games' part numbers 0 to 9 and adds
+11 to 14 (shins and forearms), 15 (cloak), 21 to 34 (beast legs), 25 (tail), 27 (jaw) and a few spare ones.
+On Graphics: Low the games' own lighter models are used.

@@ -181,7 +181,7 @@ c+=(h21(gl_FragCoord.xy)-.5)/255.;gl_FragColor=vec4(c,1.);}`, outU);
     dm.onBeforeCompile = a0.obc; dm.customProgramCacheKey = () => 'artd' + key; K.mesh.customDepthMaterial = dm;
     src.onBeforeCompile = (sh, rr) => {
       a0.obc.call(src, sh, rr); sh.uniforms.uArtChar = uChar;
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uArtChar;').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*uArtChar;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uArtChar;').replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*uArtChar*(1.-.8*min(1.,dot(diffuseColor.rgb,vec3(.4))));');
     };
     src.customProgramCacheKey = () => 'artc' + key; src.needsUpdate = true;
   }
