@@ -137,10 +137,12 @@ c+=(h21(gl_FragCoord.xy)-.5)/255.;gl_FragColor=vec4(c,1.);}`, outU);
     skyU.fogCol.value.copy(R.scene.fog.color);
     return space ? 2 : inside ? 1 : 0;
   }
+  // on a phone the softer shadow filter costs several extra texture reads for every pixel on screen; the plain filter at this map size looks nearly the same
+  const PHONE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   function shadowBox() {
     const q = G.quality(), want = q === 'low' ? 0 : q === 'medium' ? 1024 : 2048;
     if (want !== shSize) {
-      shSize = want; sun.castShadow = !!want; r.shadowMap.enabled = !!want; r.shadowMap.type = THREE.PCFSoftShadowMap;
+      shSize = want; sun.castShadow = !!want; r.shadowMap.enabled = !!want; r.shadowMap.type = PHONE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
       if (want) { sun.shadow.mapSize.set(want, want); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
       R.scene.traverse(o => { if (o.material) [].concat(o.material).forEach(m => m.needsUpdate = true); });
       R.shadows.material.opacity = want ? sun0.blob * .45 : sun0.blob;

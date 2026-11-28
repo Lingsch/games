@@ -311,7 +311,9 @@ export function initRig(G) {
     raf = requestAnimationFrame(tick); let budget = 3; if (!wrapped) wrap();
     const want = G.quality() !== 'low'; if (want !== live) { live = want; all(want); }
     if (!live) return;
-    for (const k in R.kinds) { const K = R.kinds[k]; if (!K.artRig && K.n > 0) { rigKind(K, k); if (--budget <= 0) break; } }
+    // stop once this frame has spent a few milliseconds on models, so new arrivals don't stall a frame
+    const t0 = performance.now();
+    for (const k in R.kinds) { const K = R.kinds[k]; if (!K.artRig && K.n > 0) { rigKind(K, k); if (--budget <= 0 || performance.now() - t0 > 5) break; } }
   }
   function setOn(v) {
     v = !!v; if (v === on) return; on = v; cancelAnimationFrame(raf);

@@ -109,7 +109,9 @@ export function animMat(base, amp, bob, outline) {
       .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb=mix(diffuseColor.rgb,vec3(1.,.95,.85),vFlash*.85);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance+=diffuseColor.rgb*vGlow*.9;');
   };
-  base.customProgramCacheKey = () => 'anim' + amp.join(',') + bob + outline;
+  // Build 13.4: amp, bob and outline are uniforms, so every model can share one compiled shader (two: lit and outline).
+  // Baking them into the key compiled a fresh shader for every model, hundreds of them, each a stall on a phone.
+  base.customProgramCacheKey = () => outline ? 'animO' : 'anim';
   return base;
 }
 export const OUTLINE_COL = '#1a120c';
@@ -286,6 +288,37 @@ export function telegraph(kind, x, y, z, r, yaw = 0, w = .6, col = '#ff3a1a') {
 }
 export function clearTelegraphs() { for (const t of tele) t.mesh.visible = false; }
 
+// Build 13.4: the ground is one huge mesh (up to 335,000 triangles) and was drawn whole every frame, mostly off-screen.
+// Split it into tiles that share the same vertex data (so painting the ground still works on the original), so the
+// graphics chip only draws the tiles in view. The original mesh stays as world.ground for everything that reads it.
+export function chunkGround(mesh, N = 8) {
+  const g = mesh.geometry, pos = g.attributes.position, idx = g.index; if (!idx || mesh.userData.chunked) return;
+  mesh.userData.chunked = 1;
+  g.computeBoundingBox(); const bb = g.boundingBox, w = (bb.max.x - bb.min.x) / N, d = (bb.max.z - bb.min.z) / N;
+  const lists = Array.from({ length: N * N }, () => []), ia = idx.array;
+  for (let t = 0; t < ia.length; t += 3) {
+    const a = ia[t], cx = (pos.getX(a) + pos.getX(ia[t + 1]) + pos.getX(ia[t + 2])) / 3, cz = (pos.getZ(a) + pos.getZ(ia[t + 1]) + pos.getZ(ia[t + 2])) / 3;
+    const i = Math.min(N - 1, Math.max(0, Math.floor((cx - bb.min.x) / w))), j = Math.min(N - 1, Math.max(0, Math.floor((cz - bb.min.z) / d)));
+    lists[j * N + i].push(a, ia[t + 1], ia[t + 2]);
+  }
+  const big = pos.count > 65535;
+  lists.forEach(L => {
+    if (!L.length) return;
+    const cg = new THREE.BufferGeometry();
+    for (const k in g.attributes) cg.setAttribute(k, g.attributes[k]);
+    cg.setIndex(new THREE.BufferAttribute(big ? new Uint32Array(L) : new Uint16Array(L), 1));
+    const b = new THREE.Box3(); const v = new THREE.Vector3();
+    for (const q of L) b.expandByPoint(v.fromBufferAttribute(pos, q));
+    cg.boundingBox = b; cg.boundingSphere = b.getBoundingSphere(new THREE.Sphere());
+    const m = new THREE.Mesh(cg, mesh.material); m.name = 'groundTile';
+    m.receiveShadow = true; m.castShadow = false; m.userData.artSh = 1; m.userData.groundTile = 1;
+    mesh.add(m);
+  });
+  g.setDrawRange(0, 0);     // the original draws nothing now; its tiles do
+  // keep the tiles in step if someone swaps the ground's material later
+  const mat0 = mesh.material; delete mesh.material; mesh._mat = mat0;
+  Object.defineProperty(mesh, 'material', { configurable: true, get() { return this._mat; }, set(v) { this._mat = v; for (const c of this.children) if (c.userData.groundTile) c.material = v; } });
+}
 export function resize() {
   renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix();
   const sc = renderer.domElement.height / (2 * Math.tan(cam.fov * Math.PI / 360));

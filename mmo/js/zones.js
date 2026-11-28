@@ -3,7 +3,7 @@
 // Smuggler's Rock with the open sea caves, and a reef where the drowned war fleet lies.
 import * as THREE from './three.js';
 import { WH, TAU, clamp, lerp, smooth, mulberry32, makeNoise } from './core.js';
-import { worldGroup, toon, detailTex, grassTex, uTime, addInstanced, addChunked, propMat, propOutline, scene } from './render.js';
+import { worldGroup, toon, detailTex, grassTex, uTime, addInstanced, addChunked, propMat, propOutline, scene, chunkGround } from './render.js';
 import * as M from './models.js';
 import { build, P, T, Cone, Cyl, Box, Dod, Sph, Oct } from './models.js';
 import * as CO from './coastmodels.js';
@@ -34,7 +34,7 @@ export function groundMesh(colorAt) {
   const SZ = 2 * WH + 40, gGeo = new THREE.PlaneGeometry(SZ, SZ, 300, 300).rotateX(-Math.PI / 2), p = gGeo.attributes.position, col = new Float32Array(p.count * 3);
   for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); p.setY(i, hgt(x, z)); const c = colorAt(x, z); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   gGeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); gGeo.computeVertexNormals();
-  const m = new THREE.Mesh(gGeo, new THREE.MeshLambertMaterial({ map: detailTex, vertexColors: true })); worldGroup.add(m); world.ground = m;
+  const m = new THREE.Mesh(gGeo, new THREE.MeshLambertMaterial({ map: detailTex, vertexColors: true })); worldGroup.add(m); world.ground = m; chunkGround(m);
 }
 function minimapFrom(colorAt) {
   const mm = document.createElement('canvas'); mm.width = mm.height = 200;

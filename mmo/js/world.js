@@ -4,7 +4,7 @@
 import * as THREE from './three.js';
 import { buildTown } from './town.js';
 import { WH, setWH, TAU, clamp, lerp, smooth, mulberry32, makeNoise } from './core.js';
-import { worldGroup, toon, detailTex, grassTex, uTime, addInstanced, addChunked, propMat, propOutline } from './render.js';
+import { worldGroup, toon, detailTex, grassTex, uTime, addInstanced, addChunked, propMat, propOutline, chunkGround } from './render.js';
 import * as M from './models.js';
 import { build, P, T, Cone, Cyl, Box, Dod, Sph, Oct } from './models.js';
 const O = [0, 0, 0];
@@ -204,7 +204,7 @@ function generateVale(seed) {
       col[i * 3] = c.r * sh; col[i * 3 + 1] = c.g * sh; col[i * 3 + 2] = c.b * sh;
     }
     gGeo.setAttribute('color', new THREE.BufferAttribute(col, 3)); gGeo.computeVertexNormals(); }
-  const ground = new THREE.Mesh(gGeo, new THREE.MeshLambertMaterial({ map: detailTex, vertexColors: true })); worldGroup.add(ground); world.ground = ground;
+  const ground = new THREE.Mesh(gGeo, new THREE.MeshLambertMaterial({ map: detailTex, vertexColors: true })); worldGroup.add(ground); world.ground = ground; chunkGround(ground);
 
   // ---------- the town ----------
   const tg = new THREE.Group(); tg.position.set(town.x, town.base, town.z); worldGroup.add(tg);

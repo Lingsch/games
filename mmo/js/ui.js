@@ -352,9 +352,15 @@ function updateFrames() {
     // threat is kept hidden: tanking is read from the fight, not a meter
   }
   // quest tracker under the target frame
-  const tr = $('track'), r = tf.classList.contains('hide') ? null : tf.getBoundingClientRect();
-  tr.style.top = (r && (innerWidth / innerHeight < 4 / 3) ? r.bottom + 6 : (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--st')) || 6) + 112) + 'px';
-  { const mb = $('mapbox').getBoundingClientRect().bottom + 6; if (innerWidth / innerHeight >= 4 / 3 || parseFloat(tr.style.top) < mb) tr.style.top = mb + 'px'; }
+  // Build 13.4: reading layout every frame forces the phone to lay the page out again each frame; a few times a second is plenty
+  const tr = $('track'), nowT = performance.now();
+  if (nowT - (tr._lt || 0) > 300) {
+    tr._lt = nowT;
+    const r = tf.classList.contains('hide') ? null : tf.getBoundingClientRect();
+    let top = r && (innerWidth / innerHeight < 4 / 3) ? r.bottom + 6 : (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--st')) || 6) + 112;
+    const mb = $('mapbox').getBoundingClientRect().bottom + 6; if (innerWidth / innerHeight >= 4 / 3 || top < mb) top = mb;
+    if (tr._top !== top) { tr._top = top; tr.style.top = top + 'px'; }
+  }
   const qs = QUESTS.filter(q => S.quests[q.id] && S.quests[q.id].state !== 'turned').sort((a, b) => (b.story ? 1 : 0) - (a.story ? 1 : 0)).slice(0, 3);
   const tq = qs.map(q => { const st = S.quests[q.id]; return st.state === 'done' ? `<div class="go" data-q="${q.id}">${esc(q.name)}: <b>⤴ ${esc(GIVERS[Game.turnToOf(q)].name.split(' ').pop())}</b></div>` : `<div>${esc(q.name)}: <b>${q.obj.at ? 'travel' : st.n + '/' + q.obj.n}</b></div>`; }).join('');
   if (tr._s !== tq) { tr.innerHTML = tq; tr._s = tq; }
@@ -1021,7 +1027,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.3 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.4 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

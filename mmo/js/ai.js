@@ -324,7 +324,14 @@ const inGroup = (k, group) => group.includes(k) || (k.pet && group.includes(k.pe
 const cc = m => Cb.ccd(m);
 // AoE wakes the mesmerized: don't swing one near a sleeping enemy
 const mezNear = (c, r) => S.ents.some(m => m.mob && !m.dead && m.buffs.some(b => b.data.mez) && dist(m, c) < r + 1);
-export function groupFoes(group) { return S.ents.filter(m => m.mob && !m.charmed && !m.dead && m.engaged && !m.evading && [...m.threat.keys()].some(k => inGroup(k, group))); }
+// Build 13.4: every teammate asks this several times a frame; answer once per group per moment of game time (the list is only read)
+const gfMemo = new WeakMap();
+export function groupFoes(group) {
+  const c = gfMemo.get(group); if (c && c.t === S.time && c.n === group.length) return c.list;
+  const list = [];
+  for (const m of S.ents) { if (!m.mob || m.charmed || m.dead || !m.engaged || m.evading) continue; for (const k of m.threat.keys()) if (inGroup(k, group)) { list.push(m); break; } }
+  gfMemo.set(group, { t: S.time, n: group.length, list }); return list;
+}
 // which buff each buff ability puts up
 const BUFF_ID = { seasong: 'seasong', shout: 'shout', iron: 'iron', fort: 'fort', inner: 'inner', eagle: 'eagle', trueshot: 'trueshot', kindle: 'kindle', keen: 'keen', lightfeet: 'lightfeet', steel: 'steel',
   bladeward: 'bladeward', ironbody: 'ironbody', wind: 'wind', focus: 'focusmind', faith: 'faith', serenity: 'serenity', vigor: 'vigor', rooted: 'rooted', wolf: 'wolfspirit', thorns: 'thorns',

@@ -163,10 +163,15 @@ function sceneCam(dt) {
 // ---------- drawing ----------
 const o3 = new THREE.Object3D(), up = new THREE.Vector3(0, 1, 0), tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
 let drawDt = 1 / 60;
+// Build 13.4: only what the camera can see is sent to the graphics chip. Each model kind is a draw call even with nobody wearing it,
+// and with every creature and look now its own model there are hundreds of kinds, so empty ones are switched off and
+// people off-screen are skipped (with a margin so a shadow falling into view from just outside still shows).
+const frus = new THREE.Frustum(), pvM = new THREE.Matrix4(), cullS = new THREE.Sphere();
 function draw() {
   for (const k in R.kinds) R.kinds[k].n = 0;
   let ns = 0, na = 0;
   const camP = R.cam.position;
+  R.cam.updateMatrixWorld(); pvM.multiplyMatrices(R.cam.projectionMatrix, R.cam.matrixWorldInverse); frus.setFromProjectionMatrix(pvM);
   for (const e of S.ents) {
     if (e.remove) continue;
     // druids in animal form wear the animal
@@ -174,6 +179,7 @@ function draw() {
     const K = R.kinds[kk] || (X.lazyKind && X.lazyKind(kk)); if (!K || K.n >= 160) continue;
     const ddx = e.x - camP.x, ddz = e.z - camP.z;
     if (ddx * ddx + ddz * ddz > 150 * 150) continue;
+    if (!e.isHero) { const sc = e.scale || 1; cullS.center.set(e.x, e.y + 1.2 * sc, e.z); cullS.radius = 2.5 * sc + 5; if (!frus.intersectsSphere(cullS)) { e.rx = undefined; continue; } }
     let y = e.y, rotX = 0;
     if (e.mob) { const M = MOBS[e.mob]; if (M.fly && !e.dead) y += M.fly + Math.sin(R.uTime.value * 3 + e.id) * .15; }
     if (e.dead && !e.corpse) { const f = Math.min(1, (S.time - e.deadT) * 3); rotX = -Math.PI / 2 * f; y += .2 * f; }
@@ -185,7 +191,7 @@ function draw() {
     const a = e.anim; K.anim.setXYZW(i, a.ph, e.dead ? 0 : a.mv, a.atk, a.flash);
     if (ns < 400 && !e.dead) { o3.position.set(e.x, e.y + .05, e.z); o3.rotation.set(0, 0, 0); o3.scale.setScalar(1.3 * (e.scale || 1)); o3.updateMatrix(); R.shadows.setMatrixAt(ns++, o3.matrix); }
   }
-  for (const k in R.kinds) { const K = R.kinds[k]; K.mesh.count = K.ol.count = K.n; if (K.n) { K.mesh.instanceMatrix.needsUpdate = true; K.anim.needsUpdate = true; } }
+  for (const k in R.kinds) { const K = R.kinds[k]; K.mesh.count = K.ol.count = K.n; K.mesh.visible = K.ol.visible = K.n > 0; if (K.n) { K.mesh.instanceMatrix.needsUpdate = true; K.anim.needsUpdate = true; } }
   R.shadows.count = ns; R.shadows.instanceMatrix.needsUpdate = true;
   for (const p of Cb.projectiles) if (p.kind === 'arrow' && na < 200 && p.dx !== undefined) {
     o3.position.set(p.x, p.y, p.z); tmpV.set(p.dx, p.dy, p.dz); tmpQ.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tmpV); o3.quaternion.copy(tmpQ); o3.scale.setScalar(1); o3.updateMatrix(); R.arrows.setMatrixAt(na++, o3.matrix); o3.rotation.set(0, 0, 0);
