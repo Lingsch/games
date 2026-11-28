@@ -2,7 +2,7 @@
 // (a mastiff and a stag were both "wolf"), so this registers a kind per creature in artkit/models/beasts.js and
 // points each matching creature at it, by its name. Nothing else in the game reads a creature's kind.
 // Switching the art off, or Graphics: Low, puts every creature back on its original kind.
-import { BEASTS } from './models/beasts.js';
+import { BEASTS, beastFor } from './models/beasts.js';
 import { setStyle, bake } from './models/people.js';
 export function initBeasts(G) {
   if (G.game !== 'mmo' || !G.MOBS || !G.rigAdopt) return { setOn() { } };
@@ -23,7 +23,7 @@ export function initBeasts(G) {
       if (!e.mob) continue;
       if (!live) { if (e.artK) back(e); continue; }
       if (e.artK !== undefined) continue;
-      const m = MOBS[e.mob], name = BEASTS[e.name] ? e.name : (m && BEASTS[m.name] ? m.name : null);
+      const m = MOBS[e.mob], name = BEASTS[e.name] ? e.name : (m ? beastFor(m.name, m.kind) : null);
       if (!name) { e.artK = 0; continue; }
       if (!R.kinds[key(name)] && budget-- <= 0) continue;          // build at most two new models a frame
       try { e.artK0 = e.kind; e.kind = make(name); e.artK = 1; } catch (err) { console.warn('art: beast', name, err); e.kind = e.artK0; e.artK = 0; }
