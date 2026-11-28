@@ -11,7 +11,7 @@ export function quad(o = {}) {
   const g = new THREE.Group(), fc = o.fur || '#7d6b5a', fur = mat(fc), fur2 = mat(o.fur2 || '#cdbb9c'), dk = mat(o.dark || '#3a2e26'), k = o.bulk || 1, hh = o.hh || .66, L = o.len || 1, lk = hh / .66, lr = (o.legR || 1) * k, eye = o.eye || '#ffc93a';
   const B = J(g, 0, hh, 0);
   A(B, lathe([[.01, -.66], [.2 * k, -.56], [.27 * k, -.3], [(o.waist || .2) * k, -.02], [.33 * k, .3], [.3 * k, .5], [.17 * k, .64], [.01, .72]], 14), fur, 0, 0, 0, Math.PI / 2, 0, 0, 1, L, 1);
-  A(B, sph(.24 * k), fur2, 0, -.12, .3 * L, 0, 0, 0, .85, .75, 1.3);
+  A(B, sph(.24 * k * (o.chest ?? 1)), fur2, 0, -.12, .3 * L, 0, 0, 0, .85, .75, 1.3);
   if (o.hump) A(B, sph(.28 * k), fur, 0, .13 * k, (o.humpZ ?? .3) * L, 0, 0, 0, 1, o.hump, 1.2);
   const mn = o.mane || { n: 5, len: .2 }; for (let i = 0; i < mn.n; i++) { const t = i / (mn.n - 1 || 1), m = A(B, cone((mn.w || .07) * k, mn.len * (1 - t * .4), 5), mn.mat ? mat(mn.mat, mn.glow) : dk, 0, .28 * k - t * .06 + (o.hump ? .12 * k * (1 - t) : 0), (.44 - t * .8) * L, -.55); if (mn.flick) tag(7, m); }
   const rf = o.ruff ?? 1; if (rf) for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; A(B, cone(.085 * k, .3 * rf, 4), mat(shade(fc, i % 2 ? .86 : 1.1)), Math.sin(a) * .25 * k, .04 + Math.cos(a) * .24 * k, .46 * L, -1.9 + Math.cos(a) * .3, 0, Math.sin(a) * .5, 1, 1, .6); }
@@ -278,7 +278,7 @@ const gPlates = (c = GOLD) => e => { A(e.B, sph(.5 * e.k), mat(c), 0, .66 * e.k,
 const gMaw = (c = '#ff7a2a') => e => { A(e.B, sph(.3 * e.k), mat('#1a0c08'), 0, .5 * e.k, .4 * e.k, 0, 0, 0, 1.3, .7, .5); A(e.B, sph(.16 * e.k), mat(c, 1), 0, .5 * e.k, .46 * e.k, 0, 0, 0, 1.3, .6, .4); for (let i = -3; i <= 3; i++) { A(e.B, cone(.05 * e.k, .18 * e.k, 4), mat(BONE), i * .1 * e.k, .68 * e.k, .56 * e.k, Math.PI); A(e.B, cone(.05 * e.k, .18 * e.k, 4), mat(BONE), i * .1 * e.k, .32 * e.k, .56 * e.k); } };
 // ---- families
 const WOLF = {}, HOUND = { ears: 'flop', muzzle: [.9, 1.3], bulk: 1.22, ruff: 0, mane: { n: 0 }, tail: 'thin', noCheek: 1, headK: 1.08 };
-const BEAR = { bulk: 1.7, hh: .8, len: 1.02, legR: .78, hump: .75, humpZ: .08, ears: 'round', earK: .8, muzzle: [.75, 1.15], tail: 'stub', ruff: 0, mane: { n: 0 }, neck: .62, neckRx: -1.25, neckW: 1.1, headK: 1.38, claw: 2, noCheek: 1, eyeGlow: 0, eye: '#2a1c14', eyeK: .7, turn: .15 };
+const BEAR = { bulk: 1.5, hh: .82, len: 1.22, legR: .9, hump: .7, humpZ: .2, chest: .6, ears: 'round', earK: 1.1, muzzle: [.85, 1.45], noBrow: 1, tail: 'stub', ruff: 0, mane: { n: 0 }, neck: .5, neckRx: .85, neckW: 1.25, headK: 1.45, claw: 2, noCheek: 1, eyeGlow: 0, eye: '#2a1c14', eyeK: .7, turn: .15 };
 const BOAR = { bulk: 1.3, hh: .52, len: .95, legR: .7, hump: .8, ears: 'side', earK: .7, muzzle: [1.3, 1.05], disc: 1, tusks: 1, tail: 'thin', tailLen: .5, ruff: 0, mane: { n: 8, len: .26, w: .06 }, neck: .28, neckW: 1.25, neckRx: -1.0, headK: 1.15, hoof: 1, noFang: 1, noCheek: 1, eyeGlow: 0, eye: '#2a1c14', eyeK: .6, turn: .15 };
 const RAT = { bulk: .8, hh: .34, len: .9, legR: .7, ears: 'round', earK: 1.2, muzzle: [1.2, .7], buck: 1, noFang: 1, tail: 'thin', tailC: '#d99a8a', tailLen: 1.5, ruff: 0, mane: { n: 0 }, neck: .24, neckRx: -1.1, hump: .9, noCheek: 1, noBrow: 1, eyeK: .8 };
 const STAG = { bulk: .86, hh: 1.0, len: 1.0, legR: .62, ears: 'side', earK: 1.1, muzzle: [1.1, .8], tail: 'stub', ruff: 0, mane: { n: 0 }, neck: .7, neckRx: -.25, neckW: .8, hoof: 1, noFang: 1, noCheek: 1, noBrow: 1, eyeGlow: 0, eye: '#2a1c14', eyeK: .8, waist: .24 };
