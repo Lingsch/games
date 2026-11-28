@@ -31,7 +31,7 @@ export function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.
 let errT = 0;
 function err(msg) { if (!msg || msg === 'gcd' || S.time - errT < .6) return; errT = S.time; toast(msg); }
 export function hurtFlash() { const f = $('hurt'); f.style.opacity = .7; clearTimeout(f._t); f._t = setTimeout(() => f.style.opacity = 0, 160); }
-const pct = (a, b) => b > 0 ? clamp(a / b * 100, 0, 100) : 0;
+const pct = (a, b) => b > 0 ? Math.round(clamp(a / b * 100, 0, 100) * 4) / 4 : 0;   // quarter-percent steps: a bar only repaints when it visibly moves
 
 // ---------- the hotbar ----------
 const keyEls = [];
@@ -323,10 +323,10 @@ function updateFrames() {
     $('tgtHp').style.width = pct(t.hp, t.maxHp) + '%'; $('tgtHpT').textContent = t.team === 'npc' ? '' : t.mob ? Math.round(pct(t.hp, t.maxHp)) + '%' : `${Math.ceil(t.hp)} / ${t.maxHp}`;
     $('tgtResW').classList.toggle('hide', !t.cls); if (t.cls) { $('tgtRes').style.width = pct(t.res, t.resMax) + '%'; $('tgtRes').style.background = RES_COL[t.resType]; }
     let info = '';
-    if (t.mob) { const M = MOBS[t.mob]; info = [!t.boss && !t.dead ? conCheck(t) + (pk > 1 ? ' ⛓' + pk : '') : M.undead ? 'Undead' : M.beast ? 'Beast' : M.human ? 'Humanoid' : 'Monster', t.evading ? 'Evading' : ''].filter(Boolean).join(' · '); $('tgtWeak').innerHTML = M.weak ? `Weak ${ELEMENTS[M.weak]}${M.resist ? ' Resists ' + ELEMENTS[M.resist] : ''}` : ''; }
-    else if (t.cls) { info = `${CLASSES[t.cls].name}${t.fake?.guild ? ' · <' + t.fake.guild + '>' : ''}`; $('tgtWeak').textContent = t.fake?.friend ? '★ Friend' : ''; }
-    else if (t.pet) { info = 'Serves ' + t.pet.owner.name; $('tgtWeak').textContent = ''; }
-    else { $('tgtWeak').textContent = ''; info = t.title || ''; }
+    if (t.mob) { const M = MOBS[t.mob]; info = [!t.boss && !t.dead ? conCheck(t) + (pk > 1 ? ' ⛓' + pk : '') : M.undead ? 'Undead' : M.beast ? 'Beast' : M.human ? 'Humanoid' : 'Monster', t.evading ? 'Evading' : ''].filter(Boolean).join(' · '); { const wk = M.weak ? `Weak ${ELEMENTS[M.weak]}${M.resist ? ' Resists ' + ELEMENTS[M.resist] : ''}` : ''; const tw = $('tgtWeak'); if (tw._s !== wk) { tw.innerHTML = wk; tw._s = wk; } } }
+    else if (t.cls) { info = `${CLASSES[t.cls].name}${t.fake?.guild ? ' · <' + t.fake.guild + '>' : ''}`; $('tgtWeak').textContent = t.fake?.friend ? '★ Friend' : ''; $('tgtWeak')._s = null; }
+    else if (t.pet) { info = 'Serves ' + t.pet.owner.name; $('tgtWeak').textContent = ''; $('tgtWeak')._s = null; }
+    else { $('tgtWeak').textContent = ''; $('tgtWeak')._s = null; info = t.title || ''; }
     if (t.mob) {
       if (t.charmed) info = 'Charmed · ' + Math.ceil(t.charmed.until - S.time) + ' s';
       const cc = t.buffs.find(b => b.data.mez || b.data.stun);
@@ -407,21 +407,23 @@ function updatePlates(dt) {
   while (plates.length < list.length) { const d = document.createElement('div'); d.className = 'np'; box.appendChild(d); plates.push(d); }
   const placed = [];
   plates.forEach((d, i) => {
-    const e = list[i]; if (!e || !e.name) { d.style.display = 'none'; return; }
+    const e = list[i]; if (!e || !e.name) { if (d._dsp !== 'none') { d._dsp = 'none'; d.style.display = 'none'; } return; }
     const s = screenOf(e, (e.mob ? 2.1 : 2.25) * (e.boss ? 1.4 : 1));
-    if (s.behind || s.x < -50 || s.x > innerWidth + 50) { d.style.display = 'none'; return; }
+    if (s.behind || s.x < -50 || s.x > innerWidth + 50) { if (d._dsp !== 'none') { d._dsp = 'none'; d.style.display = 'none'; } return; }
     // nudge labels up so close neighbours don't print over each other
     const w = Math.min(160, (e.name || '').length * 6.5 + 10), hh = 14;
     let y = s.y;
     for (let tries = 0; tries < 6; tries++) { const hit = placed.find(p => Math.abs(p.x - s.x) < (p.w + w) / 2 && Math.abs(p.y - y) < hh); if (!hit) break; y = hit.y - hh; }
     placed.push({ x: s.x, y, w });
-    d.style.display = ''; d.style.left = s.x + 'px'; d.style.top = y + 'px';
+    // Build 13.4.1: labels move by transform (the graphics chip slides them) instead of left/top (a page layout and repaint every frame)
+    if (d._dsp !== '') { d._dsp = ''; d.style.display = ''; }
+    { const tr = `translate3d(${Math.round(s.x)}px,${Math.round(y)}px,0) translate(-50%,-100%)`; if (d._tr !== tr) { d._tr = tr; d.style.transform = tr; } }
     let html = '', col = '#fff';
     if (e.team === 'npc') {
       let mk = '';
       if (e.giver) mk = questMark(e.giver);
       col = e.corpse || e.prop ? '#8dffef' : '#ffd34d';
-      if (e.prop) { html = `✦ ${esc(e.name)}`; if (d._s !== html) { d.innerHTML = html; d._s = html; } d.style.color = col; d.style.opacity = clamp(1.4 - dist(e, h) / 25, .4, 1); return; }
+      if (e.prop) { html = `✦ ${esc(e.name)}`; if (d._s !== html) { d.innerHTML = html; d._s = html; } if (d._col !== col) { d._col = col; d.style.color = col; } { const op = Math.round(clamp(1.4 - dist(e, h) / 25, .4, 1) * 20) / 20; if (d._op !== op) { d._op = op; d.style.opacity = op; } } return; }
       html = `${mk ? `<span class="mk">${mk}</span>` : ''}${esc(e.name)}${e.title ? `<small>${esc(e.title)}</small>` : ''}`;
     } else if (e.mob) {
       col = e.dead ? '#cfcfcf' : Cb.conColor(h.lvl, e.lvl);
@@ -432,7 +434,8 @@ function updatePlates(dt) {
     }
     if (e === S.target) col = '#fff';
     if (d._s !== html) { d.innerHTML = html; d._s = html; }
-    d.style.color = col; d.style.opacity = e === S.target ? 1 : clamp(1.4 - dist(e, h) / 40, .35, 1);
+    if (d._col !== col) { d._col = col; d.style.color = col; }
+    { const op = e === S.target ? 1 : Math.round(clamp(1.4 - dist(e, h) / 40, .35, 1) * 20) / 20; if (d._op !== op) { d._op = op; d.style.opacity = op; } }
   });
   // combat text floats up and fades
   for (let i = fct.length - 1; i >= 0; i--) { fct[i].t += dt; if (fct[i].t > 1.1) fct.splice(i, 1); }
@@ -440,7 +443,7 @@ function updatePlates(dt) {
   fctEls.forEach((d, i) => {
     const f = fct[i]; if (!f) { d.style.display = 'none'; return; }
     const s = screenOf(f.e, 2); if (s.behind) { d.style.display = 'none'; return; }
-    d.style.display = ''; d.style.left = (s.x + f.ox) + 'px'; d.style.top = (s.y - f.t * 60) + 'px'; d.style.opacity = 1 - Math.max(0, f.t - .6) / .5;
+    d.style.display = ''; d.style.transform = `translate3d(${Math.round(s.x + f.ox)}px,${Math.round(s.y - f.t * 60)}px,0) translate(-50%,-50%)`; d.style.opacity = 1 - Math.max(0, f.t - .6) / .5;
     if (d.textContent !== f.text) d.textContent = f.text; d.style.color = f.col; d.classList.toggle('big', f.big);
   });
 }
@@ -1028,7 +1031,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.4.1 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.4.2 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}

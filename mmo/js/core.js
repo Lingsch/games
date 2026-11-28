@@ -1,3 +1,26 @@
+// Build 13.4.1: adding a class an element already has (or removing one it doesn't) still counts as a change to the page; skip those.
+{
+  const T = DOMTokenList.prototype, add = T.add, rem = T.remove, tog = T.toggle;
+  T.add = function (...c) { for (const x of c) if (!this.contains(x)) return add.apply(this, c); };
+  T.remove = function (...c) { for (const x of c) if (this.contains(x)) return rem.apply(this, c); };
+  T.toggle = function (c, force) { if (force !== undefined && this.contains(c) === !!force) return !!force; return force === undefined ? tog.call(this, c) : tog.call(this, c, force); };
+}
+// Build 13.4.1: the interface sets a lot of text every frame even when it hasn't changed. Each write throws away the old text,
+// makes the page lay itself out and repaint, and with the new art the emoji in it are swapped for pictographs again.
+// On an iPhone that repainting cost more than the whole 3D world. Writing the same text twice is now skipped.
+{
+  const d = Object.getOwnPropertyDescriptor(Node.prototype, 'textContent');
+  if (d && d.set && d.get) Object.defineProperty(Node.prototype, 'textContent', {
+    configurable: true, enumerable: d.enumerable, get: d.get,
+    set(v) {
+      if (this.nodeType === 1) {
+        const s = v == null ? '' : String(v);
+        if (s === '' ? !this.firstChild : (this.firstChild && d.get.call(this) === s)) return;
+      }
+      d.set.call(this, v);
+    },
+  });
+}
 // Shared helpers and the single mutable game state.
 export const TAU = Math.PI * 2;
 export let WH = 300;              // half the zone's width, in world units (each zone sets its own)

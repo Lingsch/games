@@ -155,11 +155,12 @@ button.pri{background:var(--acc);color:#1a1208;border-color:var(--acc)}
 
 /* nameplates and combat text */
 #plates{position:fixed;inset:0;pointer-events:none;overflow:hidden}
-.np{position:absolute;transform:translate(-50%,-100%);text-align:center;font:700 10px "Alegreya Sans";white-space:nowrap;text-shadow:0 1px 2px #000,0 0 3px #000}
+#mini{will-change:transform}   /* Build 13.4.1: the minimap redraws often; on its own layer that repaints only the map, not the frame around it */
+.np{position:absolute;left:0;top:0;will-change:transform,opacity;transform:translate(-50%,-100%);text-align:center;font:700 10px "Alegreya Sans";white-space:nowrap;text-shadow:0 1px 2px #000,0 0 3px #000}
 .np small{display:block;font-weight:500;font-size:9px;opacity:.8}
 .np .mk{display:block;font:700 18px Cinzel,serif;color:#ffd34d;line-height:1}
 .np .bar{width:44px;height:4px;margin:2px auto 0}
-.ft{position:absolute;transform:translate(-50%,-50%);font:700 14px "Alegreya Sans";text-shadow:0 1px 2px #000,0 0 3px #000;white-space:nowrap}
+.ft{position:absolute;left:0;top:0;will-change:transform,opacity;transform:translate(-50%,-50%);font:700 14px "Alegreya Sans";text-shadow:0 1px 2px #000,0 0 3px #000;white-space:nowrap}
 .ft.big{font-size:19px}
 
 /* joystick */
