@@ -10,7 +10,9 @@ let S = { ...C, face: 2, hue: 0 }, INK = true; const uLine = { value: C.line };
 export const setStyle = o => { if ('ink' in o) INK = o.ink; S = { ...S, ...o }; uLine.value = S.line; };
 const tag = (p, o) => { o.userData.part = p; return o; };
 const mats = new Map();
-const mat = (c, glow) => { if (S.pal && S.pal[c]) c = S.pal[c]; const k = c + (glow ? 'g' : '') + S.sat + '/' + S.hue; if (!mats.has(k)) { const col = new THREE.Color(c); const h = {}; col.getHSL(h); col.setHSL((S.hue && !glow && h.s > .3 && !(h.h > .028 && h.h < .14)) ? (h.h + S.hue + 1) % 1 : h.h, Math.min(1, h.s * S.sat), h.l); mats.set(k, glow ? new THREE.MeshBasicMaterial({ color: col }) : new THREE.MeshToonMaterial({ color: col, gradientMap: ramp })); } return mats.get(k); };
+const mat = (c, glow) => { if (S.pal && S.pal[c]) c = S.pal[c];
+  if (S.ghost && !glow) { const q0 = new THREE.Color(c), l = Math.min(1, (q0.r + q0.g + q0.b) / 2.2); c = '#' + new THREE.Color('#3f6f90').lerp(new THREE.Color('#eafcff'), l).getHexString(); }
+  const k = c + (glow ? 'g' : '') + S.sat + '/' + S.hue; if (!mats.has(k)) { const col = new THREE.Color(c); const h = {}; col.getHSL(h); col.setHSL((S.hue && !glow && h.s > .3 && !(h.h > .028 && h.h < .14)) ? (h.h + S.hue + 1) % 1 : h.h, Math.min(1, h.s * S.sat), h.l); mats.set(k, glow ? new THREE.MeshBasicMaterial({ color: col }) : new THREE.MeshToonMaterial({ color: col, gradientMap: ramp })); } return mats.get(k); };
 const ink = new THREE.MeshBasicMaterial({ color: '#1a120c', side: THREE.BackSide });
 ink.onBeforeCompile = s => { s.uniforms.uLine = uLine; s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nuniform float uLine;').replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normalize(normal) * uLine;'); };
 const fac = g => { if (!S.facet) return g; const n = g.toNonIndexed(); n.computeVertexNormals(); return n; };
@@ -30,24 +32,30 @@ function A(p, geo, m, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0, sx = 1, sy = 
 const J = (p, x, y, z, rx = 0, ry = 0, rz = 0) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.set(rx, ry, rz); p.add(g); return g; };
 const ext = (pts, d, bev = .01) => { const s = new THREE.Shape(); pts.forEach((p, i) => i ? s.lineTo(p[0], p[1]) : s.moveTo(p[0], p[1])); const g = new THREE.ExtrudeGeometry(s, { depth: d, bevelEnabled: bev > 0, bevelThickness: bev, bevelSize: bev, bevelSegments: 2 }); g.translate(0, 0, -d / 2); return g; };
 
+function headGeo(jaw) {     // one smooth shape: tall skull, full square jaw, chin set forward. Never faceted.
+  const g = new THREE.SphereGeometry(1, 22, 16), P = g.attributes.position;
+  for (let i = 0; i < P.count; i++) { let x = P.getX(i), y = P.getY(i), z = P.getZ(i);
+    if (y < 0) { const t = -y, k = Math.pow(t, .72); x *= 1 + (jaw - 1) * t * .6 + .1 * Math.sin(t * Math.PI); y = -k * 1.02; z = z * (1 - .1 * t) + t * t * .2; }
+    if (z > 0) z *= .96;
+    P.setXYZ(i, x * .9, y * 1.14 + .1, z * .97); }
+  g.computeVertexNormals(); return g;
+}
+const smooth = (r = 1) => new THREE.SphereGeometry(r, 12, 9);
 function face(p, R, o) {
-  const skin = mat(o.skin), sk2 = mat(shade(o.skin, .8)), dk = mat('#2a1c14'), wh = mat('#fbf7ee'), F = S.face, hair = mat(o.hair);
-  A(p, sph(R), skin, 0, R * .1, 0, 0, 0, 0, .9, 1.14, .97);                                       // skull, taller than it is wide
-  A(p, sph(R * .7), skin, 0, -R * .52, R * .1, 0, 0, 0, (o.jaw || 1) * 1.08, .66, .95);           // square jaw
-  A(p, sph(R * .3), skin, 0, -R * .9, R * .4, 0, 0, 0, 1.15, .6, .8);                            // chin
-  if (o.stubble) A(p, sph(R * .72), mat(o.stubble), 0, -R * .6, R * .08, 0, 0, 0, (o.jaw || 1) * 1.1, .6, .97, false);
+  const skin = mat(o.skin), sk2 = mat(shade(o.skin, .93)), dk = mat('#2a1c14'), wh = mat('#fbf7ee'), F = S.face, hair = mat(o.hair);
+  A(p, headGeo(o.jaw || 1), skin, 0, 0, 0, 0, 0, 0, R, R, R);
   const er = R * (F === 2 ? .11 : F === 1 ? .125 : .165), ex = R * .36, ey = R * .22, ez = R * .8;
   for (const s of [-1, 1]) {
     if (F === 2) { A(p, sph(er), dk, s * ex, ey, ez + R * .04, 0, s * .2, -s * .1, 1.35, .8, .45, false); A(p, sph(er * .22), mat('#ffffff', 1), s * ex - er * .3, ey + er * .2, ez + R * .04 + er * .45, 0, 0, 0, 1, 1, .4, false); }
     else { A(p, sph(er), wh, s * ex, ey, ez, 0, s * .25, 0, 1.3, F === 1 ? .62 : .8, .45);
       A(p, sph(er * .6), mat(o.iris), s * ex * .97, ey, ez + er * .3, 0, 0, 0, 1, 1, .4, false); A(p, sph(er * .3), dk, s * ex * .96, ey, ez + er * .42, 0, 0, 0, 1, 1, .35, false);
       A(p, sph(er * .13), mat('#ffffff', 1), s * ex * .96 - er * .2, ey + er * .18, ez + er * .5, 0, 0, 0, 1, 1, .4, false); }
-    A(p, sph(er * 1.35), sk2, s * ex, ey + er * (F === 3 ? .78 : .62), ez - er * .15, 0, s * .25, -s * .14, 1.3, .5, .62, false);   // upper lid
+    A(p, smooth(er * 1.35), sk2, s * ex, ey + er * (F === 3 ? .78 : .62), ez - er * .15, 0, s * .25, -s * .14, 1.3, .5, .62, false);   // upper lid
     A(p, box(R * .5, R * .13, R * .17), hair, s * ex * 1.02, ey + er * 1.05 + R * .07, ez + R * .05, 0, s * .2, -s * o.brow + (s > 0 ? (o.brow2 || 0) : 0));
-    A(p, sph(R * .2), skin, s * R * .9, R * .04, -R * .05, 0, 0, 0, .45, 1.1, .75);                // ears
+    A(p, smooth(R * .2), skin, s * R * .88, R * .04, -R * .05, 0, 0, 0, .45, 1.1, .75);                // ears
   }
-  A(p, box(R * .15, R * .5, R * .2), skin, 0, R * .02, R * .93, -.22, 0, 0, 1, 1, 1, false);       // bridge of the nose
-  A(p, sph(R * .17), mat(o.nose || shade(o.skin, .9)), 0, -R * .24, R * 1.04, 0, 0, 0, 1.15, .85, 1.05);
+  A(p, smooth(R * .1), skin, 0, R * .0, R * .9, -.2, 0, 0, .9, 2.6, 1.3, false);                     // bridge of the nose
+  A(p, smooth(R * .16), mat(o.nose || shade(o.skin, .96)), 0, -R * .24, R * 1.0, 0, 0, 0, 1.15, .85, 1.05);
   A(p, box(R * .44, R * .05, R * .06), dk, R * .02, -R * .56, R * .82, 0, 0, o.mouth === 'smirk' ? .1 : o.mouth === 'grin' ? 0 : -.04, 1, 1, 1, false);
   if (o.mouth === 'grin') for (const s of [-1, 1]) A(p, box(R * .1, R * .05, R * .06), dk, s * R * .25 + R * .02, -R * .52, R * .8, 0, 0, s * .6, 1, 1, 1, false);
   if (o.scar) A(p, box(R * .05, R * .62, R * .04), mat(shade(o.skin, 1.18)), -R * .5, R * .12, R * .78, 0, -.5, .28, 1, 1, 1, false);
@@ -501,11 +509,45 @@ function harpy() {
   for (let i = -2; i <= 2; i++) A(Hd, cone(R * .22, R * (1.5 - Math.abs(i) * .2), 4), i % 2 ? fe : fe2, i * R * .36, R * .95, -R * .5, -.9, 0, -i * .25, 1, 1, .4);
   return g;
 }
+function merfolk() {
+  const g = new THREE.Group(), sc2 = mat('#1c4f55'), bel = mat('#a8d8c0'), fin = mat('#d8742a'), sk = '#4f9a94', r = S.limb, hip = .68, sh = hip + S.torso, R = S.head, W = S.sw, skm = mat(sk);
+  const T1 = tag(6, J(g, 0, hip + .04, 0, -.5, 0, 0)); A(T1, cyl(W * 1.0, W * .8, .44, 10), skm, 0, -.2, 0, 0, 0, 0, 1, 1, .8);
+  const T2 = J(T1, 0, -.4, 0, 1.3, 0, 0); A(T2, sph(W * .82), skm, 0, 0, 0, 0, 0, 0, 1, 1, .8); A(T2, cyl(W * .8, W * .55, .44, 10), sc2, 0, -.2, 0, 0, 0, 0, 1, 1, .8);
+  const T3 = J(T2, 0, -.4, 0, .75, 0, 0); A(T3, sph(W * .56), sc2, 0, 0, 0, 0, 0, 0, 1, 1, .8); A(T3, cyl(W * .55, W * .2, .4, 8), skm, 0, -.2, 0, 0, 0, 0, 1, 1, .8);
+  for (const s of [-1, 1]) A(T3, ext([[0, 0], [.9, -.5], [.7, -1.2], [0, -.5]], .03, .01), fin, 0, -.36, 0, 0, s > 0 ? 0 : Math.PI, 0, .45, .4, 1);
+  for (let i = 0; i < 3; i++) A(i ? T2 : T1, ext([[0, 0], [.5, .9], [1, 0]], .03, .01), fin, 0, -.34 + (i === 2 ? .16 : 0), -W * .6, 0, Math.PI / 2, Math.PI, .22, .2, 1);
+  torsoOf(g, W, hip, skm); A(g, sph(W * .78), bel, 0, hip + S.torso * .5, W * .3, 0, 0, 0, .9, 1.5, .8);
+  A(g, ext([[0, 0], [.4, 1], [1, .3], [1, 0]], .03, .01), fin, 0, hip + S.torso * .2, -W * .7, 0, -Math.PI / 2, 0, .34, S.torso * .9, 1);
+  for (const s of [-1, 1]) A(g, dome(W * .42, .6), sc2, s * W * 1.1, sh, 0, 0, 0, -s * .4);
+  const hs = armsOf(g, W, r, sh, skm, sc2, skm, { '-1': [-.9, .6, -.7], '1': [-.3, .6, -1.0] });
+  for (const s of [-1, 1]) { A(hs[s], ext([[0, 0], [.7, .5], [.3, 1.3], [0, 1]], .03, .01), fin, 0, .05, -r, 0, Math.PI / 2, 0, .2, .22, 1); for (let i = -1; i <= 1; i++) A(hs[s], cone(r * .18, r * 1.1, 4), mat('#e6dcc2'), i * r * .5, -r * 1.5, r * .3, Math.PI - .3); }
+  hold(hs[1], 'fork');
+  const Hd = headOf(g, sh, R, { skin: sk, iris: '#e0a030', hair: '#1c4f55', brow: -.32, mouth: 'grin', jaw: 1.1 }, .05, .2);
+  for (const s of [-1, 1]) { A(Hd, ext([[0, 0], [1, .5], [.8, -.3], [1, -.9], [0, -.5]], .03, .01), fin, s * R * .85, R * .15, -R * .1, 0, s > 0 ? -.4 : Math.PI + .4, 0, R * .8, R * .8, 1); A(Hd, sph(R * .07), mat('#ffe27a', 1), s * R * .36 - R * .02, R * .23, R * .9, 0, 0, 0, 1, 1, .5); }
+  A(Hd, ext([[0, 0], [.5, 1], [1.2, .6], [1.6, 0]], .03, .01), fin, 0, R * .8, R * .5, 0, Math.PI / 2, 0, R * .9, R * .7, 1);
+  for (let i = -2; i <= 2; i++) A(Hd, cone(R * .04, R * .2, 4), mat('#fbf7ee'), i * R * .09, -R * .62, R * .84, Math.PI);
+  return g;
+}
 // The three looks of a class: look 0 is the model as designed; looks 1 and 2 swap its colours for a themed set.
 export const LOOKS = {
   bulwark: [null, { '#b9c4d6': '#b89a66', '#74809a': '#6a5636', '#b8241c': '#2f6a3a', '#5c3b22': '#3a2a18' }, { '#b9c4d6': '#4c5160', '#74809a': '#2a2d38', '#b8241c': '#5a2a8a', '#e8bd4c': '#c9d2de', '#dfe6f0': '#b9a6ff' }],
   elem: [null, { '#3d57c4': '#b03a1e', '#27398c': '#6a1e12', '#b8241c': '#e8bd4c', '#7fe9ff': '#ffb347', '#2aa7d8': '#d8541a', '#ffb347': '#7fe9ff', '#ff7a2a': '#2aa7d8' }, { '#3d57c4': '#3a2a5a', '#27398c': '#201636', '#e8bd4c': '#c9d2de', '#b8241c': '#1f8f8a', '#7fe9ff': '#e0a8ff', '#2aa7d8': '#8a4ad8', '#ffb347': '#b6ff3a', '#ff7a2a': '#55a82e' }],
+  archer: [null, { '#3f7a3a': '#b0622a', '#2a552b': '#7a3a16', '#cdb07a': '#d8c8a0', '#b8241c': '#e8bd4c' }, { '#3f7a3a': '#2f4a6a', '#2a552b': '#1c2f48', '#8a5a32': '#4a4a52', '#4a2f1a': '#26262e', '#b8241c': '#c9d2de' }],
+  knifeshade: [null, { '#3b3644': '#8a6a44', '#27232e': '#5a4228', '#6b4a94': '#c9a04a', '#7a1e28': '#2f6a6a' }, { '#3b3644': '#5a5e66', '#27232e': '#383c44', '#6b4a94': '#2f8a5a', '#7a1e28': '#1f5a3a' }],
+  cleric: [null, { '#a8281e': '#2f5fb0', '#d2c8b0': '#b8c4d8' }, { '#efe9da': '#4a3a5a', '#d2c8b0': '#30243c', '#a8281e': '#e8bd4c' }],
+  bladewarden: [null, { '#2f6fb8': '#b8241c', '#5d6676': '#7a5a3a', '#3d4452': '#4a3420' }, { '#2f6fb8': '#2f8a5a', '#5d6676': '#8a8f9a', '#3d4452': '#5a5f6a', '#8a7a66': '#d8d4cc', '#5e5246': '#a8a49c' }],
+  warlock: [null, { '#3b2552': '#5a1420', '#241634': '#32080e', '#7dff6a': '#ff5a3a', '#d6ffcf': '#ffd6cf' }, { '#3b2552': '#1f3a52', '#241634': '#102030', '#7dff6a': '#7fe9ff', '#d6ffcf': '#d8f6ff' }],
+  druid: [null, { '#4f8a3a': '#c9742a', '#2f6030': '#8a3a1c', '#a8ff7a': '#ffd27a' }, { '#4f8a3a': '#c8d8e0', '#2f6030': '#8aa0b0', '#7a5a3a': '#8a8478', '#5a4028': '#5a564e', '#a8ff7a': '#9ae8ff' }],
+  wardancer: [null, { '#b3262c': '#1f7f8a', '#7a1620': '#125058' }, { '#b3262c': '#3a2a6a', '#7a1620': '#221848', '#e8bd4c': '#c9d2de' }],
+  monk: [null, { '#e08a1e': '#8a2a22', '#a85a12': '#5a1612' }, { '#e08a1e': '#2f5a8a', '#a85a12': '#1c3a5c' }],
+  aegis: [null, { '#1f8f8a': '#b03a1e', '#135e5c': '#6a1e12', '#8ff7ea': '#ffd27a' }, { '#1f8f8a': '#4a2a8a', '#135e5c': '#2c1858', '#c9d2de': '#8a8f9a', '#8ff7ea': '#e0a8ff' }],
+  lifebinder: [null, { '#f29ab8': '#f0c040', '#58a84a': '#3a8a7a', '#2f7038': '#1f5a50' }, { '#eef2e2': '#f0d8e0', '#f29ab8': '#9a6ad8', '#58a84a': '#6a8a4a' }],
+  blightblade: [null, { '#55702e': '#6a2e70', '#b6ff3a': '#e07aff', '#6a4a2a': '#4a3a5a' }, { '#55702e': '#7a2a1e', '#b6ff3a': '#ff8a3a', '#3a3f36': '#4a3a34' }],
+  bard: [null, { '#7a3aa8': '#b8241c', '#4a2270': '#6a1410', '#f0c040': '#f1ece0' }, { '#7a3aa8': '#2f7a4a', '#4a2270': '#1a4a2a', '#f0c040': '#e08a1e' }],
+  binder: [null, { '#1f6f8a': '#6a2a7a', '#17384a': '#3a1648', '#d8742a': '#e8bd4c' }, { '#1f6f8a': '#7a5a2a', '#17384a': '#4a3414', '#d8742a': '#2f8a8a' }],
+  illusionist: [null, { '#c0368a': '#1f8f8a', '#3a2a7a': '#123a4a', '#ff9af0': '#8ff7ea' }, { '#c0368a': '#e08a1e', '#3a2a7a': '#4a1a2a', '#ff9af0': '#ffd27a' }],
 };
+
 const SKIN = ['#e6b48c', '#c8946a', '#8a5a3a', '#f0c8a4'], ORC = '#7a9a4a', DROWN = '#8fb8b0', GH = '#9aa890';
 const F = o => () => folk(o);
 export const FOLK = {
@@ -539,7 +581,8 @@ export const FOLK = {
   brute: [F({ c1: '#5c3b22', legs: '#4a3a2a', skin: ORC, bareArms: 1, tusks: 1.2, hat: 'horned', hatC: '#74809a', pauld: 1.3, spikes: 1, right: 'axe', weapK: 1.3, brow: -.34, jaw: 1.25, wide: 1.15, noseC: '#6a8a3e', hair: '#1a1210' }), 1.15],
   shaman: [F({ c1: '#6a4a2a', skin: ORC, bare: 1, skirt: .5, tusks: 1, hat: 'feathers', hatC: '#b8241c', hatT: '#e8bd4c', right: 'staff', mantle: '#8a7a66', brow: -.2, jaw: 1.15, hairStyle: 'bald', noseC: '#6a8a3e', glowEyes: '#ffb03a' }), 1.12],
   troll: [F({ c1: '#5a4a3a', skin: '#7a8f9a', bare: 1, bareLegs: 1, skirt: .34, tusks: 1.7, bigNose: 1, ears: 1, hairStyle: 'bald', right: 'club', weapK: 1.5, brow: -.3, jaw: 1.3, wide: 1.25, thin: 1.25, belly: 1.15, noseC: '#687c86' }), 1.5],
-  wraith: [() => wraith()], ghost: [() => wraith('#8aa8b8', '#5f7f90', '#e8fdff')], harpy: [harpy], harpynamed: [harpy, 1.2],
+  wraith: [() => wraith()], ghost: [() => wraith('#8aa8b8', '#5f7f90', '#e8fdff')], harpy: [harpy], harpynamed: [harpy, 1.2], merfolk: [merfolk, 1.1],
+  ghostnpc: [F({ robe: 1, c1: '#b86a8a', c2: '#7a3a5a', c3: '#f1ece0', skin: SKIN[3], hair: '#4a2a1a', hairStyle: 'bun', thin: .85, wide: .82, jaw: .88, brow: .04, left: 'lantern' }), 1, { ghost: 1 }],
   abom: [F({ c1: '#6a3a3a', skin: '#a8a488', bare: 1, bareLegs: 1, skirt: .3, belly: 1.5, apron: '#7a2a2a', stitch: 1, hairStyle: 'bald', right: 'axe', weapK: 1.4, brow: -.2, jaw: 1.3, wide: 1.2, thin: 1.3, glowEyes: '#b6ff3a', mouth: 'grin' }), 1.38],
 };
 export const CLASSES = { bulwark: knight, elem: wizard, archer, knifeshade: rogue, cleric, bladewarden, warlock, druid, wardancer, monk, aegis, lifebinder, blightblade, bard, binder, illusionist };
@@ -558,7 +601,7 @@ export function bake(root, k = 1.1) {
     else for (let a = o.parent, found = 0; a && a !== root.parent; a = a.parent) { const t = a.userData.part; if (t === undefined) continue;
       if (!found) { found = 1; part = t; if (t > 10 && t < 15) p2 = at(a); else { pv = at(a); break; } } else { pv = at(a); break; } }
     if (!p2) p2 = pv;
-    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, P = g.attributes.position, N = g.attributes.normal, c = o.material.color, glow = o.material.isMeshBasicMaterial ? 1.4 : 0;
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, P = g.attributes.position, N = g.attributes.normal, c = o.material.color, glow = o.material.isMeshBasicMaterial ? 1.4 : (S.ghost ? .5 : 0);
     nm.getNormalMatrix(o.matrixWorld);
     for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); n.fromBufferAttribute(N, i).applyMatrix3(nm).normalize();
       pos.push(v.x, v.y, v.z); nor.push(n.x, n.y, n.z); col.push(c.r, c.g, c.b); piv.push(pv[0], pv[1], pv[2]); pv2.push(p2[0], p2[1], p2[2]); prt.push(part); glw.push(glow); }
