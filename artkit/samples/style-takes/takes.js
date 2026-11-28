@@ -1,11 +1,7 @@
 import * as THREE from '../../../vendor/three.module.min.js';
 // Three takes on one style: the same knight, wizard and wolf, designed from scratch, at three sets of proportions.
 const C = { head: .19, torso: .52, leg: .62, sw: .29, limb: .1, hand: 1.6, foot: 1.7, eye: 1.15, pauld: 1.25, weap: 1.15, line: .015, facet: 1, sat: 1.05 };
-const TAKES = [
-  { ...C, face: 1, name: 'C1  Hooded eyes', sub: 'narrow eyes under heavy lids, long face, strong jaw' },
-  { ...C, face: 2, name: 'C2  Simple dark eyes', sub: 'no whites at all: the brows and mouth do the acting' },
-  { ...C, face: 3, name: 'C3  Open eyes, adult features', sub: 'larger eyes, but with lids, cheekbones and a real nose' },
-];
+const TAKES = [{ ...C, face: 2, name: 'Chunky carved, simple dark eyes', sub: 'four classes built from scratch: Bulwark, Elementalist, Archer, Knifeshade' }];
 const shade = (c, k) => '#' + new THREE.Color(c).multiplyScalar(k).getHexString();
 const ramp = new THREE.DataTexture(new Uint8Array([70, 70, 70, 255, 150, 150, 150, 255, 215, 215, 215, 255, 255, 255, 255, 255]), 4, 1); ramp.minFilter = ramp.magFilter = THREE.NearestFilter; ramp.needsUpdate = true;
 let S, uLine = { value: .012 };
@@ -38,7 +34,6 @@ function face(p, R, o) {
   if (o.stubble) A(p, sph(R * .72), mat(o.stubble), 0, -R * .6, R * .08, 0, 0, 0, (o.jaw || 1) * 1.1, .6, .97, false);
   const er = R * (F === 2 ? .11 : F === 1 ? .125 : .165), ex = R * .36, ey = R * .22, ez = R * .8;
   for (const s of [-1, 1]) {
-    A(p, sph(R * .28), skin, s * R * .56, -R * .12, R * .58, 0, 0, 0, 1, .6, .7, false);          // cheekbone
     if (F === 2) { A(p, sph(er), dk, s * ex, ey, ez + R * .04, 0, s * .2, -s * .1, 1.35, .8, .45, false); A(p, sph(er * .22), mat('#ffffff', 1), s * ex - er * .3, ey + er * .2, ez + R * .04 + er * .45, 0, 0, 0, 1, 1, .4, false); }
     else { A(p, sph(er), wh, s * ex, ey, ez, 0, s * .25, 0, 1.3, F === 1 ? .62 : .8, .45);
       A(p, sph(er * .6), mat(o.iris), s * ex * .97, ey, ez + er * .3, 0, 0, 0, 1, 1, .4, false); A(p, sph(er * .3), dk, s * ex * .96, ey, ez + er * .42, 0, 0, 0, 1, 1, .35, false);
@@ -51,7 +46,6 @@ function face(p, R, o) {
   A(p, sph(R * .17), mat(o.nose || shade(o.skin, .9)), 0, -R * .24, R * 1.04, 0, 0, 0, 1.15, .85, 1.05);
   A(p, box(R * .44, R * .05, R * .06), dk, R * .02, -R * .56, R * .82, 0, 0, o.mouth === 'smirk' ? .1 : o.mouth === 'grin' ? 0 : -.04, 1, 1, 1, false);
   if (o.mouth === 'grin') for (const s of [-1, 1]) A(p, box(R * .1, R * .05, R * .06), dk, s * R * .25 + R * .02, -R * .52, R * .8, 0, 0, s * .6, 1, 1, 1, false);
-  A(p, sph(R * .12), sk2, R * .02, -R * .68, R * .78, 0, 0, 0, 1.4, .5, .6, false);                 // lower lip
   if (o.scar) A(p, box(R * .05, R * .62, R * .04), mat(shade(o.skin, 1.18)), -R * .5, R * .12, R * .78, 0, -.5, .28, 1, 1, 1, false);
 }
 function hand(p, r, m) { const k = r * S.hand; A(p, sph(k), m, 0, 0, 0, 0, 0, 0, .95, 1.1, 1); A(p, sph(k * .5), m, k * .7, k * .2, k * .5, 0, 0, 0, .8, 1.2, .8); }
@@ -122,6 +116,59 @@ function wizard() {
   const T1 = J(Hat, 0, R * .88, 0, -.35, 0, .25); A(T1, cyl(R * .4, R * .72, R * .8, 12), robe, 0, R * .38, 0); const T2 = J(T1, 0, R * .76, 0, -.6, 0, .35); A(T2, cone(R * .4, R * 1.0, 10), robe, 0, R * .48, 0); A(T2, fac(new THREE.OctahedronGeometry(R * .16)), mat('#ffd98a', 1), 0, R * 1.05, 0);
   return g;
 }
+function legsOf(g, W, r, hip, thigh, boot, cuff, lean = 0) {
+  for (const s of [-1, 1]) { const L = J(g, s * W * .46, hip, 0, (s > 0 ? .14 : -.12) + lean * s, 0, s * .09);
+    A(L, cap(r * 1.08, S.leg * .32), thigh, 0, -S.leg * .25, 0); A(L, cyl(r * 1.28, r * .98, S.leg * .48), boot, 0, -S.leg * .68, 0);
+    A(L, tor(r * 1.28, r * .26), cuff, 0, -S.leg * .45, 0, Math.PI / 2); A(L, sph(r), boot, 0, -S.leg + r * .6, r * .8, 0, 0, 0, 1.2 * S.foot, .8, 1.9 * S.foot); }
+}
+function armsOf(g, W, r, sh, up, fore, hm, pose) {
+  const out = {};
+  for (const s of [-1, 1]) { const p = pose[s], Sh = J(g, s * W * 1.06, sh - r * .3, 0, p[0], 0, s * p[1]);
+    A(Sh, sph(r * 1.3), up); A(Sh, cap(r, S.torso * .3), up, 0, -S.torso * .28, 0);
+    const El = J(Sh, 0, -S.torso * .54, 0, p[2], 0, 0); A(El, sph(r * 1.05), up); A(El, cyl(r * .95, r * 1.15, S.torso * .42), fore, 0, -S.torso * .25, 0); A(El, tor(r * 1.15, r * .2), up, 0, -S.torso * .44, 0, Math.PI / 2);
+    const H = J(El, 0, -S.torso * .54, 0); hand(H, r, hm); out[s] = H; }
+  return out;
+}
+function archer() {
+  const g = new THREE.Group(), grn = mat('#3f7a3a'), grn2 = mat('#2a552b'), lea = mat('#8a5a32'), lea2 = mat('#4a2f1a'), tan = mat('#cdb07a'), wood = mat('#6b4526'), wh = mat('#f1ece0'), red = mat('#b8241c'), r = S.limb * .84, hip = S.leg, sh = hip + S.torso, R = S.head * .96, W = S.sw * .8;
+  legsOf(g, W, r, hip, tan, lea2, lea);
+  A(g, lathe([[W * 1.3, -S.leg * .3], [W * 1.02, .02], [W * .5, .03]]), grn, 0, hip, 0, 0, 0, 0, 1, 1, .76);                      // tunic skirt
+  A(g, lathe([[W * .5, 0], [W * 1.0, 0], [W * .9, S.torso * .35], [W * .8, S.torso * .55], [W * 1.1, S.torso * .9], [W * .9, S.torso * 1.04], [W * .4, S.torso * 1.1]]), lea, 0, hip, 0, 0, 0, 0, 1, 1, .72);
+  A(g, tor(W * .93, r * .45), lea2, 0, hip + S.torso * .3, 0, Math.PI / 2, 0, 0, 1, .74, 1); A(g, box(r * 1.3, r * 1.2, r * .4), mat('#e8bd4c'), 0, hip + S.torso * .3, W * .7); A(g, box(r * 2, r * 2.2, r * 1.2), lea2, -W * .85, hip + S.torso * .16, W * .3, 0, -.6, 0);
+  A(g, box(r * .7, S.torso * 1.25, r * .3), lea2, 0, hip + S.torso * .68, W * .7, 0, 0, .72);                                       // quiver strap
+  const Q = J(g, W * .45, hip + S.torso * .8, -W * .9, .1, 0, -.45); A(Q, cyl(r * 1.0, r * .8, S.torso * .95, 8), lea2); A(Q, tor(r * 1.0, r * .18), mat('#e8bd4c'), 0, S.torso * .45, 0, Math.PI / 2);
+  for (let i = 0; i < 4; i++) { const x = (i % 2 - .5) * r * .8, z = (i > 1 ? .4 : -.4) * r; A(Q, cyl(.008, .008, S.torso * .5, 5), wood, x, S.torso * .6, z); A(Q, cone(r * .28, r * .9, 4), i % 2 ? red : wh, x, S.torso * .82, z, Math.PI, 0, 0, 1, 1, .3); }
+  A(g, ext([[-1, 0], [1, 0], [1.2, -1], [.4, -1.1], [0, -.95], [-.5, -1.12], [-1.2, -1]], .05, .01), grn2, 0, sh * .99, -W * .75, .12, 0, 0, W * .95, S.torso + S.leg * .5, 1);   // cloak
+  A(g, cone(W * 1.35, S.torso * .34, 12), grn2, 0, sh - S.torso * .08, 0, Math.PI, 0, 0, 1, 1, .8);                                 // mantle
+  const hs = armsOf(g, W, r, sh, grn, lea2, mat('#e2b08c'), { '-1': [-1.35, .25, -.1], '1': [-.15, .35, -1.1] });
+  const Bw = J(hs[-1], 0, 0, 0, 1.45, 0, 0), bl = .6 * S.weap; A(Bw, tor(bl, .02, Math.PI * .8), wood, 0, 0, -bl, 0, -Math.PI / 2, -1.257); A(Bw, cyl(.005, .005, bl * 1.9, 4), wh, 0, 0, -bl * .69); A(Bw, cyl(.03, .03, .14, 6), lea2, 0, 0, 0);
+  const Ar = J(hs[1], 0, 0, 0, 2.7, 0, .2); A(Ar, cyl(.009, .009, .7, 5), wood, 0, .2, 0); A(Ar, cone(.03, .09, 4), mat('#dfe6f0'), 0, .58, 0); A(Ar, cone(.04, .14, 4), red, 0, -.1, 0, Math.PI, 0, 0, 1, 1, .3);
+  A(g, cyl(R * .36, R * .4, R * .5), mat('#e2b08c'), 0, sh + R * .25, 0);
+  const Hd = J(g, 0, sh + R * 1.2, 0, 0, -.3, 0); face(Hd, R, { skin: '#e2b08c', iris: '#3a8a4a', hair: '#8a3a1c', brow: -.14, mouth: 'smirk', jaw: .9 });
+  A(Hd, dome(R * 1.0, .5), mat('#8a3a1c'), 0, R * .36, -R * .06, -.3); for (const s of [-1, 1]) A(Hd, sph(R * .3), mat('#8a3a1c'), s * R * .62, R * .55, R * .55, 0, 0, s * .5, 1, .7, .6);   // hair
+  A(Hd, sph(R * .7), grn2, 0, -R * .75, -R * .85, 0, 0, 0, 1.3, .7, 1); A(Hd, sph(R * .55), mat('#8a3a1c'), 0, R * .1, -R * .7, 0, 0, 0, 1, 1.2, 1); A(Hd, cone(R * .3, R * 1.3, 6), mat('#8a3a1c'), 0, -R * .6, -R * 1.15, .5, 0, 0, 1, 1, .7); A(Hd, tor(R * .93, R * .07), grn, 0, R * .62, -R * .05, Math.PI / 2 - .2);                                                       // hood
+  A(Hd, cyl(.012, .012, R * 1.1, 4), red, R * .7, R * 1.25, -R * .3, 0, 0, -.5); A(Hd, cone(R * .16, R * .5, 4), red, R * .98, R * 1.72, -R * .3, 0, 0, -.5, 1, 1, .3);                  // feather
+  return g;
+}
+function rogue() {
+  const g = new THREE.Group(), dkl = mat('#3b3644'), dk2 = mat('#27232e'), pur = mat('#6b4a94'), steel = mat('#cfd6e2'), gold = mat('#c9a04a'), cloth = mat('#7a1e28'), r = S.limb * .88, hip = S.leg * .94, sh = hip + S.torso * .96, R = S.head * .97, W = S.sw * .86;
+  legsOf(g, W * 1.25, r, hip, dkl, dk2, pur, .12);
+  const T = J(g, 0, hip, 0, .22, .1, 0);                                                                                              // leaning in
+  A(T, lathe([[W * .5, 0], [W * 1.0, 0], [W * .9, S.torso * .35], [W * .8, S.torso * .55], [W * 1.14, S.torso * .9], [W * .92, S.torso * 1.04], [W * .4, S.torso * 1.1]]), dkl, 0, 0, 0, 0, 0, 0, 1, 1, .72);
+  A(T, tor(W * .93, r * .5), cloth, 0, S.torso * .3, 0, Math.PI / 2, 0, 0, 1, .74, 1); A(T, ext([[-.5, 0], [.5, 0], [.3, -1], [-.2, -1.1]], .08, .02), cloth, -W * .55, S.torso * .3, W * .6, -.1, -.4, 0, r * 1.6, S.leg * .5, .2);
+  A(T, box(r * .7, S.torso * 1.3, r * .3), dk2, 0, S.torso * .7, W * .72, 0, 0, -.72); for (let i = 0; i < 3; i++) A(T, ext([[-.02, 0], [.02, 0], [.025, .1], [0, .16], [-.025, .1]], .01, .003), steel, W * (.42 - i * .34), S.torso * (.98 - i * .25), W * .78, 0, 0, 2.4);
+  for (const s of [-1, 1]) A(T, dome(W * .42, .55), dk2, s * W * 1.02, S.torso * .98, 0, 0, 0, -s * .5);                                // shoulder caps
+  A(T, cone(W * 1.2, S.torso * .3, 10), dk2, 0, S.torso * .98, 0, Math.PI, 0, 0, 1, 1, .8);                                              // cowl
+  const hs = armsOf(T, W, r, S.torso * 1.02, dkl, dk2, mat('#8f6344'), { '-1': [-.9, .55, -.9], '1': [-.4, .7, -1.3] });
+  for (const s of [-1, 1]) { const D = J(hs[s], 0, 0, 0, s > 0 ? 1.5 : 1.9, 0, s * -.5), w = S.weap;
+    A(D, ext([[-.035, 0], [.04, 0], [.055, .2], [.03, .36], [-.03, .42], [-.012, .2]], .014, .005), steel, 0, .07 * w, 0, 0, 0, 0, w, w, w); A(D, box(.13 * w, .025 * w, .04 * w), gold, 0, .06 * w, 0); A(D, cyl(.02 * w, .022 * w, .13 * w, 6), cloth, 0, -.01 * w, 0); A(D, sph(.03 * w), gold, 0, -.09 * w, 0); }
+  A(T, cyl(R * .36, R * .4, R * .5), mat('#8f6344'), 0, S.torso * 1.04 + R * .2, 0);
+  const Hd = J(T, 0, S.torso * 1.04 + R * 1.15, 0, -.18, .3, 0); face(Hd, R, { skin: '#8f6344', iris: '#c9a04a', hair: '#17151a', brow: -.3, mouth: 'stern', jaw: 1.0 });
+  A(Hd, sph(R * .78), pur, 0, -R * .46, R * .1, 0, 0, 0, 1.12, .8, 1.05); A(Hd, sph(R * .19), pur, 0, -R * .22, R * 1.0, 0, 0, 0, 1.25, 1.1, 1.1, false);                                       // mask over nose and mouth
+  A(Hd, dome(R * 1.2, .6), dk2, 0, R * .3, -R * .16, -.38); A(Hd, cone(R * .42, R * .9, 6), dk2, 0, R * 1.05, -R * 1.1, -1.9);                                                       // hood
+  for (const s of [-1, 1]) A(Hd, ext([[-.5, 0], [.5, 0], [.2, -1]], .04, .01), cloth, s * R * .25 - R * .9, -R * .4, -R * .7, .3, 0, s * .3 - .5, R * .4, R * 1.2, 1);                 // mask ties
+  return g;
+}
 function wolf() {
   const g = new THREE.Group(), fur = mat('#7d6b5a'), fur2 = mat('#cdbb9c'), dk = mat('#3a2e26'), k = S.limb / .085, hs = S.head / .155, hh = .62;
   const B = J(g, 0, hh, 0, 0, 0, 0);
@@ -148,10 +195,11 @@ for (const t of TAKES) {
   S = t; uLine.value = t.line; mats.clear();
   const sc = new THREE.Scene(); sc.background = new THREE.Color('#aeb9c6'); sc.add(new THREE.HemisphereLight('#ffffff', '#8a7a6a', 1.5)); const d = new THREE.DirectionalLight('#fff4e0', 2.6); d.position.set(-3, 5, 6); sc.add(d);
   const gr = new THREE.Mesh(new THREE.CircleGeometry(9, 40), new THREE.MeshBasicMaterial({ color: '#8fa07a' })); gr.rotation.x = -Math.PI / 2; sc.add(gr);
-  [[knight, -1.5, .3], [wizard, .15, -.25], [wolf, 1.8, -1.05]].forEach(([f, x, ry]) => { const m = f(); m.position.x = x; m.rotation.y = ry; sc.add(m);
-    const sh = new THREE.Mesh(new THREE.CircleGeometry(f === wolf ? .75 : .5, 24), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: .22 })); sh.rotation.x = -Math.PI / 2; sh.position.set(x, .005, 0); sc.add(sh); });
-  const box = document.createElement('div'); box.style.cssText = 'position:relative;width:' + W + 'px;margin:0 0 8px;display:flex;flex-wrap:wrap';
-  for (const [w, h, pos, at, fov] of [[1100, 400, [0, 1.35, 7.2], [.1, .98, 0], 21], [550, 400, [-1.05, 1.5, 1.75], [-1.48, 1.4, 0], 27], [550, 400, [-.2, 1.47, 1.8], [.15, 1.4, 0], 27]]) {
+  [[knight, -3.3, .35, .5], [wizard, -1.55, .1, .5], [archer, .1, -.15, .5], [rogue, 1.7, -.35, .5], [wolf, 3.5, -1.05, .75]].forEach(([f, x, ry, sr]) => { const m = f(); m.position.x = x; m.rotation.y = ry; sc.add(m);
+    const sh = new THREE.Mesh(new THREE.CircleGeometry(sr, 24), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: .22 })); sh.rotation.x = -Math.PI / 2; sh.position.set(x, .005, 0); sc.add(sh); });
+  const box = document.createElement('div'); box.style.cssText = 'position:relative;width:' + W + 'px;margin:0;display:flex;flex-wrap:wrap';
+  const shots = [[1100, 470, [.05, 1.35, 10.6], [.05, .95, 0], 21], [550, 380, [-2.75, 1.5, 1.75], [-3.28, 1.4, 0], 27], [550, 380, [-1.7, 1.47, 1.8], [-1.55, 1.4, 0], 27], [550, 380, [.6, 1.42, 1.75], [.1, 1.36, 0], 27], [550, 380, [2.5, 1.32, 1.7], [1.72, 1.28, .22], 27]];
+  for (const [w, h, pos, at, fov] of shots) {
     r.setSize(w, h); const cam = new THREE.PerspectiveCamera(fov, w / h, .1, 50); cam.position.set(...pos); cam.lookAt(...at); r.render(sc, cam);
     const im = new Image(); im.src = r.domElement.toDataURL(); im.style.cssText = 'display:block;width:' + w + 'px;height:' + h + 'px'; box.append(im);
   }
