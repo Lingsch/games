@@ -140,7 +140,7 @@ c+=(h21(gl_FragCoord.xy)-.5)/255.;gl_FragColor=vec4(c,1.);}`, outU);
   // on a phone the softer shadow filter costs several extra texture reads for every pixel on screen; the plain filter at this map size looks nearly the same
   const PHONE = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   function shadowBox() {
-    const q = G.quality(), want = q === 'low' ? 0 : q === 'medium' ? 1024 : 2048;
+    const q = G.quality(), want = q === 'low' || window.__PERF?.noShadow ? 0 : q === 'medium' ? 1024 : 2048;
     if (want !== shSize) {
       shSize = want; sun.castShadow = !!want; r.shadowMap.enabled = !!want; r.shadowMap.type = PHONE ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
       if (want) { sun.shadow.mapSize.set(want, want); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
@@ -219,7 +219,7 @@ c+=(h21(gl_FragCoord.xy)-.5)/255.;gl_FragColor=vec4(c,1.);}`, outU);
     grade(dt, space);
     for (const f of hooks) f(dt, inside, space);
     const q = G.quality();
-    if (!canPost || q === 'low') { r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = cur.exp; origRender(scene, cam); return; }
+    if (!canPost || q === 'low' || window.__PERF?.noGlow) { r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = cur.exp; origRender(scene, cam); return; }
     r.toneMapping = THREE.NoToneMapping;
     targets();
     r.setRenderTarget(rt);

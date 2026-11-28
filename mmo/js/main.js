@@ -59,6 +59,7 @@ import './craft13.js';
 import './hard11.js';
 import './script13.js';
 import './ally13.js';
+import './perf13.js';
 import * as P8 from './party8.js';
 import './heroic7.js';
 import './ach7.js';
@@ -166,6 +167,8 @@ let drawDt = 1 / 60;
 // Build 13.4: only what the camera can see is sent to the graphics chip. Each model kind is a draw call even with nobody wearing it,
 // and with every creature and look now its own model there are hundreds of kinds, so empty ones are switched off and
 // people off-screen are skipped (with a margin so a shadow falling into view from just outside still shows).
+// Build 13.4: frame timings for the speed test (Menu → Speed test)
+const PF = window.__PERF = { tick: 0, draw: 0, render: 0, ui: 0, busy: 0, frames: 0 };
 const frus = new THREE.Frustum(), pvM = new THREE.Matrix4(), cullS = new THREE.Sphere();
 function draw() {
   for (const k in R.kinds) R.kinds[k].n = 0;
@@ -191,7 +194,7 @@ function draw() {
     const a = e.anim; K.anim.setXYZW(i, a.ph, e.dead ? 0 : a.mv, a.atk, a.flash);
     if (ns < 400 && !e.dead) { o3.position.set(e.x, e.y + .05, e.z); o3.rotation.set(0, 0, 0); o3.scale.setScalar(1.3 * (e.scale || 1)); o3.updateMatrix(); R.shadows.setMatrixAt(ns++, o3.matrix); }
   }
-  for (const k in R.kinds) { const K = R.kinds[k]; K.mesh.count = K.ol.count = K.n; K.mesh.visible = K.ol.visible = K.n > 0; if (K.n) { K.mesh.instanceMatrix.needsUpdate = true; K.anim.needsUpdate = true; } }
+  for (const k in R.kinds) { const K = R.kinds[k]; K.mesh.count = K.ol.count = K.n; K.mesh.visible = K.n > 0; K.ol.visible = K.n > 0 && !PF.noOutline; if (K.n) { const im = K.mesh.instanceMatrix; im.clearUpdateRanges(); im.addUpdateRange(0, K.n * 16); im.needsUpdate = true; K.anim.clearUpdateRanges(); K.anim.addUpdateRange(0, K.n * 4); K.anim.needsUpdate = true; } }
   R.shadows.count = ns; R.shadows.instanceMatrix.needsUpdate = true;
   for (const p of Cb.projectiles) if (p.kind === 'arrow' && na < 200 && p.dx !== undefined) {
     o3.position.set(p.x, p.y, p.z); tmpV.set(p.dx, p.dy, p.dz); tmpQ.setFromUnitVectors(new THREE.Vector3(0, 0, 1), tmpV); o3.quaternion.copy(tmpQ); o3.scale.setScalar(1); o3.updateMatrix(); R.arrows.setMatrixAt(na++, o3.matrix); o3.rotation.set(0, 0, 0);
@@ -222,7 +225,7 @@ function loop() {
     scKey = '';
     const inp = UI.pollInput();
     moveHero(dt, inp);
-    Game.tick(dt);
+    const tq0 = performance.now(); Game.tick(dt); PF.tick += performance.now() - tq0;
     camera(dt);
     dayNight(S.time); for (const f of X.light) f(dt); ruinGloom(S.hero);
     if (world.water !== null) updateWater(now / 1000);
@@ -231,10 +234,11 @@ function loop() {
     R.cam.position.set(Math.cos(t * .04) * 60, 22, Math.sin(t * .04) * 60); R.cam.lookAt(0, 6, 0);
     dayNight(t * 6);
   }
-  drawDt = dt; draw();
+  const t1 = performance.now(); drawDt = dt; draw();
   R.magic.update(dt); R.dust.update(dt);
-  R.renderer.render(R.scene, R.cam);
-  UI.update(dt);
+  const t2 = performance.now(); R.renderer.render(R.scene, R.cam);
+  const t3 = performance.now(); UI.update(dt);
+  const t4 = performance.now(); PF.draw += t2 - t1; PF.render += t3 - t2; PF.ui += t4 - t3; PF.frames++; PF.busy += t4 - now;
   fN++; if (now - fT > 500) { S.fps = Math.round(fN * 1000 / (now - fT)); fN = 0; fT = now; }
 }
 loop();

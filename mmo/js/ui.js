@@ -989,7 +989,7 @@ function renderSettings(box, inGame, back) {
     <div class="card" style="text-align:left"><h3>Camera &amp; touch</h3>${['camSpeed', 'joySize', 'tapSens'].map(segHtml).join('')}</div>
     <div class="card" style="text-align:left"><h3>Text &amp; interface size</h3>${['ui', 'text'].map(segHtml).join('')}</div>
     <div class="card" style="text-align:left"><h3>Loot</h3>${segHtml('loot')}</div>
-    <div class="card" style="text-align:left"><h3>Graphics</h3>${segHtml('gfx')}<p class="dim" style="font-size:12px;margin:0">Low and Medium draw fewer pixels, so the game runs smoother and the phone stays cooler.</p></div>
+    <div class="card" style="text-align:left"><h3>Graphics</h3>${segHtml('gfx')}<p class="dim" style="font-size:12px;margin:0">Low and Medium draw fewer pixels, so the game runs smoother and the phone stays cooler.</p>${inGame ? '<div class="acts"><button data-a="speed">Speed test</button></div><p class="dim" style="font-size:12px;margin:0">About 30 seconds. It switches parts of the graphics off one at a time and times each, so we can see what slows your device down.</p>' : ''}</div>
     <div class="card" style="text-align:left"><h3>Save codes</h3>
       ${info ? `<p style="margin:0 0 6px">Your character: <b>${esc(info.name)}</b>, level ${info.lvl} ${CLASSES[info.cls]?.name || ''}.</p><div class="acts"><button data-a="copy">Copy save code</button></div><textarea id="codeOut" readonly class="hide" style="height:60px"></textarea>` : '<p class="dim" style="margin:0 0 6px">No character saved on this device yet.</p>'}
       <p style="margin:8px 0 4px">Load a save code:</p><textarea id="codeIn" placeholder="Paste a code starting OSSU1." style="height:60px"></textarea><div class="acts"><button data-a="paste">📥 Paste</button><button data-a="load">Load</button></div><p class="dim" style="font-size:12px;margin:4px 0 0">Copy the code on one device, send it to yourself, then paste it here on the other. The game saves every few seconds.</p>
@@ -1001,6 +1001,7 @@ function renderSettings(box, inGame, back) {
     if (b.dataset.o) { setOpt(b.dataset.o, isNaN(+b.dataset.v) ? b.dataset.v : +b.dataset.v); b.parentElement.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); return; }
     const a = b.dataset.a;
     if (a === 'back') back();
+    if (a === 'speed') { closeSheet(); X.speedTest?.(); }
     if (a === 'copy') { if (S.running) Game.save(); const code = await Game.makeCode(inGame ? null : true); const t = $('codeOut'); t.value = code; t.classList.remove('hide'); try { await navigator.clipboard.writeText(code); toast('Save code copied'); } catch (e) { t.select(); toast('Select and copy the code'); } }
     if (a === 'paste') { try { $('codeIn').value = await navigator.clipboard.readText(); } catch (e) { $('codeIn').focus(); toast('Long-press the box to paste'); } }
     if (a === 'load') { try { const sv = await Game.readCode($('codeIn').value); Game.loadSave(sv); closeSheet(); afterStart(); toast('Save loaded'); } catch (e) { toast("That code didn't work"); } }
@@ -1027,7 +1028,7 @@ export function showTitle(view = 'home') {
   if (S.scene) Game.endScene(); S.pendingScene = null; document.body.classList.remove('inscene'); $('scene').classList.add('hide');
   $('hud').classList.add('hide'); $('title').classList.remove('hide');
   const T = $('titleIn'), info = Game.saveInfo();
-  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.4 · a century after the summoner wars</div>`;
+  const head = `<h1>Single-Player MMO</h1><div class="sub">Build 13.4.1 · a century after the summoner wars</div>`;
   if (view === 'home') {
     T.innerHTML = `${head}<div class="tmenu">
       ${info ? `<button class="pri" data-a="cont">Continue<small>${esc(info.name)} · level ${info.lvl} ${CLASSES[info.cls]?.name || ''}</small></button>` : ''}
