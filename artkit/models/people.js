@@ -586,7 +586,7 @@ export const FOLK = {
   abom: [F({ c1: '#6a3a3a', skin: '#a8a488', bare: 1, bareLegs: 1, skirt: .3, belly: 1.5, apron: '#7a2a2a', stitch: 1, hairStyle: 'bald', right: 'axe', weapK: 1.4, brow: -.2, jaw: 1.3, wide: 1.2, thin: 1.3, glowEyes: '#b6ff3a', mouth: 'grin' }), 1.38],
 };
 export const CLASSES = { bulwark: knight, elem: wizard, archer, knifeshade: rogue, cleric, bladewarden, warlock, druid, wardancer, monk, aegis, lifebinder, blightblade, bard, binder, illusionist };
-export { THREE, wolf, uLine, A, J, tag, mat, shade, sph, cyl, cone, cap, box, tor, lathe, dome, ext, fac };
+export { THREE, wolf, uLine, A, J, tag, mat, shade, sph, cyl, cone, cap, box, tor, lathe, dome, ext, fac, harpy };
 
 // One geometry for the game engine: position, normal, colour, and for every vertex which joint moves it and where that joint is.
 // Parts: 0 body, 1/2 thighs, 11/12 shins, 3/4 upper arms, 13/14 forearms and whatever they hold, 5 head, 15 cloak.
