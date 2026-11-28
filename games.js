@@ -19,11 +19,11 @@ window.GAMES = [
   {
     title: "The Lamplighters of Hulrouhn",
     folder: "mmo",
-    version: "Build 14",
+    version: "Build 15",
     updated: "November 2026",
     kind: "Tab-target MMO, solo",
-    blurb: "A single-player MMO on Hulrouhn, a hundred years after the summoner wars. Four peoples, sixteen classes that split in two at level 20, and a world that ends up under the dark: Vhorun climbs out, the lamps go out, and something falls from the sky. Found the Lamplighters and relight them.",
-    facts: ["16 classes", "Levels 1–40", "4 peoples"],
+    blurb: "A single-player MMO on Hulrouhn, a hundred years after the summoner wars. Four peoples, sixteen classes that split in two at level 20, and a world that ends up under the dark: Vhorun climbs out, the lamps go out, and something falls from the sky. Found the Lamplighters, relight them, and then climb to the moon to sing what sleeps inside it back to sleep.",
+    facts: ["16 classes", "Levels 1–45", "4 peoples"],
     accent: "#63b7c9"
   },
   {

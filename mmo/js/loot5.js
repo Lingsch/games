@@ -9,7 +9,7 @@ import { rareFrom, gearBudget } from './crafting.js';
 export const SET_ROLE = { bulwark: 'tank', wardancer: 'tank', bladewarden: 'tank', cleric: 'healer', aegis: 'healer', lifebinder: 'healer',
   longwatch: 'dps', knifeshade: 'dps', blightblade: 'dps', elementalist: 'mage', warlock: 'mage', binder: 'mage', monk: 'support', druid: 'support', bard: 'support', illusionist: 'support' };
 export const TIER = { keep: 0, grove: 0, catacombs: 1, mines: 1, teeth: 2, shrine: 2, brinevaults: 3, bonewhale: 3, barrows: 4, foundry: 4, witchroot: 4, cathedral: 4, gaol: 5, ossuary: 5, between: 6 };
-export const TIER_LVL = [6, 10, 12, 15, 18, 20, 20, 22, 25, 25, 27, 30, 30, 32, 35, 35, 35, 37, 38, 39, 40, 40], TIER_K = [.5, 1, 1.25, 1.6, 1.9, 2.2, 2.8, 2.6, 3, 3.5, 3.6, 4.1, 4.6, 4.4, 5, 5.5, 6.2, 6.4, 6.8, 7.2, 7.6, 8.4], TIER_BUDGET = [1, 1, 1, 1, 1, 1.1, 1.35, 1.1, 1.2, 1.45, 1.1, 1.2, 1.45, 1.1, 1.2, 1.45, 1.7, 1.25, 1.3, 1.35, 1.5, 1.8];
+export const TIER_LVL = [6, 10, 12, 15, 18, 20, 20, 22, 25, 25, 27, 30, 30, 32, 35, 35, 35, 37, 38, 39, 40, 40, 41, 42, 43, 44, 45, 45], TIER_K = [.5, 1, 1.25, 1.6, 1.9, 2.2, 2.8, 2.6, 3, 3.5, 3.6, 4.1, 4.6, 4.4, 5, 5.5, 6.2, 6.4, 6.8, 7.2, 7.6, 8.4, 8.2, 8.6, 9, 9.4, 9.9, 10.8], TIER_BUDGET = [1, 1, 1, 1, 1, 1.1, 1.35, 1.1, 1.2, 1.45, 1.1, 1.2, 1.45, 1.1, 1.2, 1.45, 1.7, 1.25, 1.3, 1.35, 1.5, 1.8, 1.4, 1.45, 1.5, 1.55, 1.7, 2];
 const SETNAME = [{ tank: 'Gatewarden', healer: 'Mercyward', dps: 'Cutpurse', mage: 'Hedge-Witch', support: 'Wayfarer' }, { tank: 'Bonewall', healer: 'Lantern-Keeper', dps: 'Gravecutter', mage: 'Dirge-Weaver', support: 'Deepsong' },
   { tank: 'Saltbreaker', healer: 'Lamplight', dps: "Wrecker's", mage: 'Tidecaller', support: 'Driftwood' }, { tank: 'Admiralty', healer: 'Lightkeeper', dps: 'Riptide', mage: 'Abyssal', support: 'Shanty' },
   { tank: 'Emberguard', healer: 'Orrinite', dps: 'Ashstalker', mage: 'Blightbane', support: 'Barrowsong' }, { tank: 'Gaolbreaker', healer: "Pilgrim's", dps: 'Legionbane', mage: 'Hollowfire', support: 'Throne-Herald' },
@@ -24,7 +24,11 @@ const SETNAME = [{ tank: 'Gatewarden', healer: 'Mercyward', dps: 'Cutpurse', mag
   // Build 14: the Lamplighters' road, 36-40 (17 the Reach, 18 the Hollows, 19 Starfall and the Forge, 20 the Great Lamp, 21 its raids)
   { tank: 'Wayshrine', healer: 'Lampwick', dps: 'Darkstalker', mage: 'Gutterflame', support: 'Nightwalk' }, { tank: 'Tidewarden', healer: 'Pearl-Lamp', dps: 'Deepcutter', mage: 'Drowned Choir', support: 'Undertow' },
   { tank: 'Starforged', healer: 'Lightwright', dps: 'Scoutbreaker', mage: 'Eater\'s Bane', support: 'Starsinger' }, { tank: 'Lamplighter', healer: 'Curtainkeeper', dps: 'Wickcutter', mage: 'Lanternwright', support: 'Dawnwalker' },
-  { tank: 'Hulrouhn\'s Shield', healer: 'Great Lamp', dps: 'Hungerbreaker', mage: 'Curtainweaver', support: 'Lightsong' }];
+  { tank: 'Hulrouhn\'s Shield', healer: 'Great Lamp', dps: 'Hungerbreaker', mage: 'Curtainweaver', support: 'Lightsong' },
+  // Build 15: the moon road (tiers 22-27, levels 41-45)
+  { tank: 'Faultwarden', healer: 'Vale-Mender', dps: 'Cracksplitter', mage: 'Quakecaller', support: 'Hearthward' }, { tank: 'Nestguard', healer: 'Broodmother', dps: 'Shellcutter', mage: 'Hatchling', support: 'Nursery' },
+  { tank: 'Moonroad', healer: 'Pale Lantern', dps: 'Towerbreaker', mage: 'Moonbeam', support: 'Pilgrim\'s' }, { tank: 'Shellbound', healer: 'Silverblood', dps: 'Chitincleaver', mage: 'Shellsinger', support: 'Undercroft' },
+  { tank: 'Sleeper\'s Wall', healer: 'Lullaby', dps: 'Wakebreaker', mage: 'Dreamweaver', support: 'Moonward' }, { tank: 'Last Lamplighter', healer: 'Hulrouhn\'s Mercy', dps: 'Sleeperbane', mage: 'Moonbreaker', support: 'Curtainbearer' }];
 const BONUS = { tank: [{ sta: 8 }, { sta: 20, pow: 4 }], healer: [{ pow: 6 }, { pow: 10, crit: 3 }], dps: [{ crit: 3 }, { pow: 14 }], mage: [{ pow: 8 }, { pow: 8, crit: 3 }], support: [{ sta: 6, pow: 4 }, { sta: 8, pow: 8 }] };
 for (const t of SETNAME.keys()) for (const [role, nm] of Object.entries(SETNAME[t])) {
   const b = BONUS[role], k = TIER_K[t], sc = o => Object.fromEntries(Object.entries(o).map(([s, v]) => [s, Math.round(v * k * 10) / 10]));
@@ -39,7 +43,7 @@ export function setPieceFor(cls, tier) {
   if (role === 'dps' || role === 'mage') stats.crit = +(1 + L * .1).toFixed(1);
   // Build 13: the new tiers carry secondaries, and the raid tiers the resistance the next raid asks for
   if (tier >= 13) { const sec = { tank: pick(['dodge', 'parry']), healer: pick(['haste', 'spi', 'mreg']), dps: 'haste', mage: 'haste', support: pick(['haste', 'spi']) }[role]; secondary(stats, sec, L, 3, budget); if (tier >= 14) secondary(stats, tier === 14 ? 'rfrost' : 'rshadow', L, 3, budget * .7); }
-  return makeItem({ forCls: cls, name: `${SETNAME[tier][role]} ${PIECE[slot][at]}`, slot, type: at, armorType: at, lvl: L, rarity: tier === 6 || tier === 9 || tier === 12 || tier === 15 || tier === 16 || tier === 20 || tier === 21 ? 4 : 3, set: `s${tier}_${role}`, stats, value: Math.round((3 + L * 4) * 6) });
+  return makeItem({ forCls: cls, name: `${SETNAME[tier][role]} ${PIECE[slot][at]}`, slot, type: at, armorType: at, lvl: L, rarity: tier === 6 || tier === 9 || tier === 12 || tier === 15 || tier === 16 || tier === 20 || tier === 21 || tier >= 26 ? 4 : 3, set: `s${tier}_${role}`, stats, value: Math.round((3 + L * 4) * 6) });
 }
 
 // ---------- collectibles ----------

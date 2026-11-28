@@ -378,9 +378,10 @@ export const lockedAt20 = () => FAMILIES.some(f => famBest(f) < 20);
 export const lockedAt25 = () => FAMILIES.some(f => famBest(f) < 25);
 export const lockedAt30 = () => FAMILIES.some(f => famBest(f) < 30);
 export const lockedAt35 = () => FAMILIES.some(f => famBest(f) < 35);   // Build 14
+export const lockedAt40 = () => FAMILIES.some(f => famBest(f) < 40);   // Build 15
 // Build 13.2: which families still have to catch up before this class can grow past its level
 export function capInfo(p = S.hero) {
-  if (!p) return null; const L = [10, 20, 25, 30, 35].find(n => p.lvl === n && FAMILIES.some(f => famBest(f) < n));
+  if (!p) return null; const L = [10, 20, 25, 30, 35, 40].find(n => p.lvl === n && FAMILIES.some(f => famBest(f) < n));
   if (!L) return null; return { lvl: L, missing: FAMILIES.filter(f => famBest(f) < L) };
 }
 export const capText = c => `Your ${CLASSES[S.heroCls].name} can't grow past level ${c.lvl} until you also have a ${c.missing.join(', a ').replace(/, a ([^,]*)$/, ' and a $1')} at level ${c.lvl}. The experience you earn now is saved as veteran experience, and it doubles what your other classes earn until it runs out.`;
@@ -834,7 +835,7 @@ Cb.setHooks({
     return a;
   },
   onOverflow(p, over) { if (over > 0) S.vetXp = Math.min(40000, (S.vetXp || 0) + Math.round(over)); },
-  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : lockedAt20() && p.lvl >= 20 ? 20 : lockedAt25() && p.lvl >= 25 ? 25 : lockedAt30() && p.lvl >= 30 ? 30 : lockedAt35() && p.lvl >= 35 ? 35 : MAX_LVL),
+  lvlCap: p => (lockedAt10() && p.lvl >= 10 ? 10 : lockedAt20() && p.lvl >= 20 ? 20 : lockedAt25() && p.lvl >= 25 ? 25 : lockedAt30() && p.lvl >= 30 ? 30 : lockedAt35() && p.lvl >= 35 ? 35 : lockedAt40() && p.lvl >= 40 ? 40 : MAX_LVL),
   onCapped(p) { if (cappedSaid) return; cappedSaid = true; const c = capInfo(p); chat('sys', null, c ? capText(c) : 'You have learned all this weapon can teach you, for now.'); if (c) X.ui?.toast?.(`Level ${c.lvl} is as far as this class goes for now`); summonArmory(); },
   onYield(m, src) {
     // he only surrenders to your group, and only while you're on his quest

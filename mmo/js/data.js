@@ -2,7 +2,7 @@
 // Ability effects receive C (the combat API in combat.js), the user u, the target t and the ability.
 
 import { S as _S } from './core.js';
-export const MAX_LVL = 40;   // Build 14: forty
+export const MAX_LVL = 45;   // Build 15: forty-five
 export const xpNeed = L => Math.round(80 * L ** 1.7 + 120);
 export const GCD = 1.5;
 

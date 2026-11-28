@@ -26,6 +26,12 @@ const LANDS = {
   sf14: { tint: '#eae6ff', lift: '#0a0418', sat: 1.16, con: 1.14, cloud: .3, bloom: .95 },
   mf14: { tint: '#e8f6ff', lift: '#040c18', sat: 1.06, con: 1.18, cloud: .2, bloom: 1 },
   gl14: { tint: '#fff2d8', lift: '#100804', sat: 1.12, con: 1.12, cloud: .45, bloom: .9 },
+  // Build 15: the road to the moon. Moonlit everywhere: cool, silver, and a bit more bloom each land.
+  cv15: { tint: '#e6e4ff', lift: '#0a0820', sat: 1.04, con: 1.12, cloud: .35, bloom: .8 },
+  ht15: { tint: '#ece4ff', lift: '#120a24', sat: 1.12, con: 1.14, cloud: .25, bloom: .9 },
+  mr15: { tint: '#e4e6ff', lift: '#080a20', sat: 1, con: 1.16, cloud: .15, bloom: 1 },
+  sh15: { tint: '#f0ecff', lift: '#14082a', sat: 1.1, con: 1.16, cloud: 0, bloom: 1.05 },
+  wh15: { exp: .78, tint: '#e8ecff', lift: '#000008', sat: .9, con: 1.2, cloud: 0, bloom: 1.1 },
 };
 let INST = null;
 function landOf(zone) {
@@ -56,6 +62,11 @@ const AIR = {
   sf14: { col: [.8, .5, 1], rate: 8, size: .14, vel: [0, .25, 0], life: 5, glow: 1, low: 6 },               // star-dust off the wreck
   mf14: { col: [.4, 1, 1], rate: 9, size: .12, vel: [.3, .4, 0], life: 3.5, glow: 1, low: 5 },             // sparks from the Forge
   gl14: { col: [1, .9, .55], rate: 6, size: .15, vel: [0, .4, 0], life: 5, glow: 1, low: 6 },
+  cv15: { col: [.8, .75, 1], rate: 5, size: .12, vel: [0, .5, 0], life: 5, glow: 1, low: 4 },               // silver dust rising toward the moon
+  ht15: { col: [.75, .5, 1], rate: 7, size: .14, vel: [0, .3, 0], life: 5, glow: 1, low: 5 },
+  mr15: { col: [.9, .88, 1], rate: 8, size: .12, vel: [0, .9, 0], life: 4, glow: 1, low: 6 },
+  sh15: { col: [.7, .45, 1], rate: 9, size: .16, vel: [0, .2, 0], life: 6, glow: 1, low: 5 },
+  wh15: { col: [.9, .9, 1], rate: 6, size: .1, vel: [0, .15, 0], life: 7, glow: 1, low: 2 },                // moon dust, slow to fall
 };
 const FIREFLY = { col: [.75, 1, .35], rate: 7, size: .2, vel: [0, .05, 0], life: 4, glow: 1, low: 2.5 };
 const CAVE = { col: [.8, .75, .6], rate: 4, size: .1, vel: [0, .05, 0], life: 6, glow: 1, low: 4 };

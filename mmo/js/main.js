@@ -65,9 +65,17 @@ import './mf14.js';
 import './gl14.js';
 import './fill14.js';
 import './craft14.js';
+import './l15.js';
+import './cv15.js';
+import './ht15.js';
+import './mr15.js';
+import './sh15.js';
+import './wh15.js';
+import './craft15.js';
 import './hard11.js';
 import './script13.js';
 import './spells14.js';
+import './spells15.js';
 import './ally13.js';
 import './perf13.js';
 import * as P8 from './party8.js';
@@ -196,6 +204,7 @@ function draw() {
     let y = e.y, rotX = 0;
     if (e.mob) { const M = MOBS[e.mob]; if (M.fly && !e.dead) y += M.fly + Math.sin(R.uTime.value * 3 + e.id) * .15; }
     if (world.swimBob && !e.dead && !e.prop) y += .55 + Math.sin(R.uTime.value * 1.6 + e.id) * .22;   // Build 14: under the Dusk Sea everyone swims
+    if (world.lowGrav && !e.dead && !e.prop) y += Math.abs(Math.sin(R.uTime.value * 1.9 + e.id)) * .9 * (e.moving ?? .7);   // Build 15: on the moon everyone bounds
     if (e.dead && !e.corpse) { const f = Math.min(1, (S.time - e.deadT) * 3); rotX = -Math.PI / 2 * f; y += .2 * f; }
     if (e.isHero || e.rx === undefined || Math.abs(e.x - e.rx) + Math.abs(e.z - e.rz) > 4) { e.rx = e.x; e.rz = e.z; e.ryaw = e.yaw; }
     else { const k = Math.min(1, drawDt * 14); e.rx += (e.x - e.rx) * k; e.rz += (e.z - e.rz) * k; e.ryaw += wrapA(e.yaw - e.ryaw) * Math.min(1, drawDt * 12); }
