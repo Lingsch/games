@@ -299,8 +299,16 @@ export function initRig(G) {
   // On Graphics: Low (chosen, or stepped down to because the frame rate stayed low) the games' lighter models are used.
   let on = false, raf = 0, live = true;
   const all = v => { for (const k in R.kinds) { const K = R.kinds[k]; if (K.artRig && K.artRig.geo) setRig(K, v); } };
+  // The game makes a people's or an area's version of a kind (<kind>_<people>, <kind>~<look>) from the plain kind's model as it
+  // stands. While the new models are showing, hand it the game's own model for that, so switching the art off shows the right thing.
+  let wrapped = false;
+  function wrap() {
+    const X = window.__G && window.__G.X; if (!X || !X.lazyKind) return; wrapped = true; const lz = X.lazyKind;
+    X.lazyKind = kk => { const m = /^(.+)[_~][a-z]+$/.exec(kk || ''), Bk = m && R.kinds[m[1]], sw = Bk && Bk.artRig && Bk.artRig.geo && Bk.mesh.geometry === Bk.artRig.geo;
+      if (sw) Bk.mesh.geometry = Bk.artRig.old; try { return lz(kk); } finally { if (sw) Bk.mesh.geometry = Bk.artRig.geo; } };
+  }
   function tick() {
-    raf = requestAnimationFrame(tick); let budget = 3;
+    raf = requestAnimationFrame(tick); let budget = 3; if (!wrapped) wrap();
     const want = G.quality() !== 'low'; if (want !== live) { live = want; all(want); }
     if (!live) return;
     for (const k in R.kinds) { const K = R.kinds[k]; if (!K.artRig && K.n > 0) { rigKind(K, k); if (--budget <= 0) break; } }

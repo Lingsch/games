@@ -11,6 +11,7 @@ export const setStyle = o => { if ('ink' in o) INK = o.ink; S = { ...S, ...o }; 
 const tag = (p, o) => { o.userData.part = p; return o; };
 const mats = new Map();
 const mat = (c, glow) => { if (S.pal && S.pal[c]) c = S.pal[c];
+  if (S.skinTo && !glow) { const q0 = new THREE.Color(c), f = S.skinFrom, k = q0.r / f.r; if (k > .72 && k < 1.25 && Math.abs(q0.g / f.g - k) < .1 && Math.abs(q0.b / f.b - k) < .12) c = '#' + new THREE.Color(S.skinTo).multiplyScalar(Math.min(k, 1.2)).getHexString(); }   // another people's skin
   if (S.ghost && !glow) { const q0 = new THREE.Color(c), l = Math.min(1, (q0.r + q0.g + q0.b) / 2.2); c = '#' + new THREE.Color('#3f6f90').lerp(new THREE.Color('#eafcff'), l).getHexString(); }
   const k = c + (glow ? 'g' : '') + S.sat + '/' + S.hue; if (!mats.has(k)) { const col = new THREE.Color(c); const h = {}; col.getHSL(h); col.setHSL((S.hue && !glow && h.s > .3 && !(h.h > .028 && h.h < .14)) ? (h.h + S.hue + 1) % 1 : h.h, Math.min(1, h.s * S.sat), h.l); mats.set(k, glow ? new THREE.MeshBasicMaterial({ color: col }) : new THREE.MeshToonMaterial({ color: col, gradientMap: ramp })); } return mats.get(k); };
 const ink = new THREE.MeshBasicMaterial({ color: '#1a120c', side: THREE.BackSide });
@@ -41,7 +42,17 @@ function headGeo(jaw) {     // one smooth shape: tall skull, full square jaw, ch
   g.computeVertexNormals(); return g;
 }
 const smooth = (r = 1) => new THREE.SphereGeometry(r, 12, 9);
+// What the three other peoples add to a head: the Varr horns, pointed ears and a dark nose; the Grael a stone brow, a rock at
+// the back of the skull and an ember on the crown; the Sallow lit eyes.
+function raceFace(p, R, o) {
+  const skin = mat(o.skin), r = S.race;
+  if (r === 'varr') { for (const s of [-1, 1]) { A(p, cone(R * .17, R * .62, 4), skin, s * R * .98, R * .3, -R * .05, 0, 0, -s * 1.15, 1, 1, .5); A(p, cone(R * .2, R * 1.7, 5), mat('#e8dcc4'), s * R * 1.25, R * 1.25, -R * .25, -.35, 0, -s * .8); A(p, cyl(R * .22, R * .22, R * .16, 6), mat('#b8a888'), s * R * .78, R * .72, -R * .12, -.35, 0, -s * .8); } A(p, smooth(R * .13), mat('#2a1a10'), 0, -R * .24, R * 1.13); }
+  else if (r === 'grael') { A(p, box(R * 1.5, R * .2, R * .3), mat('#6a6058'), 0, R * .5, R * .76, .2); A(p, sph(R * .34), mat('#6a6058'), 0, R * .7, -R * .55); for (const s of [-1, 1]) A(p, box(R * .05, R * .3, R * .04), mat('#ff8a3a', 1), s * R * .72, R * .0, R * .62, 0, s * .7, s * .3, 1, 1, 1, false); }
+  else if (r === 'sallow') for (const s of [-1, 1]) { A(p, sph(R * .1), mat('#9affff', 1), s * R * .36, R * .22, R * .88, 0, s * .2, 0, 1.2, .75, .4, false); A(p, box(R * .04, R * .3, R * .03), mat('#5a6a70'), s * R * .36, -R * .12, R * .86, 0, s * .3, 0, 1, 1, 1, false); }
+}
 function face(p, R, o) {
+  if (S.learn) S.learn.skin = o.skin;
+  if (S.race) raceFace(p, R, o);
   const skin = mat(o.skin), sk2 = mat(shade(o.skin, .93)), dk = mat('#2a1c14'), wh = mat('#fbf7ee'), F = S.face, hair = mat(o.hair);
   A(p, headGeo(o.jaw || 1), skin, 0, 0, 0, 0, 0, 0, R, R, R);
   const er = R * (F === 2 ? .11 : F === 1 ? .125 : .165), ex = R * .36, ey = R * .22, ez = R * .8;

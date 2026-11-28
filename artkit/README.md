@@ -38,6 +38,8 @@ dark eyes). Nothing in the game's own model files changes. Every model is made i
   `golem`. Area versions and bosses add their own pieces. `beastFor(name, kind)` gives a creature that is not listed
   its family's ordinary model, so a creature added to the game later is not left on the old one.
   `beastkit.js` gives each listed creature a kind of its own (`art:<name>`).
+- The other three peoples (`<class><0-2>_varr`, `_grael`, `_sallow`): the same class models with that people's skin
+  and build, plus horns, pointed ears and a tail (Varr); a stone brow, shoulder rocks and embers (Grael); lit eyes (Sallow).
 - Area versions of people (`<kind>~ashen`, `~spectral`, `~gilded`, `~verdant`): `rig.js` rebuilds them from the plain
   kind in the area's colours, and `classes.js` adds a halo and gold caps, wisps, embers, or moss and flowers.
 - Sample pages: `samples/style-takes/` (people) and `samples/beasts/` (every beast, six to a row; `?from=N&to=M`,

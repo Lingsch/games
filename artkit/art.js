@@ -7,7 +7,7 @@ import { initBeasts } from './beastkit.js';
 import { initLight } from './light.js';
 import { initFx } from './fx.js';
 import { initUi } from './ui.js';
-export const ART_VERSION = '10';
+export const ART_VERSION = '11';
 export function initArt(G) {
   const { SET } = G;
   if (SET.art === undefined) SET.art = 1;
