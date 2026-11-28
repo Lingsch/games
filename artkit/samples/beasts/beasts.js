@@ -2,7 +2,7 @@
 import { THREE, setStyle } from '../../models/people.js';
 import { BEASTS } from '../../models/beasts.js';
 setStyle({ ink: true, hue: 0, pal: null, ghost: 0, det: .45 });
-const names = Object.keys(BEASTS), per = 6;
+const from = +(new URLSearchParams(location.search).get('from') || 0), names = Object.keys(BEASTS).slice(from), per = 6;
 const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setPixelRatio(1.3); r.outputColorSpace = THREE.SRGBColorSpace;
 for (let row = 0; row * per < names.length; row++) {
   const set = names.slice(row * per, row * per + per), W = 1320, H = 300, scn = new THREE.Scene(); scn.background = new THREE.Color('#aeb9c6'); scn.add(new THREE.HemisphereLight('#ffffff', '#8a7a6a', 1.5)); const d = new THREE.DirectionalLight('#fff4e0', 2.6); d.position.set(-3, 5, 6); scn.add(d);

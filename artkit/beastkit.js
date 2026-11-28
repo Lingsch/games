@@ -6,7 +6,9 @@ import { BEASTS } from './models/beasts.js';
 import { setStyle, bake } from './models/people.js';
 export function initBeasts(G) {
   if (G.game !== 'mmo' || !G.MOBS || !G.rigAdopt) return { setOn() { } };
-  const { R, S, MOBS } = G, AMP = { wolf: [[.75, 0, 0, .55], .07, .035], bear: [[.55, 0, 0, .5], .08, .04], boar: [[.8, 0, 0, .4], .06, .035], boarbig: [[.8, 0, 0, .4], .06, .04] };
+  const { R, S, MOBS } = G, AMP = { wolf: [[.75, 0, 0, .55], .07, .035], bear: [[.55, 0, 0, .5], .08, .04], boar: [[.8, 0, 0, .4], .06, .035], boarbig: [[.8, 0, 0, .4], .06, .04],
+    wasp: [[0, 0, 0, .3], 0, .025], spider: [[.9, 0, 0, 0], .03, .03], crab: [[.9, 0, 1.2, 0], .03, .03], crabbig: [[.9, 0, 1.2, 0], .03, .035], shark: [[0, 0, 0, .3], 0, .03],
+    harpy: [[.5, 1.2, 1.2, .3], 0, .03], leviathan: [[0, 0, 0, .2], 0, .05], treant: [[.45, .35, 1.4, .2], .05, .04], golempet: [[.45, .4, 1.6, .15], .05, .04] };
   const key = n => 'art:' + n;
   function make(name) {
     const b = BEASTS[name], k = key(name); if (R.kinds[k]) return k;

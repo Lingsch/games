@@ -74,9 +74,75 @@ const cracks = (c = '#ff7a2a') => e => { for (const [x, y, z, w, rz] of [[.28, .
 const shards = (c, glow, n = 7, len = .4) => e => { for (let i = 0; i < n; i++) { const t = i / (n - 1); A(e.B, octa(.09), mat(c, glow), Math.sin(i * 2.3) * .1, .3 * e.k + .04, (.45 - t * .9) * e.L, Math.sin(i) * .3, 0, Math.cos(i * 1.7) * .4, .8, len * 5, .8); } };
 const tails = (c = '#c98a80', n = 5) => e => { for (let i = 0; i < n; i++) { const Tl = J(e.T, 0, .05, 0, (i - (n - 1) / 2) * .22, 0, (i % 2 ? .3 : -.3)); A(Tl, cyl(.012, .03, .7, 5), mat(c), 0, .35, 0); } A(e.T, sph(.07), mat(c), 0, .1, 0); };
 
+// ---- winged things: wasps, moths, bats, sprites. Parts 8/9 are fast wings, 28/29 slow wings, 5 the head.
+export function bug(o = {}) {
+  const g = new THREE.Group(), c1 = mat(o.fur || '#e8b82a', o.glowBody), c2 = mat(o.fur2 || '#2a2018'), dk = mat(o.dark || '#1a1410'), k = o.bulk || 1, y0 = o.y || 1.15, eye = o.eye || '#2a1c14', wc = o.wingC || '#dff2ff';
+  const B = J(g, 0, y0, 0, o.pitch ?? -.3, 0, 0), fat = o.fat || 1;
+  A(B, sph(.2 * k), o.fuzzy ? c1 : c2, 0, 0, 0, 0, 0, 0, 1, .95, 1.15);
+  const T = J(B, 0, -.02, -.2 * k, o.curl ?? .5, 0, 0), n = o.segs || 4;
+  for (let i = 0; i < n; i++) { const t = i / n, r = .2 * k * fat * (1 - t * .55) * (i ? 1 : 1.05); A(T, sph(r), (o.stripe === 0 ? c1 : i % 2 ? c2 : c1), 0, 0, -i * .17 * k * fat, 0, 0, 0, 1, .92, 1.05); }
+  if (o.sting) A(T, cone(.035 * k, .26 * k * o.sting, 5), mat(o.stingC || BONE), 0, 0, -(n * .17 + .06) * k * fat, -Math.PI / 2);
+  if (o.lamp) A(T, sph(.2 * k * fat), mat(o.lamp, 1), 0, 0, -(n - 1) * .17 * k * fat, 0, 0, 0, .9, .85, 1);
+  if (!o.noLegs) for (const s of [-1, 1]) for (let i = 0; i < 3; i++) { A(B, cyl(.012 * k, .012 * k, .3 * k, 4), dk, s * .13 * k, -.18 * k, (.1 - i * .11) * k, .3 - i * .3, 0, -s * .4); }
+  const R = .15 * k * (o.headK || 1), H = tag(5, J(B, 0, .02, .27 * k, .25, o.turn ?? .2, 0));
+  A(H, sph(R), o.fuzzy ? c1 : c2, 0, 0, 0, 0, 0, 0, 1.05, .95, 1);
+  for (const s of [-1, 1]) {
+    A(H, sph(R * .5 * (o.eyeK || 1)), mat(eye, o.eyeGlow), s * R * .62, R * .15, R * .55, 0, 0, 0, .7, 1.1, .8);
+    if (o.feeler === 'feather') A(H, ext([[0, 0], [.22, .5], [.1, 1.3], [0, 1], [-.1, 1.3], [-.22, .5]], .02, .006), mat(o.feelerC || BONE), s * R * .4, R * .7, R * .2, -.5, 0, -s * .5, R * 1.4, R * 1.3, 1);
+    else if (o.feeler !== 'none') { A(H, cyl(.008 * k, .008 * k, R * 1.6, 4), dk, s * R * .35, R * 1.2, R * .5, .6, 0, -s * .35); }
+    if (o.ears) A(H, cone(R * .5, R * 1.4, 4), c1, s * R * .7, R * 1.0, -R * .1, -.1, 0, -s * .4, 1, 1, .4);
+    if (o.mand) A(H, cone(R * .14, R * .7 * o.mand, 4), mat(o.mandC || BONE), s * R * .3, -R * .5, R * .9, Math.PI - .6, 0, s * .4);
+  }
+  if (o.beak) A(H, cone(R * .1, R * 1.6 * o.beak, 5), dk, 0, -R * .2, R * 1.5, Math.PI / 2 + .3);
+  const wk = (o.wingK || 1) * k;
+  for (const s of [-1, 1]) {
+    if (o.wing === 'moth' || o.wing === 'bat') {
+      const Wg = tag(s > 0 ? 28 : 29, J(B, s * .12 * k, .12 * k, 0, 0, 0, s * .25));
+      if (o.wing === 'moth') { const up = [[0, 0], [.35, .55], [1.0, .75], [1.25, .3], [.8, -.1]], lo = [[0, -.05], [.8, -.15], [.95, -.6], [.5, -.9], [.1, -.5]];
+        A(Wg, ext(up.map(p => [p[0] * s, p[1]]), .02, .006), mat(wc), 0, 0, .05, -Math.PI / 2, 0, 0, wk * .5, wk * .5, 1); A(Wg, ext(lo.map(p => [p[0] * s, p[1]]), .02, .006), mat(o.wingC2 || wc), 0, -.01, .02, -Math.PI / 2, 0, 0, wk * .47, wk * .47, 1);
+        if (o.spot) { A(Wg, cyl(wk * .09, wk * .09, .03, 8), mat(o.spot, o.spotGlow), s * wk * .39, .012, -wk * .22); A(Wg, cyl(wk * .04, wk * .04, .04, 6), dk, s * wk * .39, .014, -wk * .22); A(Wg, cyl(wk * .07, wk * .07, .03, 8), mat(o.spot, o.spotGlow), s * wk * .31, .0, wk * .19); } }
+      else { const mem = [[0, 0], [.5, .35], [1.3, .3], [1.15, -.1], [.85, -.02], [.7, -.4], [.4, -.25], [.2, -.5]]; A(Wg, ext(mem.map(p => [p[0] * s, p[1]]), .02, .006), mat(wc, o.wingGlow), 0, 0, 0, -Math.PI / 2, 0, 0, wk * .6, wk * .6, 1);
+        for (const [x, z] of [[1.3, -.3], [.85, .02], [.4, .25]]) A(Wg, cyl(.012 * k, .016 * k, Math.hypot(x, z) * wk * .6, 4), dk, s * x * wk * .3, .015, z * wk * .3, Math.PI / 2, 0, s * Math.atan2(x, -z) - (s > 0 ? 0 : 0)); }
+    } else for (let j = 0; j < 2; j++) { const Wg = tag(s > 0 ? 8 : 9, J(B, s * .1 * k, .14 * k, (.05 - j * .12) * k, 0, s * (-.25 - j * .5), s * .2)); A(Wg, ext([[0, 0], [.5 * s, .14], [1.0 * s, .05], [.9 * s, -.14], [.3 * s, -.12]], .012, .004), mat(wc), 0, 0, 0, -Math.PI / 2, 0, 0, wk * (.75 - j * .2), wk * (.75 - j * .2), 1); }
+  }
+  const e = { g, B, N: H, H, T, Jw: H, R, k, L: .5, hh: y0, fly: 1 }; for (const f of [].concat(o.extra || [])) f(e);
+  return g;
+}
+// ---- many legs: spiders and mites. Parts 41-44 are the left legs, 45-48 the right, 5 the head.
+export function spider(o = {}) {
+  const g = new THREE.Group(), c1 = mat(o.fur || '#5a4030'), c2 = mat(o.fur2 || '#2e2018'), dk = mat(o.dark || '#1a120c'), k = o.bulk || 1, hy = .42 * k * (o.tall || 1), eye = o.eye || '#ff3a2a', nl = o.legs || 4, lg = (o.legK || 1) * k;
+  const B = J(g, 0, hy, 0);
+  A(B, sph(.34 * k * (o.abd || 1)), c1, 0, .1 * k, -.34 * k * (o.abd || 1), -.15, 0, 0, 1, .85, 1.25); A(B, sph(.2 * k), c2, 0, 0, .12 * k, 0, 0, 0, 1.1, .8, 1.2);
+  if (o.mark) for (let i = 0; i < 3; i++) A(B, box(.16 * k * (1 - i * .25), .03, .08 * k), mat(o.mark, o.markGlow), 0, .39 * k * (o.abd || 1) - i * .015, (-.2 - i * .16) * k * (o.abd || 1), -.15 + i * .25);
+  if (o.shell) { A(B, dome(.4 * k * (o.abd || 1), .5), mat(o.shell, o.shellGlow), 0, .04 * k, -.2 * k, -.1, 0, 0, 1.05, .95, 1.35); }
+  if (o.sac) A(B, sph(.2 * k), mat(o.sac), 0, -.04 * k, -.66 * k * (o.abd || 1), 0, 0, 0, 1, 1, 1);
+  const R = .16 * k, H = tag(5, J(B, 0, .0, .3 * k, .1, o.turn ?? .15, 0)); A(H, sph(R), c2, 0, 0, 0, 0, 0, 0, 1.1, .85, 1);
+  for (const s of [-1, 1]) { for (const [x, y, r] of [[.3, .3, .2], [.62, .2, .14], [.25, .62, .12], [.75, .45, .1]].slice(0, o.eyes || 4)) A(H, sph(R * r), mat(eye, 1), s * R * x, R * y, R * .8, 0, 0, 0, 1, 1, .6);
+    A(H, cone(R * .2, R * 1.1 * (o.fang || 1), 5), mat(o.fangC || BONE, o.fangGlow), s * R * .32, -R * .7, R * .7, Math.PI + .25, 0, s * .15); A(H, cyl(R * .1, R * .12, R * .9, 5), c1, s * R * .7, -R * .3, R * .8, 1.0, 0, -s * .4); }
+  for (const s of [-1, 1]) for (let i = 0; i < nl; i++) {
+    const Lg = tag((s > 0 ? 45 : 41) + i, J(B, s * .16 * k, 0, (.2 - i * (.42 / nl)) * k, 0, -s * (1.0 - i * (1.9 / nl)), 0)), h = hy / .42;
+    A(Lg, cyl(.035 * lg, .045 * lg, .38 * lg, 5), o.legC ? mat(o.legC) : c2, s * .16 * lg, .1 * lg, 0, 0, 0, -s * (Math.PI / 2 - .6)); A(Lg, sph(.05 * lg), dk, s * .31 * lg, .2 * lg, 0);
+    A(Lg, cyl(.016 * lg, .034 * lg, Math.hypot(.24 * lg, hy + .2 * lg), 5), o.legC ? mat(o.legC) : c2, s * .43 * lg, (.2 * lg - hy) / 2, 0, 0, 0, s * Math.atan2(.24 * lg, hy + .2 * lg));
+  }
+  const T = J(B, 0, .1 * k, -.7 * k * (o.abd || 1), -1.4, 0, 0), e = { g, B, N: H, H, T, Jw: H, R, k, L: .8, hh: hy }; for (const f of [].concat(o.extra || [])) f(e);
+  return g;
+}
+// ---- grubs and crawlers: a chain of segments that ripples. Parts 50-59, head 5.
+export function grub(o = {}) {
+  const g = new THREE.Group(), c1 = mat(o.fur || '#d8cfa8'), c2 = mat(o.fur2 || '#a89a70'), dk = mat(o.dark || '#3a2e1e'), k = o.bulk || 1, n = Math.min(9, o.segs || 7), r0 = .24 * k, eye = o.eye || '#2a1c14';
+  const B = J(g, 0, r0 * .9, 0); let z = .5 * k;
+  for (let i = 0; i < n; i++) { const t = i / (n - 1), r = r0 * (1 - Math.abs(t - .35) * .7), S = tag(50 + i, J(B, 0, 0, z)); A(S, sph(r), i % 2 ? c2 : c1, 0, 0, 0, 0, 0, 0, 1.1, .9, .75);
+    if (o.plate) A(S, dome(r * 1.05, .45), mat(o.plate, o.plateGlow), 0, r * .08, 0, 0, 0, 0, 1.1, .9, .8); if (o.spine) A(S, cone(r * .16, r * 1.1 * o.spine, 4), mat(o.spineC || BONE, o.spineGlow), 0, r * .95, 0);
+    if (o.feet) for (const s of [-1, 1]) A(S, cone(r * .12, r * .7, 4), dk, s * r * .85, -r * .6, 0, Math.PI, 0, s * .5); if (o.dots) for (const s of [-1, 1]) A(S, sph(r * .14), mat(o.dots, 1), s * r * .95, r * .1, 0);
+    z -= r * 1.25; }
+  const R = r0 * .8 * (o.headK || 1), H = tag(5, J(B, 0, .02, .5 * k + R * .9, 0, o.turn ?? .15, 0)); A(H, sph(R), o.headC ? mat(o.headC) : dk, 0, 0, 0, 0, 0, 0, 1.05, .9, .9);
+  for (const s of [-1, 1]) { A(H, sph(R * .2), mat(eye, o.eyeGlow), s * R * .5, R * .3, R * .7); A(H, cone(R * .2, R * 1.1 * (o.mand || 1), 4), mat(o.mandC || BONE), s * R * .5, -R * .25, R * 1.0, Math.PI / 2, 0, s * .5 - (s > 0 ? 0 : 0)); }
+  const T = J(B, 0, 0, z, -1.5, 0, 0), e = { g, B, N: H, H, T, Jw: H, R, k, L: 1, hh: r0 }; for (const f of [].concat(o.extra || [])) f(e);
+  return g;
+}
 // ---- families
 const WOLF = {}, HOUND = { ears: 'flop', muzzle: [.9, 1.3], bulk: 1.22, ruff: 0, mane: { n: 0 }, tail: 'thin', noCheek: 1, headK: 1.08 };
-const BEAR = { bulk: 1.7, hh: .8, len: 1.02, legR: .78, hump: .75, humpZ: .08, ears: 'round', earK: .8, muzzle: [.75, 1.15], tail: 'stub', ruff: 0, mane: { n: 0 }, neck: .5, neckRx: -1.05, neckW: 1.15, headK: 1.3, claw: 2, noCheek: 1, eyeGlow: 0, eye: '#2a1c14', eyeK: .7, turn: .15 };
+const BEAR = { bulk: 1.7, hh: .8, len: 1.02, legR: .78, hump: .75, humpZ: .08, ears: 'round', earK: .8, muzzle: [.75, 1.15], tail: 'stub', ruff: 0, mane: { n: 0 }, neck: .62, neckRx: -1.25, neckW: 1.1, headK: 1.38, claw: 2, noCheek: 1, eyeGlow: 0, eye: '#2a1c14', eyeK: .7, turn: .15 };
 const BOAR = { bulk: 1.3, hh: .52, len: .95, legR: .7, hump: .8, ears: 'side', earK: .7, muzzle: [1.3, 1.05], disc: 1, tusks: 1, tail: 'thin', tailLen: .5, ruff: 0, mane: { n: 8, len: .26, w: .06 }, neck: .28, neckW: 1.25, neckRx: -1.0, headK: 1.15, hoof: 1, noFang: 1, noCheek: 1, eyeGlow: 0, eye: '#2a1c14', eyeK: .6, turn: .15 };
 const RAT = { bulk: .8, hh: .34, len: .9, legR: .7, ears: 'round', earK: 1.2, muzzle: [1.2, .7], buck: 1, noFang: 1, tail: 'thin', tailC: '#d99a8a', tailLen: 1.5, ruff: 0, mane: { n: 0 }, neck: .24, neckRx: -1.1, hump: .9, noCheek: 1, noBrow: 1, eyeK: .8 };
 const STAG = { bulk: .86, hh: 1.0, len: 1.0, legR: .62, ears: 'side', earK: 1.1, muzzle: [1.1, .8], tail: 'stub', ruff: 0, mane: { n: 0 }, neck: .7, neckRx: -.25, neckW: .8, hoof: 1, noFang: 1, noCheek: 1, noBrow: 1, eyeGlow: 0, eye: '#2a1c14', eyeK: .8, waist: .24 };
@@ -131,4 +197,39 @@ export const BEASTS = {
   "The King's White Stag": [Q(STAG, { fur: '#f4f1e8', fur2: '#ffffff', dark: '#b8b0a0', eye: '#2f5fb0', extra: [antlers(GOLD, 0, 1.3), collar(GOLD), blanket('#2f5fb0')] }), 'boarbig'],
   'The Black Hart': [Q(STAG, { fur: '#1c181c', fur2: '#2e262c', dark: '#0a080a', eye: '#ff7a2a', eyeGlow: 1, eyeK: 1.2, bulk: .95, extra: [antlers('#ff7a2a', 1, 1.4), cracks(), e => { for (const s of [-1, 1]) for (let i = 0; i < 3; i++) tag(7, A(e.H, cone(e.R * .12, e.R * .5, 4), mat(FLAME[i], 1), s * e.R * (.7 + i * .35), e.R * (2.2 + i * .5), -e.R * .4)); }] }), 'boarbig'],
   'The Hollow Stag': [Q(STAG, { fur: '#8fb8cc', fur2: '#dff6ff', dark: '#3a6a88', eye: '#ffffff', eyeGlow: 1, eyeK: 1.2, bulk: .8, extra: [antlers('#e8fbff', 1, 1.5), ribs('#e8fbff', '#bfefff'), wisps('#e8fbff', 5)] }), 'wolf'],
+  // wasps, moths, bats, sprites
+  'Meadow Stinger': [() => bug({ sting: 1, mand: .6 }), 'wasp'],
+  'Carrion Wasp': [() => bug({ fur: '#8a2a22', fur2: '#1e1214', sting: 1.8, mand: 1.2, eye: '#b6ff3a', eyeGlow: 1, wingC: '#c8b8a8', bulk: 1.1, extra: [e => sores('#b6ff3a', 3)({ ...e, B: e.T, L: .3, k: .5 })] }), 'wasp'],
+  'Nettlewasp': [() => bug({ fur: '#6aa83a', fur2: '#1e2a14', sting: 1.4, mand: .8, wingC: '#d8f2c0', extra: [e => { for (let i = 0; i < 6; i++) A(e.T, cone(.02, .16, 4), mat('#3f7a3a'), Math.sin(i * 2.1) * .12, .1, -i * .1, Math.sin(i) * .6, 0, Math.cos(i * 2.1) * .8); }] }), 'wasp'],
+  'Marsh Biter': [() => bug({ fur: '#6a6a3a', fur2: '#3a3a22', stripe: 0, fat: .7, segs: 5, beak: 1.4, feeler: 'none', wingC: '#c8d8c0', headK: .85, eye: '#ff4a2a', eyeGlow: 1 }), 'wasp'],
+  'Blight Sprite': [() => bug({ fur: '#b6ff3a', glowBody: 1, fur2: '#3a5a1e', stripe: 0, fuzzy: 1, fat: .6, segs: 3, noLegs: 1, bulk: .7, wing: 'moth', wingK: .9, wingC: '#d8ff9a', wingC2: '#8ac84a', eye: '#1a2a0a', eyeK: 1.3, feeler: 'none', extra: [e => wisps('#d8ff9a', 4)(e)] }), 'wasp'],
+  'Gravemoth': [() => bug({ fur: '#a8a49a', fur2: '#6a665e', fuzzy: 1, wing: 'moth', wingK: 1.5, wingC: '#b8b4a8', wingC2: '#8a867c', spot: BONE, feeler: 'feather', fat: 1.15, segs: 3 }), 'wasp'],
+  'Duskwing': [() => bug({ fur: '#5a4a8a', fur2: '#2e2450', fuzzy: 1, wing: 'moth', wingK: 1.6, wingC: '#6a5aa8', wingC2: '#c0368a', spot: '#ffd27a', spotGlow: 1, feeler: 'feather', feelerC: '#c0368a', fat: 1.1, segs: 3, eye: '#ffd27a', eyeGlow: 1 }), 'wasp'],
+  'Slagbat': [() => bug({ fur: '#3a2e2e', fur2: '#241c1c', fuzzy: 1, stripe: 0, wing: 'bat', wingK: 1.6, wingC: '#6a2e1e', ears: 1, mand: .7, mandC: '#fbf7ee', feeler: 'none', fat: .8, segs: 2, noLegs: 1, eye: '#ff7a2a', eyeGlow: 1, curl: .9, extra: [e => { for (let i = 0; i < 3; i++) A(e.B, box(.025, .14, .02), mat('#ff7a2a', 1), (i - 1) * .1, .0, .12, .3, 0, i - 1); }] }), 'wasp'],
+  'Shardwing': [() => bug({ fur: '#e8bd4c', fur2: '#8a6a2a', sting: 1.6, stingC: '#fff2b0', mand: .9, wingC: '#fff2b0', eye: '#ffffff', eyeGlow: 1, bulk: 1.1, extra: [e => shards('#fff2b0', 1, 4, .3)({ ...e, B: e.T, L: .5, k: .1 })] }), 'wasp'],
+  'Void Moth': [() => bug({ fur: '#221a3a', fur2: '#120e22', fuzzy: 1, wing: 'moth', wingK: 1.6, wingC: '#2a2050', wingC2: '#17122e', spot: '#b9a6ff', spotGlow: 1, feeler: 'feather', feelerC: '#b9a6ff', eye: '#e0a8ff', eyeGlow: 1, fat: 1.1, segs: 3 }), 'wasp'],
+  'Gloom-Moth': [() => bug({ fur: '#4a4444', fur2: '#262222', fuzzy: 1, wing: 'moth', wingK: 1.5, wingC: '#3a3434', wingC2: '#5a2a1a', spot: '#ff7a2a', spotGlow: 1, feeler: 'feather', feelerC: '#8a8078', eye: '#ff7a2a', eyeGlow: 1, fat: 1.1, segs: 3 }), 'wasp'],
+  'The Moth-Queen of the Last Light': [() => bug({ fur: '#fff6d8', fur2: '#e8d8a0', fuzzy: 1, wing: 'moth', wingK: 2.3, wingC: '#fffbe8', wingC2: '#ffe9a0', spot: '#ffd27a', spotGlow: 1, feeler: 'feather', feelerC: GOLD, eye: '#ffb347', eyeGlow: 1, eyeK: 1.2, fat: 1.4, segs: 4, lamp: '#ffe9a0', bulk: 1.3, extra: [crown(GOLD, '#fff2b0'), e => wisps('#fff2b0', 7)(e), e => { for (let i = 0; i < 7; i++) A(e.B, cone(.05, .3, 4), mat('#fff6d8'), Math.sin(i * .9) * .2, .02, .12 + Math.cos(i * .9) * .08, -1.2, 0, Math.sin(i * .9) * 1.2); }] }), 'wasp'],
+  'The Moth King': [() => bug({ fur: '#2a3a7a', fur2: '#141c44', fuzzy: 1, wing: 'moth', wingK: 2.2, wingC: '#3a4a9a', wingC2: '#1a2458', spot: '#7fe9ff', spotGlow: 1, feeler: 'feather', feelerC: '#7fe9ff', eye: '#7fe9ff', eyeGlow: 1, fat: 1.3, segs: 4, bulk: 1.3, mand: 1.2, extra: [crown('#c9d2de', '#7fe9ff'), e => { for (let i = 0; i < 9; i++) A(e.B, cone(.06, .34, 4), mat(i % 2 ? '#e8fbff' : '#3a4a9a'), Math.sin(i * .7) * .22, .04, .14 + Math.cos(i * .7) * .08, -1.2, 0, Math.sin(i * .7) * 1.2); }] }), 'wasp'],
+  'The Void-Moth Queen': [() => bug({ fur: '#16102a', fur2: '#0a0816', fuzzy: 1, wing: 'moth', wingK: 2.4, wingC: '#1e1640', wingC2: '#0e0a20', spot: '#e07aff', spotGlow: 1, feeler: 'feather', feelerC: '#e07aff', eye: '#e07aff', eyeGlow: 1, eyeK: 1.3, fat: 1.4, segs: 5, lamp: '#8a4ad8', bulk: 1.35, sting: 1.5, stingC: '#e07aff', extra: [crown('#3a2a5a', '#e07aff'), e => wisps('#e07aff', 8)(e), e => shards('#b9a6ff', 1, 5, .4)({ ...e, B: e.T, L: .5, k: .1 })] }), 'wasp'],
+  // spiders, mites, grubs and crawlers
+  'Hollin Webspinner': [() => spider({ mark: '#e8bd4c' }), 'spider'],
+  'Barkspinner': [() => spider({ fur: '#6a5438', fur2: '#3a2c1a', mark: '#4f8a3a', legK: 1.1, extra: [moss('#4f8a3a')] }), 'spider'],
+  'Rotweaver': [() => spider({ fur: '#6a705a', fur2: '#34382a', eye: '#b6ff3a', mark: '#b6ff3a', markGlow: 1, abd: 1.15, extra: [e => sores('#b6ff3a', 5)({ ...e, L: .6 })] }), 'spider'],
+  'Mirecrawler': [() => spider({ fur: '#4a5a3a', fur2: '#26301e', legK: 1.35, tall: 1.3, abd: .8, eye: '#ffd27a' }), 'spider'],
+  'Glass Spider': [() => spider({ fur: '#9fd8ec', fur2: '#5a9ab8', dark: '#2a5a78', legC: '#bfefff', eye: '#ffffff', mark: '#ffffff', markGlow: 1, fangC: '#e8fbff', fangGlow: 1, extra: [e => shards('#e8fbff', 1, 4, .3)({ ...e, L: .5 })] }), 'spider'],
+  'Thornling': [() => spider({ fur: '#4f7a3a', fur2: '#2a4a22', legs: 3, legK: .8, bulk: .8, abd: .9, shell: '#3f6a2e', eye: '#ffd27a', eyes: 2, fang: .6, extra: [e => { for (let i = 0; i < 7; i++) A(e.B, cone(.03, .22, 4), mat('#6b4526'), Math.sin(i * 2.2) * .16, .3, -.2 + Math.cos(i * 1.3) * .2, Math.cos(i) * .5, 0, Math.sin(i * 2.2) * .7); }] }), 'spider'],
+  'Glassmite': [() => spider({ fur: '#7ab8d0', fur2: '#3a7a98', legs: 3, legK: .75, bulk: .8, shell: '#bfefff', shellGlow: 1, eye: '#ffffff', eyes: 2, fang: .6, legC: '#9fd8ec' }), 'spider'],
+  'Deep Crawler': [() => grub({ fur: '#6a5a4a', fur2: '#4a3e32', plate: '#3a3028', feet: 1, mand: 1.3, eye: '#ffd27a', eyeGlow: 1, segs: 8 }), 'spider'],
+  'Deepcrawler': [() => grub({ fur: '#4a4a5a', fur2: '#2e2e3a', plate: '#22222c', feet: 1, mand: 1.5, eye: '#7fe9ff', eyeGlow: 1, dots: '#7fe9ff', segs: 9, bulk: 1.1 }), 'spider'],
+  'Wound-Crawler': [() => grub({ fur: '#5a2a2a', fur2: '#2a1414', plate: '#1a0e0e', feet: 1, mand: 1.6, mandC: '#2a1c14', eye: '#ff7a2a', eyeGlow: 1, dots: '#ff7a2a', spine: .8, spineC: '#1a0e0e', segs: 9, bulk: 1.1 }), 'spider'],
+  'Mother Grub': [() => grub({ fur: '#e8dcb0', fur2: '#c8b880', headC: '#8a5a2a', bulk: 1.5, segs: 8, mand: 1.2, dots: '#ffd27a', extra: [e => { for (const [x, z] of [[.45, .2], [-.5, -.2], [.4, -.7]]) { A(e.g, sph(.1), mat('#e8dcb0'), x, .1, z, 0, 0, 0, 1, .9, 1.6); A(e.g, sph(.06), mat('#8a5a2a'), x, .1, z + .16); } }, e => sores('#ffd27a', 5)({ ...e, L: 1, k: .8 })] }), 'spider'],
+  'The Pale Grub': [() => grub({ fur: '#f1ece0', fur2: '#d8d0c0', headC: '#f1ece0', dark: '#8a8478', bulk: 1.6, segs: 9, mand: 2.0, eye: '#ff3a2a', eyeGlow: 1, spine: 1.0, spineC: '#d8d0c0', extra: [e => { for (let i = 0; i < 8; i++) A(e.H, cone(e.R * .1, e.R * .5, 4), mat('#fbf7ee'), Math.sin(i * .785) * e.R * .6, Math.cos(i * .785) * e.R * .55, e.R * .85, Math.PI / 2); A(e.H, sph(e.R * .5), mat('#7a1e28'), 0, 0, e.R * .6, 0, 0, 0, 1, 1, .5); }] }), 'spider'],
+  'The Gnaw': [() => grub({ fur: '#3a3034', fur2: '#1e181a', plate: '#141012', headC: '#141012', bulk: 1.7, headK: 1.5, segs: 8, mand: 2.6, mandC: '#e6dcc2', eye: '#ff7a2a', eyeGlow: 1, dots: '#ff7a2a', spine: 1.3, spineC: '#e6dcc2', feet: 1, extra: [e => cracks()({ ...e, k: .6 })] }), 'spider'],
+  'The Thornmother': [() => spider({ fur: '#3f6a2e', fur2: '#22381a', bulk: 1.35, abd: 1.3, legK: 1.2, mark: '#c0368a', eye: '#ffd27a', fang: 1.5, sac: '#e8dcb0', extra: [crown('#6b4526', '#c0368a'), e => { for (let i = 0; i < 12; i++) A(e.B, cone(.045, .34, 4), mat('#6b4526'), Math.sin(i * 2.2) * .24, .34, -.45 + Math.cos(i * 1.3) * .3, Math.cos(i) * .5 - .2, 0, Math.sin(i * 2.2) * .8); }] }), 'spider'],
+  'The Tunnel Queen': [() => spider({ fur: '#d8d0c0', fur2: '#a8a090', dark: '#5a5448', legC: '#c8c0b0', bulk: 1.5, abd: 1.45, legK: 1.3, tall: 1.2, eye: '#ff3a2a', fang: 1.8, sac: '#f1ece0', mark: '#7a1e28', extra: [crown(BONE, '#ff3a2a'), e => { for (const s of [-1, 1]) for (let i = 0; i < 3; i++) A(e.H, sph(e.R * .1), mat('#ff3a2a', 1), s * e.R * (.2 + i * .25), e.R * (.75 - i * .1), e.R * .6); }] }), 'spider'],
+  'Icefang Broodmother': [() => spider({ fur: '#dfeef6', fur2: '#9fc0d8', dark: '#5a86a8', legC: '#bfe0f0', bulk: 1.4, abd: 1.3, legK: 1.2, eye: '#7fe9ff', fang: 2.2, fangC: '#d8f6ff', fangGlow: 1, mark: '#7fe9ff', markGlow: 1, sac: '#e8fbff', extra: [e => shards('#e8fbff', 1, 7, .5)({ ...e, L: .7 })] }), 'spider'],
+  'The Glass Queen': [() => spider({ fur: '#7ab8d0', fur2: '#3a7a98', legs: 3, legK: 1.0, bulk: 1.5, shell: '#bfefff', shellGlow: 1, eye: '#ffffff', eyes: 3, fang: 1.2, legC: '#9fd8ec', extra: [crown('#e8fbff', '#ffffff'), e => shards('#ffffff', 1, 9, .6)({ ...e, L: .7 })] }), 'spider'],
+  'The Crystal Mother': [() => spider({ fur: '#b89ae8', fur2: '#6a4aa8', dark: '#3a2a6a', legC: '#d8c8ff', bulk: 1.45, abd: 1.3, legK: 1.25, eye: '#ffffff', fang: 1.6, fangC: '#f0e8ff', fangGlow: 1, shell: '#d8c8ff', shellGlow: 1, sac: '#f0e8ff', extra: [e => shards('#f0e8ff', 1, 10, .7)({ ...e, L: .8 })] }), 'spider'],
+  'The Thorn-Queen': [() => spider({ fur: '#4f8a3a', fur2: '#2a5a22', bulk: 1.4, abd: 1.3, legK: 1.2, eye: '#ff9ad0', fang: 1.4, mark: '#ff9ad0', extra: [crown('#3f7a3a', '#ff9ad0'), moss('#58a84a'), e => { for (let i = 0; i < 5; i++) { const a = i * 1.26; A(e.B, sph(.09), mat('#ff9ad0'), Math.sin(a) * .16, .42, -.4 + Math.cos(a) * .16, 0, 0, 0, 1, .5, 1); } A(e.B, sph(.07), mat('#ffe27a', 1), 0, .45, -.4); }] }), 'spider'],
 };
