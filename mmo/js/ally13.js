@@ -38,8 +38,8 @@ X.allyInspect = (t, body) => {
   const could = [];
   const sp = abs.map(([k, ab]) => {
     const r = BOOK.rank(t, ab) || 0, tier = spellTier(t, ab);
-    for (const nr of [1, 2]) if (nr > r && !X.whyNot?.(t, t.cls, k, nr)) { could.push(`${BOOK.names[nr]}'s Tome: ${ab.name}`); break; }
-    return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0"><span style="position:relative;display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:5px;background:#0006;${tier > 1 ? 'box-shadow:0 0 0 2px ' + ['', '', '#4aa3ff', '#b35cff', '#ff9a2a'][tier] : ''}">${ab.icon || '•'}${rkBadge(tier)}</span><span>${esc(r ? BOOK.names[r] + ' ' + ab.name : ab.name)}</span></div>`;
+    for (const nr of [r + 1, 5]) if (nr <= 8 && nr > r && !X.whyNot?.(t, t.cls, k, nr)) { could.push(`${BOOK.names[nr]} Tome: ${ab.name}`); break; }
+    return `<div style="display:flex;align-items:center;gap:6px;margin:2px 0"><span style="position:relative;display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:5px;background:#0006;${tier > 1 ? 'box-shadow:0 0 0 2px ' + (tier >= 7 ? '#ff9a2a' : tier >= 3 ? '#b35cff' : '#4aa3ff') : ''}">${ab.icon || '•'}${rkBadge(tier)}</span><span>${esc(BOOK.label ? BOOK.label(t, ab) : ab.name)}</span></div>`;
   }).join('');
   body.appendChild(el(`<div class="card" style="text-align:left"><h3>Spells</h3><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:0 10px">${sp}</div>${could.length ? `<p class="dim" style="margin:6px 0 0">Tomes they could use now: ${could.map(esc).join(', ')}.</p>` : ''}</div>`));
   // specialization

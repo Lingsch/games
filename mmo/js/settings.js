@@ -1,7 +1,7 @@
 // Player settings: camera and touch, interface and text size, graphics quality. Kept on this device.
 import * as R from './render.js';
 const KEY = 'mmo-settings';
-export const SET = { camSpeed: 1, joySize: 1, tapSens: 1, ui: 1, text: 1, gfx: 'high', loot: 'roll' };
+export const SET = { camSpeed: 1, joySize: 1, tapSens: 1, ui: 1, text: 1, gfx: 'high', loot: 'roll', fps: 60 };
 try { Object.assign(SET, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) { }
 export const OPTS = {
   camSpeed: ['Camera speed', [['Slow', .6], ['Normal', 1], ['Fast', 1.5], ['Very fast', 2.1]]],
@@ -10,6 +10,7 @@ export const OPTS = {
   ui: ['Interface size', [['Small', .85], ['Normal', 1], ['Large', 1.15], ['Huge', 1.3]]],
   text: ['Text size', [['Small', .9], ['Normal', 1], ['Large', 1.2], ['Huge', 1.4]]],
   gfx: ['Graphics quality', [['Low', 'low'], ['Medium', 'medium'], ['High', 'high']]],
+  fps: ['Frame rate', [['60', 60], ['30 (cooler, saves battery)', 30]]],
   loot: ['Gear from bodies you open', [['Need or greed', 'roll'], ['I hand it out', 'master']]],
 };
 // Build 13.4: dynamic resolution, the way console games hold their frame rate. When frames run slow for a couple of seconds the
@@ -19,7 +20,7 @@ export const dyn = { max: 1.75, min: 1, cur: 1.75, low: 0, high: 0, wait: 0 };
 setInterval(() => {
   const S = window.__G?.S; if (!S?.running || document.hidden || navigator.webdriver) { dyn.low = dyn.high = 0; return; }
   const f = S.fps || 60; if (dyn.wait > 0) { dyn.wait--; return; }
-  dyn.low = f < 48 ? dyn.low + 1 : 0; dyn.high = f >= 57 ? dyn.high + 1 : 0;
+  const tgt = SET.fps === 30 ? 30 : 60; dyn.low = f < tgt * .8 ? dyn.low + 1 : 0; dyn.high = f >= tgt * .95 ? dyn.high + 1 : 0;
   let next = dyn.cur;
   // a phone in Low Power Mode caps the frame rate at 30 however little there is to draw: if dropping all the way didn't help, go back up and leave it a minute
   if (dyn.low >= 4 && dyn.cur <= dyn.min && dyn.f0 && f < dyn.f0 + 4) { next = dyn.max; dyn.f0 = 0; dyn.wait = 120; }

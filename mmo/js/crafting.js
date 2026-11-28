@@ -102,7 +102,7 @@ export function addRecipe(id, prof, name, req, mats, out, rare = null) { rec(id,
 
 // ---------- state ----------
 // Build 10: skill shows at two points per level of what it makes: 50 makes level-25 gear
-export const SKILL_CAP = 175, shown = v => v == null ? v : Math.max(1, Math.round(v * .4));
+export const SKILL_CAP = 200, shown = v => v == null ? v : Math.max(1, Math.round(v * .4));
 export function initState() { S.prof = S.prof || {}; S.mats = S.mats || {}; S.recipes = S.recipes || []; S.cons = S.cons || {}; }
 export const skill = (p, who) => who ? (who.craft && (who.craft.gather === p || who.craft.make === p) ? (who.craft.skill?.[p] ?? 1) : null) : S.prof?.[p] ?? null;      // null: not learned
 // friends can be given one gathering job and one crafting job; they level those skills themselves

@@ -100,7 +100,7 @@ const trees = {};
 export function treeOf(cls, sk) {
   const id = cls + ':' + sk; if (trees[id]) return trees[id];
   const s = subOf(cls, sk), [, , , focus, , , adj] = s, C = CLASSES[cls].abilities;
-  const own = Object.entries(C).filter(([k, a]) => !a.sub && k !== 'racial' && a.kind !== 'ult');
+  const own = Object.entries(C).filter(([k, a]) => !a.sub && !a.b14 && k !== 'racial' && a.kind !== 'ult');   // Build 14: new abilities don't reshuffle anyone's tree
   const hit = own.filter(([, a]) => a.kind === 'attack' || a.kind === 'heal').sort((x, y) => (y[1].lvl || 0) - (x[1].lvl || 0)).slice(0, 3);
   const cds = own.filter(([, a]) => a.cd >= 20).slice(0, 2);
   const t = [];
@@ -122,10 +122,15 @@ export function treeOf(cls, sk) {
   t.push({ id: 'lam2', tier: 5, max: 3, name: 'Undimmed', desc: r => STAT_DESC.haste(+(.02 * r).toFixed(2)), stat: ['haste', .02] });
   t.push({ id: 'lam3', tier: 5, max: 2, name: 'Warded by Light', desc: r => STAT_DESC.resAll(12 * r), stat: ['resAll', 12] });
   t.push({ id: 'lam4', tier: 5, max: 1, name: `The ${s[1]} Undying`, desc: () => `${s[5][0].name} and ${s[5][1].name} are 15% stronger, and you have +4% power.`, ab: [`sig_${sk}1`, .15], stat: ['powP', .04] });
+  // Build 14: a seventh tier, Lamplighter, for levels 36-40
+  t.push({ id: 'lit1', tier: 6, max: 3, name: `Wayfire ${STAT_NAME[cap[0]]}`, desc: r => STAT_DESC[cap[0]](+(.03 * r).toFixed(2)), stat: [cap[0], .03] });
+  t.push({ id: 'lit2', tier: 6, max: 3, name: 'Kept Flame', desc: r => STAT_DESC.crit(+(.015 * r).toFixed(3)), stat: ['crit', .015] });
+  t.push({ id: 'lit3', tier: 6, max: 2, name: 'Curtain of Light', desc: r => STAT_DESC.resAll(15 * r), stat: ['resAll', 15] });
+  t.push({ id: 'lit4', tier: 6, max: 1, name: `The ${s[1]} Lamplighter`, desc: () => `${s[5][0].name} and ${s[5][1].name} are 20% stronger, and you have +3% haste.`, ab: [`sig_${sk}1`, .2], stat: ['haste', .03] });
   while (t.filter(x => x.tier === 2).length < 3) t.push({ id: 'pad' + t.length, tier: 2, max: 2, name: `${adj} Resolve`, desc: r => STAT_DESC.hpP(+(.02 * r).toFixed(2)), stat: ['hpP', .02] });
   return (trees[id] = t);
 }
-const TIER_NEED = [0, 3, 7, 11, 20, 30];
+const TIER_NEED = [0, 3, 7, 11, 20, 30, 40];
 export const ptsTotal = cls => { const L = (CLASS_KEYS.includes(cls) && (cls === S.heroCls ? S.hero?.lvl : S.classes[cls]?.lvl)) || 0; if (L < 20 || !chosen(cls)) return 0; return 1 + (Math.min(L, 25) - 20) * 3 + Math.max(0, L - 25) * 2 + Math.min(11, T()[cls].aa || 0); };
 export const ptsSpent = cls => Object.values(T()[cls]?.pts || {}).reduce((a, b) => a + b, 0);
 export function canTake(cls, tal) {
@@ -175,7 +180,7 @@ X.book.push(['talents', 'Talents', body => {
   }
   const s = subOf(cls, st.sub), tree = treeOf(cls, st.sub), left = ptsTotal(cls) - ptsSpent(cls);
   body.appendChild(el(`<div class="card" style="text-align:left"><h3 style="color:${C.color}">${esc(s[1])}</h3><p style="margin:2px 0">${left} point${left === 1 ? '' : 's'} to spend · ${ptsSpent(cls)} spent</p></div>`));
-  ['Foundations', 'Specialty', 'Discipline', 'Mastery', 'Ascendancy', 'Lamplight'].forEach((tn, ti) => {
+  ['Foundations', 'Specialty', 'Discipline', 'Mastery', 'Ascendancy', 'Lamplight', 'Lamplighter'].forEach((tn, ti) => {
     body.appendChild(el(`<p style="margin:10px 0 4px;font:700 13px Cinzel;color:var(--acc)">${tn}${TIER_NEED[ti] ? ` <small class="dim">(${TIER_NEED[ti]} points in the tree)</small>` : ''}</p>`));
     for (const tal of tree.filter(x => x.tier === ti)) {
       const r = st.pts[tal.id] || 0, why = canTake(cls, tal);

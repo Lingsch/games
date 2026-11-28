@@ -17,13 +17,13 @@ window.GAMES = [
     accent: "#e2853a"
   },
   {
-    title: "Single-Player MMO",
+    title: "The Lamplighters of Hulrouhn",
     folder: "mmo",
-    version: "Build 13.4.2",
+    version: "Build 14",
     updated: "November 2026",
     kind: "Tab-target MMO, solo",
-    blurb: "The same world, a hundred years after the summoner wars. Four peoples, sixteen classes that split in two at level 20, and a chase for three keys to the door below the Last Lamp. Climb to the sky lands, where the makers of Vhorun are knocking at the Gate of Stars. Build a fortune, take on hard modes, and keep your friends.",
-    facts: ["16 classes", "Levels 1–30", "4 peoples"],
+    blurb: "A single-player MMO on Hulrouhn, a hundred years after the summoner wars. Four peoples, sixteen classes that split in two at level 20, and a world that ends up under the dark: Vhorun climbs out, the lamps go out, and something falls from the sky. Found the Lamplighters and relight them.",
+    facts: ["16 classes", "Levels 1–40", "4 peoples"],
     accent: "#63b7c9"
   },
   {

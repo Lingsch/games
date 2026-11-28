@@ -23,22 +23,41 @@ export function ranksOf(e, cls = e?.cls) {
   const a = (S.ext.allyRanks[e.name] = S.ext.allyRanks[e.name] || {});
   return (a[cls] = a[cls] || {});
 }
-BOOK.rank = (e, ab) => {
+// Build 14: the tier ladder. A spell's tier belongs to the version you have (Fireball II, III...); when a stronger version
+// arrives, a Master spell carries over as Adept IV and an Adept spell as Apprentice II (Rod's rule). Old saves' Adept and
+// Master ranks become Adept IV and Master III, about the same strength they were.
+function migrate14() {
+  if (!S.ext || S.ext.ladder14) return; S.ext.ladder14 = 1;
+  const fix = r => { for (const k in r) if (!k.includes(':') && (r[k] === 1 || r[k] === 2)) r[k] = r[k] === 1 ? 4 : 7; };
+  for (const c in S.ext.ranks || {}) fix(S.ext.ranks[c]);
+  for (const n in S.ext.allyRanks || {}) for (const c in S.ext.allyRanks[n]) fix(S.ext.allyRanks[n][c]);
+  for (const it of [...(S.bag || []), ...(S.bank || [])]) if (it.book && !it.book.l14) { it.book.l14 = 1; it.book.rank = it.book.rank === 2 ? 5 : 1; if (it.book.blank) Object.assign(it, blankTome(it.book.rank)); else if (CLASSES[it.book.cls]?.abilities[it.book.key]) Object.assign(it, tome(it.book.cls, it.book.key, it.book.rank)); }
+}
+export function tierOf(e, ab) {
   if (!ab?.key || !e?.cls || (!e.isHero && !e.fake)) return 0;
-  const r = e.isHero ? S.ext.ranks?.[e.cls] : S.ext.allyRanks?.[e.name]?.[e.cls];
-  return r?.[ab.key] || 0;
-};
-const RANK_FX = ['', '15% stronger and 10% cheaper', '30% stronger, 20% cheaper and with a 15% shorter cooldown'];
-export const needLvl = (ab, rank) => Math.min(MAX_LVL, rank === 1 ? Math.max(6, ab.lvl + 2) : Math.max(14, ab.lvl + 6));
-// null if this person can study this rank of this spell, otherwise why not
+  migrate14();
+  const r = e.isHero ? S.ext.ranks?.[e.cls] : S.ext.allyRanks?.[e.name]?.[e.cls]; if (!r) return 0;
+  let q = r[ab.key] || 0; if (!q) return 0;
+  const cv = BOOK.verOf ? BOOK.verOf(e, ab).v : 1; let sv = r['v:' + ab.key] || 1;
+  if (sv < cv) {   // a stronger version came in since this tier was learned
+    while (sv < cv) { if (q >= 5) q = 4; else { if (q >= 1) r['a2:' + ab.key] = sv + 1; q = 0; } sv++; if (!q) break; }
+    r[ab.key] = q; r['v:' + ab.key] = cv;
+  }
+  return q;
+}
+BOOK.rank = tierOf;
+const TIER_FX = q => `${Math.round((BOOK.pow[q] - 1) * 100)}% stronger and ${Math.round((1 - BOOK.cost[q]) * 100)}% cheaper${BOOK.cd[q] < 1 ? `, with a ${Math.round((1 - BOOK.cd[q]) * 100)}% shorter cooldown` : ''}`;
+// the level each tier asks for, counted from when you got this version of the spell
+export const needLvl = (ab, q, e) => { const L = e && BOOK.verOf ? BOOK.verOf(e, ab).Lv : ab.lvl; return Math.min(MAX_LVL, q <= 4 ? Math.max(6, L + 2 * q) : Math.max(14, L + 4 + 2 * (q - 4))); };
+// null if this person can study this tier of this spell, otherwise why not
 export function whyNot(e, cls, key, rank) {
   const ab = CLASSES[cls]?.abilities[key]; if (!ab) return 'The writing makes no sense to you.';
   if (e.cls !== cls) return `Written for a ${CLASSES[cls].name}.`;
   if (e.lvl < ab.lvl) return `You don't know ${ab.name} yet.`;
   const cur = BOOK.rank(e, ab);
-  if (cur >= rank) return `You already know the ${BOOK.names[cur]} rank.`;
-  if (rank === 2 && cur < 1) return 'Learn the Adept rank first.';
-  if (e.lvl < needLvl(ab, rank)) return `Requires level ${needLvl(ab, rank)}.`;
+  if (cur >= rank) return `You already know ${BOOK.names[cur]}.`;
+  if (rank !== 1 && rank !== 5 && cur < rank - 1) return `Learn ${BOOK.names[rank - 1]} first.`;
+  if (e.lvl < needLvl(ab, rank, e)) return `Requires level ${needLvl(ab, rank, e)}.`;
   return null;
 }
 // spells a blank tome could be written into, for this person
@@ -48,12 +67,12 @@ export const canStudy = (e, it) => it.book && (it.book.blank ? blankOptions(e, i
 // ---------- the tomes ----------
 export function tome(cls, key, rank) {
   const ab = CLASSES[cls].abilities[key], L = needLvl(ab, rank);
-  return makeItem({ name: `${rank === 1 ? "Adept's" : "Master's"} Tome: ${ab.name}`, slot: 'book', book: { cls, key, rank }, lvl: L, rarity: rank === 1 ? 2 : 3, stats: {}, value: rank === 1 ? 20 + L * 3 : 70 + L * 6,
-    desc: `${CLASSES[cls].name}. Raises ${ab.name} to its ${BOOK.names[rank]} rank: ${RANK_FX[rank]}.` });
+  return makeItem({ name: `${BOOK.names[rank]} Tome: ${ab.name}`, slot: 'book', book: { cls, key, rank, l14: 1 }, lvl: L, rarity: rank >= 7 ? 4 : rank >= 5 ? 3 : 2, stats: {}, value: rank >= 5 ? 70 + L * 6 * (rank - 4) : 20 + L * 3 * rank,
+    desc: `${CLASSES[cls].name}. Raises ${ab.name} to ${BOOK.names[rank]}: ${TIER_FX(rank)}.${rank !== 1 && rank !== 5 ? ` It has to be at ${BOOK.names[rank - 1]} first.` : ''}` });
 }
 export function blankTome(rank) {
-  return makeItem({ name: rank === 1 ? "Blank Adept's Tome" : "Blank Master's Tome", slot: 'book', book: { blank: true, rank }, lvl: rank === 1 ? 6 : 14, rarity: rank === 1 ? 2 : 3, stats: {}, value: rank === 1 ? 45 : 160, crafted: true,
-    desc: `Any class. Study it to write one of your spells into the ${BOOK.names[rank]} rank: ${RANK_FX[rank]}.` });
+  return makeItem({ name: `Blank ${BOOK.names[rank]} Tome`, slot: 'book', book: { blank: true, rank, l14: 1 }, lvl: rank * 6, rarity: rank >= 5 ? 3 : 2, stats: {}, value: 30 + rank * 25, crafted: true,
+    desc: `Any class. Study it to write one of your spells up to ${BOOK.names[rank]}: ${TIER_FX(rank)}.${rank !== 1 ? ` The spell has to be at ${BOOK.names[rank - 1]} first.` : ''}` });
 }
 // learn it. Returns a message if it didn't take.
 export function study(e, it, key) {
@@ -61,9 +80,9 @@ export function study(e, it, key) {
   const cls = b.blank ? e.cls : b.cls; key = b.blank ? key : b.key;
   if (b.blank && !key) return 'Choose a spell.';
   const why = whyNot(e, cls, key, b.rank); if (why) return why;
-  ranksOf(e, cls)[key] = b.rank;
-  const ab = CLASSES[cls].abilities[key];
-  if (e.isHero) { S.bag = S.bag.filter(x => x !== it); chat('sys', null, `You study the tome until the words stay put. ${ab.name} is now ${BOOK.names[b.rank]}.`); }
+  const ab = CLASSES[cls].abilities[key], rr = ranksOf(e, cls);
+  rr[key] = b.rank; rr['v:' + key] = BOOK.verOf ? BOOK.verOf(e, ab).v : 1;
+  if (e.isHero) { S.bag = S.bag.filter(x => x !== it); chat('sys', null, `You study the tome until the words stay put. ${ab.name} is now ${BOOK.names[b.rank]}.`); X.ui?.refreshKeys?.(true); }
   else chat('party', e.name, pick([`ok ${BOOK.names[b.rank].toLowerCase()} ${ab.name.toLowerCase()} unlocked`, `reading this now, ty`, `${ab.name} rank up!! ty`, 'oh nice, been wanting that one']));
   return null;
 }
@@ -74,8 +93,10 @@ function bookFor(m) {
   const people = S.party.filter(p => p.cls && !p.dead), who = Math.random() < .5 ? S.hero : Math.random() < .8 && people.length ? pick(people) : null;
   const cls = who ? who.cls : pick(Object.keys(CLASSES));
   const keys = Object.keys(CLASSES[cls].abilities).filter(k => CLASSES[cls].abilities[k].lvl <= m.lvl + 1); if (!keys.length) return null;
-  const masterCh = m.lvl < 14 ? 0 : m.raidBoss ? .7 : m.boss ? .5 : m.named ? .35 : m.elite ? .2 : .1;
-  return tome(cls, pick(keys), Math.random() < masterCh ? 2 : 1);
+  // Adept I from anything; Master I from instance and raid bosses; Master II and III, rarely, from raid bosses
+  const raid = m.raidBoss || MOBS[m.mob]?.raidBoss, inst = m.boss || m.boss2, r = Math.random();
+  const q = m.lvl < 14 ? 1 : raid ? (r < .12 ? 7 : r < .35 ? 6 : r < .8 ? 5 : 1) : inst ? (r < .5 ? 5 : 1) : 1;
+  return tome(cls, pick(keys), q);
 }
 
 // ---------- the rest of what a body carries ----------
@@ -136,14 +157,15 @@ add('vellum', 'scribing', 'Vellum (2)', 1, { lighthide: 2 }, { mat: 'vellum', n:
 add('ink', 'scribing', "Scribe's Ink (2)", 1, { meadowsweet: 2 }, { mat: 'ink', n: 2 });
 add('scrollward', 'scribing', 'Scroll of Warding (2)', 10, { vellum: 1, ink: 1 }, { cons: 'scrollward', n: 2 });
 add('scrollsight', 'scribing', 'Scroll of Keen Sight (2)', 20, { vellum: 1, ink: 1, dust: 1 }, { cons: 'scrollsight', n: 2 });
-add('tome1', 'scribing', "Blank Adept's Tome", 30, { vellum: 3, ink: 3, page: 2 }, { tome: 1 });
+add('tome1', 'scribing', 'Blank Adept I Tome', 30, { vellum: 3, ink: 3, page: 2 }, { tome: 1 });
 add('hvellum', 'scribing', 'Heavy Vellum (2)', 40, { thickhide: 2 }, { mat: 'hvellum', n: 2 });
 add('gloomink', 'scribing', 'Gloomink (2)', 40, { graveroot: 2, bonedust: 1 }, { mat: 'gloomink', n: 2 });
 add('scrollwar', 'scribing', 'Scroll of the War-Chant (2)', 50, { hvellum: 1, gloomink: 1 }, { cons: 'scrollwar', n: 2 });
-add('tome1b', 'scribing', "Blank Adept's Tome, Heavy-Bound", 55, { hvellum: 2, gloomink: 2, page: 1 }, { tome: 1 });
+add('tome1b', 'scribing', 'Blank Adept II Tome', 55, { hvellum: 2, gloomink: 2, page: 2 }, { tome: 2 });
 add('tideink', 'scribing', 'Tide Ink (2)', 70, { kelpbloom: 2, pearl: 1 }, { mat: 'tideink', n: 2 });
 add('scrollvigil', 'scribing', 'Scroll of the Long Vigil (2)', 75, { hvellum: 1, tideink: 1, shard: 1 }, { cons: 'scrollvigil', n: 2 });
-add('tome2', 'scribing', "Blank Master's Tome", 85, { hvellum: 4, tideink: 3, page: 4, shard: 3 }, { tome: 2 });
+add('tome2', 'scribing', 'Blank Adept III Tome', 85, { hvellum: 3, tideink: 3, page: 3, shard: 2 }, { tome: 3 });
+add('tome4', 'scribing', 'Blank Adept IV Tome', 130, { hvellum: 4, tideink: 4, page: 5, shard: 4 }, { tome: 4 });   // Build 14: Master tiers can't be written, only found or earned
 Craft.craftHooks.tome = blankTome;
 Craft.craftHooks.mat = (k, n) => Craft.addMat(k, n, true);
 

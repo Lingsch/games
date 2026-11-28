@@ -7,6 +7,7 @@ import * as Cb from './combat.js';
 import * as UI from './ui.js';
 import { hgt, collide, world, generateWorld, wallHit } from './world.js';
 import { MOBS } from './data.js';
+import { SET } from './settings.js';
 import { updateWater } from './zones.js';
 import * as Sea from './sea.js';
 // Build 6: the bigger coast, professions, reputation and mounts, guilds and the market, more Vale
@@ -58,6 +59,7 @@ import './vt13.js';
 import './craft13.js';
 import './hard11.js';
 import './script13.js';
+import './spells14.js';
 import './ally13.js';
 import './perf13.js';
 import * as P8 from './party8.js';
@@ -216,6 +218,8 @@ function draw() {
 let last = performance.now(), fN = 0, fT = last;
 function loop() {
   requestAnimationFrame(loop);
+  // Build 14: Settings → Graphics → Frame rate 30 skips every other screen refresh (cooler phone, longer battery)
+  if (SET.fps === 30 && performance.now() - last < 1000 / 30 - 4) return;
   const now = performance.now(), dt = Math.max(0, Math.min(.05, (now - last) / 1000)); last = now;
   R.uTime.value = now / 1000;
   if (S.running && S.hero && S.scene) {

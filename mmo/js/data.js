@@ -2,7 +2,7 @@
 // Ability effects receive C (the combat API in combat.js), the user u, the target t and the ability.
 
 import { S as _S } from './core.js';
-export const MAX_LVL = 35;
+export const MAX_LVL = 40;   // Build 14: forty
 export const xpNeed = L => Math.round(80 * L ** 1.7 + 120);
 export const GCD = 1.5;
 
@@ -600,11 +600,15 @@ export const CHAT = {
 // spells you learned ten levels ago become Rank II: 35% stronger, same bar slot
 export const rankOf = (e, ab) => ab && e.lvl >= ab.lvl + 10 ? 2 : 1;
 // Build 8: spell books add two more ranks on top, Adept and Master. BOOK.rank is filled in by spell8.js.
-export const BOOK = { rank: () => 0, names: ['', 'Adept', 'Master'], pow: [1, 1.15, 1.3], cost: [1, .9, .8], cd: [1, 1, .85] };
-export const rankMul = (e, ab) => (rankOf(e, ab) > 1 ? 1.35 : 1) * BOOK.pow[BOOK.rank(e, ab)] * (BOOK.tal ? BOOK.tal(e, ab) : 1);
-export const costMul = (e, ab) => BOOK.cost[BOOK.rank(e, ab)];
-export const cdMul = (e, ab) => BOOK.cd[BOOK.rank(e, ab)] * (BOOK.talCd ? BOOK.talCd(e, ab) : 1);
-export const rankName = (e, ab) => { const b = ab ? BOOK.rank(e, ab) : 0; return (b ? BOOK.names[b] + ' ' : '') + ab.name + (rankOf(e, ab) > 1 ? ' II' : ''); };
+// Build 14: the EverQuest 2 ladder. Past Apprentice (I as learned, II later) a spell climbs Adept I-IV, then Master I-IV.
+// BOOK.rank gives that tier, 0-8. Spells also get stronger versions (Fireball II, III...) as you level; spells14.js fills in
+// BOOK.app (the version and Apprentice part of the strength), BOOK.label and BOOK.code.
+export const BOOK = { rank: () => 0, names: ['', 'Adept I', 'Adept II', 'Adept III', 'Adept IV', 'Master I', 'Master II', 'Master III', 'Master IV'],
+  pow: [1, 1.04, 1.08, 1.12, 1.16, 1.2, 1.24, 1.28, 1.32], cost: [1, .96, .93, .9, .88, .86, .84, .82, .8], cd: [1, 1, 1, 1, 1, .9, .88, .86, .85] };
+export const rankMul = (e, ab) => (BOOK.app ? BOOK.app(e, ab) : rankOf(e, ab) > 1 ? 1.35 : 1) * (BOOK.pow[BOOK.rank(e, ab)] || 1) * (BOOK.tal ? BOOK.tal(e, ab) : 1);
+export const costMul = (e, ab) => BOOK.cost[BOOK.rank(e, ab)] || 1;
+export const cdMul = (e, ab) => (BOOK.cd[BOOK.rank(e, ab)] || 1) * (BOOK.talCd ? BOOK.talCd(e, ab) : 1);
+export const rankName = (e, ab) => { if (BOOK.label && e) return BOOK.label(e, ab); const b = ab ? BOOK.rank(e, ab) : 0; return (b ? BOOK.names[b] + ' ' : '') + ab.name + (rankOf(e, ab) > 1 ? ' II' : ''); };
 const NEW_SPELLS = {
   bulwark: {
     bash: { name: 'Shield Bash', icon: '🛡️', lvl: 12, kind: 'util', cost: 15, cd: 12, range: 3, tgt: 'enemy', desc: 'Interrupts any spell and stuns for 2 seconds (bosses are only interrupted).',

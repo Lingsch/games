@@ -120,7 +120,7 @@ function statCard(e) {
   if (!e.isHero && e.fake) rows.push(['Mood', e.fake.mood >= 4 ? 'Happy with you' : e.fake.mood >= 0 ? 'Content' : e.fake.mood > -3 ? 'Grumbling' : 'Thinking about leaving']);
   const buffs = (e.buffs || []).filter(b => b.dur > 0 && b.dur < 1e6).map(b => b.id), uniq = [...new Set(buffs)];
   if (uniq.length) rows.push(['Effects', uniq.map(buffName).join(', ')]);
-  const sp = Object.values(C.abilities).filter(a => a.lvl <= e.lvl).map(a => { const b = BOOK.rank(e, a), r2 = rankOf(e, a) > 1; return b || r2 ? `${a.icon} ${(b ? BOOK.names[b] + ' ' : '') + a.name + (r2 ? ' II' : '')}` : null; }).filter(Boolean);
+  const sp = Object.values(C.abilities).filter(a => a.lvl <= e.lvl).map(a => (BOOK.code ? BOOK.code(e, a) > 1 : BOOK.rank(e, a) || rankOf(e, a) > 1) ? `${a.icon} ${BOOK.label ? BOOK.label(e, a) : a.name}` : null).filter(Boolean);
   return `<div class="card" style="text-align:left"><h3 style="color:${C.color}">${esc(e.name)} · ${C.name}</h3>${rows.map(([k, v]) => `<div class="stat"><span>${k}</span><span>${esc(String(v))}</span></div>`).join('')}${sp.length ? `<p style="margin:6px 0 0;font-size:12.5px"><b>Ranked spells:</b> ${sp.map(esc).join(' · ')}</p>` : ''}</div>`;
 }
 let statPick = 0;
