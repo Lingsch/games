@@ -10,7 +10,7 @@ let S = { ...C, face: 2, hue: 0 }, INK = true; const uLine = { value: C.line };
 export const setStyle = o => { if ('ink' in o) INK = o.ink; S = { ...S, ...o }; uLine.value = S.line; };
 const tag = (p, o) => { o.userData.part = p; return o; };
 const mats = new Map();
-const mat = (c, glow) => { const k = c + (glow ? 'g' : '') + S.sat + '/' + S.hue; if (!mats.has(k)) { const col = new THREE.Color(c); const h = {}; col.getHSL(h); col.setHSL((S.hue && !glow && h.s > .3 && !(h.h > .028 && h.h < .14)) ? (h.h + S.hue + 1) % 1 : h.h, Math.min(1, h.s * S.sat), h.l); mats.set(k, glow ? new THREE.MeshBasicMaterial({ color: col }) : new THREE.MeshToonMaterial({ color: col, gradientMap: ramp })); } return mats.get(k); };
+const mat = (c, glow) => { if (S.pal && S.pal[c]) c = S.pal[c]; const k = c + (glow ? 'g' : '') + S.sat + '/' + S.hue; if (!mats.has(k)) { const col = new THREE.Color(c); const h = {}; col.getHSL(h); col.setHSL((S.hue && !glow && h.s > .3 && !(h.h > .028 && h.h < .14)) ? (h.h + S.hue + 1) % 1 : h.h, Math.min(1, h.s * S.sat), h.l); mats.set(k, glow ? new THREE.MeshBasicMaterial({ color: col }) : new THREE.MeshToonMaterial({ color: col, gradientMap: ramp })); } return mats.get(k); };
 const ink = new THREE.MeshBasicMaterial({ color: '#1a120c', side: THREE.BackSide });
 ink.onBeforeCompile = s => { s.uniforms.uLine = uLine; s.vertexShader = s.vertexShader.replace('#include <common>', '#include <common>\nuniform float uLine;').replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed += normalize(normal) * uLine;'); };
 const fac = g => { if (!S.facet) return g; const n = g.toNonIndexed(); n.computeVertexNormals(); return n; };
@@ -406,7 +406,7 @@ function bard() {
   { const Lu = J(g, -W * .1, hip + S.torso * .5, W * 1.15, .1, .2, .9); A(Lu, sph(.2), wood, 0, 0, 0, 0, 0, 0, 1, 1.25, .5); A(Lu, cyl(.07, .07, .012, 10), mat('#3a2414'), 0, .03, .1, Math.PI / 2); A(Lu, box(.06, .5, .04), mat('#6b4526'), 0, .45, .02); A(Lu, box(.1, .14, .05), mat('#6b4526'), 0, .74, -.01, -.5); for (const x of [-.015, 0, .015]) A(Lu, cyl(.003, .003, .62, 3), wh, x, .34, .08); }
   const Hd = headOf(g, sh, R, { skin: sk, iris: '#7a3aa8', hair: '#8a4a1c', brow: -.04, brow2: .3, mouth: 'grin', jaw: .95 }, -.05, .25); hairOf(Hd, R, '#8a4a1c', 1);
   A(Hd, cone(R * .2, R * .5, 5), mat('#8a4a1c'), 0, -R * 1.2, R * .5, Math.PI + .2); for (const s of [-1, 1]) A(Hd, cone(R * .08, R * .6, 4), mat('#8a4a1c'), s * R * .4, -R * .36, R * .88, 0, 0, s * 1.9);
-  const Ht = J(Hd, 0, R * .62, 0, -.1, 0, .22); A(Ht, cyl(R * 2.0, R * 2.1, R * .08, 12), pur); A(Ht, cyl(R * .85, R * 1.0, R * .5, 10), pur, 0, R * .28, 0); A(Ht, tor(R * 1.0, R * .08), yel, 0, R * .1, 0, Math.PI / 2); for (let i = 0; i < 4; i++) A(Ht, sph(R * (.3 - i * .04)), i % 2 ? wh : yel, R * (.9 + i * .1), R * (.3 + i * .32), -R * (.2 + i * .25), 0, 0, 0, .5, 1, 1);
+  const Ht = J(Hd, 0, R * .62, 0, -.1, 0, .22); A(Ht, cyl(R * 2.0, R * 2.1, R * .08, 12), pur); A(Ht, cyl(R * .8, R * 1.02, R * 1.0, 10), pur, 0, R * .52, 0); A(Ht, tor(R * 1.02, R * .1), yel, 0, R * .14, 0, Math.PI / 2); for (let i = 0; i < 5; i++) A(Ht, sph(R * (.42 - i * .05)), i % 2 ? wh : yel, R * (.95 + i * .12), R * (.5 + i * .42), -R * (.1 + i * .36), 0, 0, 0, .5, 1.2, 1);
   return g;
 }
 function binder() {
@@ -467,6 +467,45 @@ function folk(o) {
   if (bone) { A(Hd, box(R * .5, R * .12, R * .06), mat('#f6f1e4'), 0, -R * .56, R * .84); for (let i = -2; i <= 2; i++) A(Hd, box(R * .015, R * .12, R * .07), mat('#2a1c14'), i * R * .09, -R * .56, R * .85, 0, 0, 0, 1, 1, 1, false); }
   return g;
 }
+// ---- the dead and the half-beasts
+function wraith(c1 = '#1c2a30', c2 = '#0f171b', gl = '#6ff2e0') {
+  const g = new THREE.Group(), rb = mat(c1), rb2 = mat(c2), glow = mat(gl, 1), bone = mat('#d8d2b8'), r = S.limb * .8, sh = S.leg + S.torso + .25, R = S.head, W = S.sw * .9, y0 = .38;
+  A(g, lathe([[W * .25, y0], [W * 1.25, y0 + .2], [W * 1.0, sh * .6], [W * .82, sh * .72], [W * 1.15, sh * .9], [W * .9, sh * .99], [W * .4, sh * 1.03]]), rb, 0, 0, 0, 0, 0, 0, 1, 1, .82);
+  for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; tag(7, A(g, cone(W * .34, .5 + (i % 3) * .14, 4), i % 2 ? rb : rb2, Math.sin(a) * W * 1.0, y0 + .1, Math.cos(a) * W * .82, Math.PI, a, 0, 1, 1, .5)); }
+  for (let i = 0; i < 4; i++) tag(7, A(g, fac(new THREE.OctahedronGeometry(.05 - i * .008)), glow, Math.sin(i * 2.2) * W * .5, y0 - .08 - i * .07, Math.cos(i * 2.2) * W * .4, 0, 0, 0, 1, 1.8, 1));
+  A(g, box(r * .9, sh * .5, .03), rb2, 0, sh * .62, W * .86, -.1); for (let i = 0; i < 3; i++) A(g, tor(r * .6, r * .14), bone, 0, sh * (.5 + i * .12), W * (.95 - i * .03), -.1);
+  A(g, cone(W * 1.35, S.torso * .45, 8), rb2, 0, sh - S.torso * .1, 0, 0, 0, 0, 1, 1, .82);
+  const hs = armsOf(g, W, r, sh, rb, rb2, bone, { '-1': [-1.0, .55, -.6], '1': [-1.25, .4, -.5] });
+  for (const s of [-1, 1]) { A(hs[s], cyl(r * 1.0, r * 2.2, S.torso * .3, 6), rb, 0, S.torso * .14, 0); for (let i = -1; i <= 1; i++) A(hs[s], cone(r * .2, r * 1.6, 4), bone, i * r * .5, -r * 1.7, r * .3, Math.PI - .35); }
+  const Hd = tag(5, J(g, 0, sh + R * 1.0, 0, .18, 0, 0)); A(Hd, sph(R * .92), mat('#05080a'), 0, 0, R * .06);
+  for (const s of [-1, 1]) A(Hd, sph(R * .14), glow, s * R * .34, R * .12, R * .9, 0, 0, s * .5, 1.5, .6, .5); A(Hd, sph(R * .1), glow, 0, -R * .4, R * .86, 0, 0, 0, 1.6, .4, .5);
+  A(Hd, dome(R * 1.32, .62), rb2, 0, R * .26, -R * .18, -.4); A(Hd, cone(R * .5, R * 1.3, 6), rb2, 0, R * 1.0, -R * 1.3, -1.9);
+  return g;
+}
+function harpy() {
+  const g = new THREE.Group(), fe = mat('#6a5a7a'), fe2 = mat('#3f344a'), bel = mat('#b8a8a0'), tal = mat('#e6dcc2'), yel = mat('#e0a030'), sk = '#9aa08a', r = S.limb * .8, hip = S.leg * .86, R = S.head * .95, W = S.sw * .9;
+  for (const s of [-1, 1]) { const L = tag(s > 0 ? 2 : 1, J(g, s * W * .5, hip, 0, -.5, 0, s * .1)), Kn = tag(s > 0 ? 12 : 11, J(L, 0, -S.leg * .42, 0, 1.0, 0, 0));
+    A(L, sph(r * 1.6), fe, 0, -S.leg * .16, 0, 0, 0, 0, 1, 1.6, 1.1); A(Kn, cyl(r * .5, r * .4, S.leg * .5, 6), yel, 0, -S.leg * .24, 0);
+    for (let i = -1; i <= 1; i++) { A(Kn, cone(r * .32, r * 2.4, 5), yel, i * r * .8, -S.leg * .5, r * 1.0, Math.PI / 2 - .5, 0, -i * .45); A(Kn, cone(r * .2, r * .9, 4), tal, i * r * 1.3, -S.leg * .56, r * 2.1, Math.PI / 2, 0, -i * .45); } A(Kn, cone(r * .28, r * 1.6, 5), yel, 0, -S.leg * .46, -r * .7, -Math.PI / 2 - .5); }
+  const Bd = J(g, 0, hip, 0, .4, 0, 0);
+  A(Bd, lathe([[.02, -.14], [W * .9, 0], [W * 1.2, S.torso * .4], [W * 1.0, S.torso * .8], [W * .4, S.torso * 1.06]]), fe, 0, 0, 0, 0, 0, 0, 1, 1, .86); A(Bd, sph(W * .8), bel, 0, S.torso * .42, W * .46, 0, 0, 0, .9, 1.3, .7);
+  for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; A(Bd, cone(W * .26, S.torso * .5, 4), i % 2 ? fe2 : fe, Math.sin(a) * W * .55, S.torso * .95, Math.cos(a) * W * .5, Math.PI + Math.cos(a) * .5, 0, -Math.sin(a) * .5, 1, 1, .5); }
+  const Tl = tag(6, J(Bd, 0, S.torso * .12, -W * .8, -1.9, 0, 0)); for (let i = -2; i <= 2; i++) A(Tl, ext([[-.5, 0], [.5, 0], [.35, 1], [0, 1.25], [-.35, 1]], .03, .01), i % 2 ? fe : fe2, i * W * .22, 0, 0, 0, 0, -i * .22, W * .4, S.torso * (1.3 - Math.abs(i) * .15), 1);
+  for (const s of [-1, 1]) { const Wg = tag(s > 0 ? 28 : 29, J(Bd, s * W * .95, S.torso * .86, -W * .1, 0, s * .25, s * .35));
+    A(Wg, cyl(r * .7, r * .45, W * 2.6, 6), fe2, s * W * 1.3, 0, 0, 0, 0, s * Math.PI / 2); A(Wg, cone(r * .3, r * 1.6, 4), tal, s * W * 2.7, r * .4, 0, 0, 0, -s * 1.0);
+    for (let i = 0; i < 7; i++) A(Wg, ext([[-.5, 0], [.5, 0], [.34, -1], [0, -1.22], [-.34, -1]], .03, .01), i % 2 ? fe : fe2, s * W * (.25 + i * .38), -r * .2, -.01 * i, .12, 0, s * i * .1, W * .46, S.torso * (1.55 - i * .1), 1); }
+  A(Bd, cyl(R * .34, R * .42, R * .7, 6), mat(sk), 0, S.torso * 1.12, W * .16, .4);
+  const Hd = tag(5, J(Bd, 0, S.torso * 1.3 + R * .5, W * .36, -.3, .15, 0)); face(Hd, R, { skin: sk, iris: '#e0a030', hair: '#3f344a', brow: -.36, mouth: 'stern', jaw: .9 });
+  A(Hd, cone(R * .36, R * 1.2, 5), yel, 0, -R * .2, R * 1.25, Math.PI / 2 + .35, 0, 0, 1, 1, .8); A(Hd, cone(R * .26, R * .7, 5), mat('#b07818'), 0, -R * .6, R * 1.0, Math.PI / 2 + .1, 0, 0, 1, 1, .6);
+  for (const s of [-1, 1]) A(Hd, sph(R * .07), mat('#ffe27a', 1), s * R * .36 - R * .02, R * .23, R * .9, 0, 0, 0, 1, 1, .5);
+  for (let i = -2; i <= 2; i++) A(Hd, cone(R * .22, R * (1.5 - Math.abs(i) * .2), 4), i % 2 ? fe : fe2, i * R * .36, R * .95, -R * .5, -.9, 0, -i * .25, 1, 1, .4);
+  return g;
+}
+// The three looks of a class: look 0 is the model as designed; looks 1 and 2 swap its colours for a themed set.
+export const LOOKS = {
+  bulwark: [null, { '#b9c4d6': '#b89a66', '#74809a': '#6a5636', '#b8241c': '#2f6a3a', '#5c3b22': '#3a2a18' }, { '#b9c4d6': '#4c5160', '#74809a': '#2a2d38', '#b8241c': '#5a2a8a', '#e8bd4c': '#c9d2de', '#dfe6f0': '#b9a6ff' }],
+  elem: [null, { '#3d57c4': '#b03a1e', '#27398c': '#6a1e12', '#b8241c': '#e8bd4c', '#7fe9ff': '#ffb347', '#2aa7d8': '#d8541a', '#ffb347': '#7fe9ff', '#ff7a2a': '#2aa7d8' }, { '#3d57c4': '#3a2a5a', '#27398c': '#201636', '#e8bd4c': '#c9d2de', '#b8241c': '#1f8f8a', '#7fe9ff': '#e0a8ff', '#2aa7d8': '#8a4ad8', '#ffb347': '#b6ff3a', '#ff7a2a': '#55a82e' }],
+};
 const SKIN = ['#e6b48c', '#c8946a', '#8a5a3a', '#f0c8a4'], ORC = '#7a9a4a', DROWN = '#8fb8b0', GH = '#9aa890';
 const F = o => () => folk(o);
 export const FOLK = {
@@ -500,6 +539,7 @@ export const FOLK = {
   brute: [F({ c1: '#5c3b22', legs: '#4a3a2a', skin: ORC, bareArms: 1, tusks: 1.2, hat: 'horned', hatC: '#74809a', pauld: 1.3, spikes: 1, right: 'axe', weapK: 1.3, brow: -.34, jaw: 1.25, wide: 1.15, noseC: '#6a8a3e', hair: '#1a1210' }), 1.15],
   shaman: [F({ c1: '#6a4a2a', skin: ORC, bare: 1, skirt: .5, tusks: 1, hat: 'feathers', hatC: '#b8241c', hatT: '#e8bd4c', right: 'staff', mantle: '#8a7a66', brow: -.2, jaw: 1.15, hairStyle: 'bald', noseC: '#6a8a3e', glowEyes: '#ffb03a' }), 1.12],
   troll: [F({ c1: '#5a4a3a', skin: '#7a8f9a', bare: 1, bareLegs: 1, skirt: .34, tusks: 1.7, bigNose: 1, ears: 1, hairStyle: 'bald', right: 'club', weapK: 1.5, brow: -.3, jaw: 1.3, wide: 1.25, thin: 1.25, belly: 1.15, noseC: '#687c86' }), 1.5],
+  wraith: [() => wraith()], ghost: [() => wraith('#8aa8b8', '#5f7f90', '#e8fdff')], harpy: [harpy], harpynamed: [harpy, 1.2],
   abom: [F({ c1: '#6a3a3a', skin: '#a8a488', bare: 1, bareLegs: 1, skirt: .3, belly: 1.5, apron: '#7a2a2a', stitch: 1, hairStyle: 'bald', right: 'axe', weapK: 1.4, brow: -.2, jaw: 1.3, wide: 1.2, thin: 1.3, glowEyes: '#b6ff3a', mouth: 'grin' }), 1.38],
 };
 export const CLASSES = { bulwark: knight, elem: wizard, archer, knifeshade: rogue, cleric, bladewarden, warlock, druid, wardancer, monk, aegis, lifebinder, blightblade, bard, binder, illusionist };
