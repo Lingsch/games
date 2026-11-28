@@ -2,10 +2,11 @@
 // Each game loads this from its own art/art.js and hands over its engine modules, so nothing here imports game files.
 import { initRig } from './rig.js';
 import { initCreatures } from './creatures.js';
+import { initClasses } from './classes.js';
 import { initLight } from './light.js';
 import { initFx } from './fx.js';
 import { initUi } from './ui.js';
-export const ART_VERSION = '3';
+export const ART_VERSION = '4';
 export function initArt(G) {
   const { SET } = G;
   if (SET.art === undefined) SET.art = 1;
@@ -19,7 +20,7 @@ export function initArt(G) {
   }, 1000);
   G.base = new URL('.', import.meta.url).href; G.version = ART_VERSION;
   const parts = [];
-  for (const [name, init] of [['light', initLight], ['fx', initFx], ['ui', initUi], ['rig', initRig], ['creatures', initCreatures]]) {
+  for (const [name, init] of [['light', initLight], ['fx', initFx], ['ui', initUi], ['rig', initRig], ['creatures', initCreatures], ['classes', initClasses]]) {
     try { parts.push(init(G)); } catch (e) { console.warn('art: ' + name + ' failed to start', e); }
   }
   let on = null;
