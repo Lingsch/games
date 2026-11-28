@@ -57,6 +57,14 @@ import './vm13.js';
 import './vf13.js';
 import './vt13.js';
 import './craft13.js';
+import './l14.js';
+import './lr14.js';
+import './dh14.js';
+import './sf14.js';
+import './mf14.js';
+import './gl14.js';
+import './fill14.js';
+import './craft14.js';
 import './hard11.js';
 import './script13.js';
 import './spells14.js';
@@ -187,6 +195,7 @@ function draw() {
     if (!e.isHero) { const sc = e.scale || 1; cullS.center.set(e.x, e.y + 1.2 * sc, e.z); cullS.radius = 2.5 * sc + 5; if (!frus.intersectsSphere(cullS)) { e.rx = undefined; continue; } }
     let y = e.y, rotX = 0;
     if (e.mob) { const M = MOBS[e.mob]; if (M.fly && !e.dead) y += M.fly + Math.sin(R.uTime.value * 3 + e.id) * .15; }
+    if (world.swimBob && !e.dead && !e.prop) y += .55 + Math.sin(R.uTime.value * 1.6 + e.id) * .22;   // Build 14: under the Dusk Sea everyone swims
     if (e.dead && !e.corpse) { const f = Math.min(1, (S.time - e.deadT) * 3); rotX = -Math.PI / 2 * f; y += .2 * f; }
     if (e.isHero || e.rx === undefined || Math.abs(e.x - e.rx) + Math.abs(e.z - e.rz) > 4) { e.rx = e.x; e.rz = e.z; e.ryaw = e.yaw; }
     else { const k = Math.min(1, drawDt * 14); e.rx += (e.x - e.rx) * k; e.rz += (e.z - e.rz) * k; e.ryaw += wrapA(e.yaw - e.ryaw) * Math.min(1, drawDt * 12); }
@@ -231,7 +240,7 @@ function loop() {
     moveHero(dt, inp);
     const tq0 = performance.now(); Game.tick(dt); PF.tick += performance.now() - tq0;
     camera(dt);
-    dayNight(S.time); for (const f of X.light) f(dt); ruinGloom(S.hero);
+    dayNight(S.time); for (const f of X.light) f(dt); ruinGloom(S.hero); for (const f of X.lightLate || []) f(dt);
     if (world.water !== null) updateWater(now / 1000);
   } else {
     const t = now / 1000;

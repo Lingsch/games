@@ -19,6 +19,13 @@ const LANDS = {
   xm13: { tint: '#dcdcff', lift: '#08061c', sat: .98, con: 1.18, cloud: .85, bloom: .85 },
   xf13: { tint: '#e0f0ff', lift: '#081428', sat: .98, cloud: .65, bloom: .65 },
   xt13: { tint: '#ffe2c8', lift: '#1a0806', sat: 1.14, con: 1.16, cloud: .6, bloom: .8 },
+  // Build 14: the Lamplighters' road. The Reach is kept dark on purpose: low exposure, little character self-light,
+  // so your lamp and the wayshrines are the only real light. The others are the sea, the crash and the Forge.
+  lr14: { exp: .62, fill: .7, char: .12, tint: '#ffe8cc', lift: '#000000', sat: .9, con: 1.22, cloud: 0, bloom: 1.05 },
+  dh14: { tint: '#d0f0ff', lift: '#021420', sat: 1.12, con: 1.1, cloud: 0, bloom: .9 },
+  sf14: { tint: '#eae6ff', lift: '#0a0418', sat: 1.16, con: 1.14, cloud: .3, bloom: .95 },
+  mf14: { tint: '#e8f6ff', lift: '#040c18', sat: 1.06, con: 1.18, cloud: .2, bloom: 1 },
+  gl14: { tint: '#fff2d8', lift: '#100804', sat: 1.12, con: 1.12, cloud: .45, bloom: .9 },
 };
 let INST = null;
 function landOf(zone) {
@@ -44,6 +51,11 @@ const AIR = {
   xm13: { col: [.55, .45, 1], rate: 6, size: .2, vel: [0, .12, 0], life: 6, glow: 1, low: 5 },
   xf13: { col: [1, 1, 1], rate: 40, size: .13, vel: [1.6, -1.8, .5], life: 6 },
   xt13: { col: [1, .55, .2], rate: 10, size: .18, vel: [.1, 1, 0], life: 4, glow: 1, low: 4 },
+  lr14: { col: [1, .7, .35], rate: 3, size: .1, vel: [0, .05, 0], life: 5, glow: 1, low: 3 },                // a few motes of stolen light
+  dh14: { col: [.7, .95, 1], rate: 10, size: .14, vel: [0, .6, 0], life: 4, glow: 1, low: 6 },
+  sf14: { col: [.8, .5, 1], rate: 8, size: .14, vel: [0, .25, 0], life: 5, glow: 1, low: 6 },               // star-dust off the wreck
+  mf14: { col: [.4, 1, 1], rate: 9, size: .12, vel: [.3, .4, 0], life: 3.5, glow: 1, low: 5 },             // sparks from the Forge
+  gl14: { col: [1, .9, .55], rate: 6, size: .15, vel: [0, .4, 0], life: 5, glow: 1, low: 6 },
 };
 const FIREFLY = { col: [.75, 1, .35], rate: 7, size: .2, vel: [0, .05, 0], life: 4, glow: 1, low: 2.5 };
 const CAVE = { col: [.8, .75, .6], rate: 4, size: .1, vel: [0, .05, 0], life: 6, glow: 1, low: 4 };

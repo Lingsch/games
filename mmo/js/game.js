@@ -361,6 +361,7 @@ export function inspect(e) {
     if (p.tag === 'grave') chat('sys', null, pick(['The earth is heaped outward. Whatever left this grave dug its way up.', 'Claw marks on the inside of the coffin lid. Lots of them.', 'Footprints lead out of the grave and north. Bare feet. Very bony feet.']));
     if (p.tag === 'headstone') { chat('sys', null, 'You heave the headstone upright.'); e.kind = 'shrine'; e.remove = true; e.dead = true; }
     if (p.tag === 'bell') { chat('sys', null, 'BONNNG. The bell rings out over Hollin... and something in the fields answers.'); R.burst(e.x, e.y + 2, e.z, 30, [1, .9, .5], 3, 1, .6); for (let k = 0; k < 2; k++) { const g = Cb.makeMob('ghost', irnd(4, 5), { x: e.x + rnd(-9, 9), z: e.z + rnd(-9, 9), home: { x: e.x, z: e.z }, add: true }); g.y = hgt(g.x, g.z); Cb.addThreat(g, h, 5); } }
+    if (X.inspectSay?.[p.tag]) chat('sys', null, pick(X.inspectSay[p.tag]));   // Build 14: what you find, said by the land that owns the prop
     if (p.tag === 'wardstone') { chat('sys', null, 'The runes flare blue. The stone hums, faintly approving.'); R.burst(e.x, e.y + 1.5, e.z, 30, [.5, .8, 1], 2.5, 1, .6); }
     if (st.n >= q.obj.n) { st.state = 'done'; chat('sys', null, `${q.name}: done! Return to ${GIVERS[q.turnTo || q.giver].name}.`); Banter.onQuest('done', q); }
   }

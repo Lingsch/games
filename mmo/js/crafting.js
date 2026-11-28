@@ -179,17 +179,17 @@ export function useCons(k) {
 // ---------- gathering from what enemies leave behind ----------
 export function mobMats(m) {
   initState();
-  const D = MOBS[m.mob] || {}, L = m.lvl, tier = L < 6 ? 0 : L < 11 ? 1 : L < 20 ? 2 : L < 26 ? 3 : L < 31 ? 4 : 5, got = [];
+  const D = MOBS[m.mob] || {}, L = m.lvl, tier = L < 6 ? 0 : L < 11 ? 1 : L < 20 ? 2 : L < 26 ? 3 : L < 31 ? 4 : L < 36 || !MATS.duskhide ? 5 : 6, got = [];
   if (D.beast) {
     if (Math.random() < .45) got.push([m.mob === 'crab' || m.mob === 'crabbig' ? 'crabmeat' : 'meat', 1]);
     const sk = skill('skinning') !== null ? null : friendWith('gather', 'skinning'), sv = skill('skinning', sk);
-    if (sv !== null) { const h = ['lighthide', 'thickhide', 'scalehide', 'wyrmhide', 'stormhide', 'gloomhide'][tier], req = [1, 40, 75, 100, 125, 150][tier]; if (sv >= req) { got.push([h, irnd(1, 2)]); skillUp('skinning', req, sk); } }
+    if (sv !== null) { const h = ['lighthide', 'thickhide', 'scalehide', 'wyrmhide', 'stormhide', 'gloomhide', 'duskhide'][tier], req = [1, 40, 75, 100, 125, 150, 175][tier]; if (sv >= req) { got.push([h, irnd(1, 2)]); skillUp('skinning', req, sk); } }
   }
   if (m.mob === 'crab' || m.mob === 'crabbig') { if (Math.random() < .5) got.push(['crabmeat', 1]); }
-  if (D.human && Math.random() < .35) got.push([['linen', 'wool', 'seasilk', 'moonweave', 'starweave', 'lampsilk'][tier], irnd(1, 2)]);
+  if (D.human && Math.random() < .35) got.push([['linen', 'wool', 'seasilk', 'moonweave', 'starweave', 'lampsilk', 'wickweave'][tier], irnd(1, 2)]);
   if (D.undead && Math.random() < .3) got.push(['bonedust', 1]);
-  if (D.ore && Math.random() < .6) got.push([tier < 2 ? 'iron' : tier < 3 ? 'silver' : tier < 4 ? 'starsteel' : tier < 5 ? 'skysilver' : 'voidiron', irnd(1, 2)]);
-  if (m.named && Math.random() < .5) got.push([['garnet', 'moonstone', 'pearl', 'starstone', 'heartstar', 'lampheart'][tier], 1]);
+  if (D.ore && Math.random() < .6) got.push([tier < 2 ? 'iron' : tier < 3 ? 'silver' : tier < 4 ? 'starsteel' : tier < 5 ? 'skysilver' : tier < 6 ? 'voidiron' : 'lumenite', irnd(1, 2)]);
+  if (m.named && Math.random() < .5) got.push([['garnet', 'moonstone', 'pearl', 'starstone', 'heartstar', 'lampheart', 'curtainshard'][tier], 1]);
   for (const [k, n] of got) addMat(k, n, true);
   if (got.length) chat('loot', null, `You gather ${got.map(([k, n]) => `${n} ${MATS[k].name}`).join(', ')}.`);
 }
