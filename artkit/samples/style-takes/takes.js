@@ -89,7 +89,7 @@ function knight() {
       A(B, box(k * .12, k * 1.0, .03), gold, 0, -k * .03, .045); A(B, box(k * .8, k * .12, .03), gold, 0, k * .2, .045); A(B, sph(k * .12), gold, 0, k * .2, .05, 0, 0, 0, 1, 1, .5); }
   }
   A(g, cyl(R * .5, R * .62, R * .5), sd, 0, sh + R * .1, 0); A(g, cyl(R * .4, R * .44, R * .5), mat('#d9a47c'), 0, sh + R * .45, 0);                                    // gorget
-  const Hd = J(g, 0, sh + R * 1.3, 0, .04, -.18, 0); face(Hd, R, { skin: '#d9a47c', iris: '#3f7fd0', hair: '#4a2e18', brow: .24, mouth: 'smirk', jaw: 1.18, stubble: '#b88a68', scar: 1 });
+  const Hd = J(g, 0, sh + R * 1.3, 0, .04, -.18, 0); face(Hd, R, { skin: '#d9a47c', iris: '#3f7fd0', hair: '#4a2e18', brow: -.2, mouth: 'smirk', jaw: 1.18, stubble: '#b88a68', scar: 1 });
   A(Hd, dome(R * 1.1, .5), st, 0, R * .5, -R * .04, -.1); A(Hd, tor(R * 1.07, R * .08), gold, 0, R * .58, -R * .06, Math.PI / 2 - .1, 0, 0);
   for (const s of [-1, 1]) A(Hd, ext([[-.5, .5], [.5, .5], [.4, -.5], [-.1, -.8]], .1, .03), st, s * R * 1.02, -R * .2, R * .12, 0, s * 1.35, 0, R * .7, R * .9, R);
   A(Hd, box(R * .11, R * .42, R * .08), st, 0, R * .5, R * 1.0, -.1);
