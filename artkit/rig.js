@@ -296,5 +296,6 @@ export function initRig(G) {
     v = !!v; if (v === on) return; on = v; cancelAnimationFrame(raf);
     if (v) { live = G.quality() !== 'low'; all(live); tick(); } else all(false);
   }
+  G.rigAdopt = K => { K.artRig = { old: K.mesh.geometry, geo: K.mesh.geometry }; setRig(K, on && live ? 1 : 0); };   // a kind built by the art layer itself
   return { setOn, rigKind, person, split };
 }
