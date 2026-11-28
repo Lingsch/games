@@ -586,7 +586,7 @@ export const FOLK = {
   abom: [F({ c1: '#6a3a3a', skin: '#a8a488', bare: 1, bareLegs: 1, skirt: .3, belly: 1.5, apron: '#7a2a2a', stitch: 1, hairStyle: 'bald', right: 'axe', weapK: 1.4, brow: -.2, jaw: 1.3, wide: 1.2, thin: 1.3, glowEyes: '#b6ff3a', mouth: 'grin' }), 1.38],
 };
 export const CLASSES = { bulwark: knight, elem: wizard, archer, knifeshade: rogue, cleric, bladewarden, warlock, druid, wardancer, monk, aegis, lifebinder, blightblade, bard, binder, illusionist };
-export { THREE, wolf, uLine };
+export { THREE, wolf, uLine, A, J, tag, mat, shade, sph, cyl, cone, cap, box, tor, lathe, dome, ext, fac };
 
 // One geometry for the game engine: position, normal, colour, and for every vertex which joint moves it and where that joint is.
 // Parts: 0 body, 1/2 thighs, 11/12 shins, 3/4 upper arms, 13/14 forearms and whatever they hold, 5 head, 15 cloak.
@@ -599,7 +599,7 @@ export function bake(root, k = 1.1) {
     let part = 0, pv = [0, 0, 0], p2 = null;
     if (o.userData.part !== undefined) { part = o.userData.part; pv = at(o); }
     else for (let a = o.parent, found = 0; a && a !== root.parent; a = a.parent) { const t = a.userData.part; if (t === undefined) continue;
-      if (!found) { found = 1; part = t; if (t > 10 && t < 15) p2 = at(a); else { pv = at(a); break; } } else { pv = at(a); break; } }
+      if (!found) { found = 1; part = t; if ((t > 10 && t < 15) || t === 27 || (t > 30 && t < 35)) p2 = at(a); else { pv = at(a); break; } } else { pv = at(a); break; } }
     if (!p2) p2 = pv;
     const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry, P = g.attributes.position, N = g.attributes.normal, c = o.material.color, glow = o.material.isMeshBasicMaterial ? 1.4 : (S.ghost ? .5 : 0);
     nm.getNormalMatrix(o.matrixWorld);
