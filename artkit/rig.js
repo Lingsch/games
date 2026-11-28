@@ -275,12 +275,25 @@ export function initRig(G) {
     for (const m of [K.mesh.material, K.ol.material]) { patch(m); m.userData.rigOn = v ? 1 : 0; m.needsUpdate = true; }
     K.artSh = 0;                  // the lighting module rebuilds this model's shadow material to match
   }
+  // Area versions. The game makes a kind named <kind>~<look> (ashen, spectral, gilded, verdant) by copying the plain kind's
+  // model as it stands and tinting it. Here such a kind is rebuilt from the plain kind's own model, so it gets the same
+  // new model as the plain one, in the area's colours (the people in classes.js add pieces of their own on top).
+  const TINT = { ashen: [.55, .55, .55, .4], spectral: [.55, .8, 1, .65], gilded: [1, .82, .35, .6], verdant: [.4, .9, .45, .55] };   // as in mmo/js/comp9.js
+  G.rigTint = (g, look, k = 1) => {
+    const tn = TINT[look]; if (!tn) return g; const c = g.attributes.color, gl = g.attributes.glow, w = tn[3] * k;
+    for (let i = 0; i < c.count; i++) { if (gl && gl.getX(i) > 0) continue; const l = (c.getX(i) + c.getY(i) + c.getZ(i)) / 3 * 1.6 * w;
+      c.setXYZ(i, c.getX(i) * (1 - w) + tn[0] * l, c.getY(i) * (1 - w) + tn[1] * l, c.getZ(i) * (1 - w) + tn[2] * l); }
+    c.needsUpdate = true; return g; };
   function rigKind(K, k) {
-    const old = K.mesh.geometry; K.artRig = { old };
+    let old = K.mesh.geometry; K.artRig = { old };
     if (old.index || !old.attributes.part || !old.attributes.aAnim) { K.artRig.skip = 1; return; }
+    const vm = /^(.+)~([a-z]+)$/.exec(k), Bk = vm && TINT[vm[2]] ? R.kinds[vm[1]] : null; let src = old, name = k, look = null;
+    if (Bk) { if (!Bk.artRig) rigKind(Bk, vm[1]); name = vm[1]; look = vm[2]; src = Bk.artRig.old;
+      if (src.attributes.part && !src.index) { const o2 = G.rigTint(src.clone(), look); o2.setAttribute('aAnim', old.attributes.aAnim); old = K.artRig.old = o2; } }
     let geo = null;
-    for (const plan of plans) { try { geo = plan(old, k, K); } catch (e) { console.warn('art: model', k, e); } if (geo) break; }
-    if (!geo) { K.artRig.skip = 1; return; }
+    for (const plan of plans) { try { geo = plan(src, name, K, look); } catch (e) { console.warn('art: model', k, e); } if (geo) break; }
+    if (!geo) { K.artRig.skip = 1; if (look) { K.mesh.geometry = old; K.ol.geometry = old; } return; }
+    if (look && !geo.userData.look) G.rigTint(geo, look);
     geo.setAttribute('aAnim', old.attributes.aAnim); K.artRig.geo = geo; setRig(K, 1);
   }
   // On Graphics: Low (chosen, or stepped down to because the frame rate stayed low) the games' lighter models are used.
